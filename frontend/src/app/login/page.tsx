@@ -74,7 +74,9 @@ export default function LoginPage() {
     setIsTyping(true);
     
     // تحديث حالة الكتابة فقط
-    clearTimeout(typingTimeout.current);
+    if (typingTimeout.current) {
+      clearTimeout(typingTimeout.current);
+    }
     typingTimeout.current = setTimeout(() => setIsTyping(false), 500);
   };
 
