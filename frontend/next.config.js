@@ -24,7 +24,6 @@ const nextConfig = {
     optimizeCss: false, // تعطيل مؤقتاً لحل مشاكل التحميل
     scrollRestoration: true,
     optimizePackageImports: ['react-icons'],
-    serverActions: true,
   },
   webpack: (config, { isServer }) => {
     // حل مشاكل الـ chunks
