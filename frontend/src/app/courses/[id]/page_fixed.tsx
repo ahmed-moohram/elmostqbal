@@ -186,7 +186,7 @@ function CoursePage() {
         <div className="bg-white rounded-lg p-6 shadow">
           <h3 className="text-xl font-semibold mb-4">المتطلبات</h3>
           <ul className="space-y-2">
-            {course.requirements.map((req, index) => (
+            {course.requirements?.map((req, index) => (
               <li key={index} className="flex items-center gap-2">
                 <span className="text-blue-500">•</span>
                 {req}
@@ -197,7 +197,7 @@ function CoursePage() {
         <div className="bg-white rounded-lg p-6 shadow">
           <h3 className="text-xl font-semibold mb-4">المميزات</h3>
           <ul className="space-y-2">
-            {course.features.map((feat, index) => (
+            {course.features?.map((feat, index) => (
               <li key={index} className="flex items-center gap-2">
                 <span className="text-blue-500">•</span>
                 {feat}
@@ -211,7 +211,7 @@ function CoursePage() {
       <div className="bg-white rounded-lg p-6 shadow">
         <h3 className="text-xl font-semibold mb-4">الدروس</h3>
         <div className="space-y-4">
-          {course.lessons.map((lesson) => (
+          {course.lessons?.map((lesson) => (
             <div
               key={lesson.id}
               className={`p-4 rounded-lg cursor-pointer ${
