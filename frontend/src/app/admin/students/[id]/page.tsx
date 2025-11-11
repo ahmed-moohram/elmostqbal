@@ -11,7 +11,7 @@ import {
 
 export default function StudentDetailsPage() {
   const params = useParams();
-  const studentId = params.id;
+  const studentId = params?.id as string;
   const [student, setStudent] = useState<any>(null);
   const [achievements, setAchievements] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);

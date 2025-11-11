@@ -21,7 +21,7 @@ function CoursePage() {
   const router = useRouter();
   const params = useParams();
   // استخدام معرف الدورة كنص لضمان التوافق مع واجهة API
-  const courseId = params.id as string;
+  const courseId = params?.id as string;
 
   const [course, setCourse] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);

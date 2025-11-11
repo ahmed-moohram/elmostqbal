@@ -22,12 +22,11 @@ interface Course {
 export default function CourseCheckout() {
   const params = useParams();
   const router = useRouter();
+  const courseId = params?.id as string;
   const [course, setCourse] = useState<Course | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [paymentStep, setPaymentStep] = useState<'summary' | 'payment' | 'confirmation'>('summary');
-
-  const courseId = Number(params.id);
 
   // استرداد معلومات الكورس
   useEffect(() => {

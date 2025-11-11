@@ -203,7 +203,7 @@ const mockCourse: Course = {
 
 export default function CourseLearnPage() {
   const params = useParams();
-  const courseId = params.id as string;
+  const courseId = params?.id as string;
   const router = useRouter();
   
   // State variables

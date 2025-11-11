@@ -19,7 +19,7 @@ interface CourseDetails {
 export default function PaymentPage() {
   const params = useParams();
   const router = useRouter();
-  const courseId = Number(params.id);
+  const courseId = Number(params?.id);
   
   const [course, setCourse] = useState<CourseDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
