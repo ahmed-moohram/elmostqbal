@@ -6,7 +6,7 @@ import AdminLayout from '@/components/AdminLayout';
 import { FaUsers, FaSearch, FaUserGraduate, FaChalkboardTeacher, FaCog } from 'react-icons/fa';
 
 export default function UsersPage() {
-  const [users, setUsers] = useState([]);
+  const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
 

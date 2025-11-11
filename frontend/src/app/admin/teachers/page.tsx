@@ -88,7 +88,7 @@ const ignoredMockTeachers = [
 ];
 
 export default function TeachersManagement() {
-  const [teachers, setTeachers] = useState([]);
+  const [teachers, setTeachers] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterSpecialty, setFilterSpecialty] = useState('');
   const [sortField, setSortField] = useState('name');
