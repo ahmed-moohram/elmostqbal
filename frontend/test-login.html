@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>اختبار تسجيل الدخول</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            width: 400px;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #555;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 18px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background: #5a67d8;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            display: none;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+            margin-top: 20px;
+        }
+        pre {
+            background: #f4f4f4;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 اختبار تسجيل الدخول</h1>
+        
+        <div class="info">
+            <h3>مستخدمين تجريبيين:</h3>
+            <p><strong>مستخدم 1:</strong></p>
+            <ul>
+                <li>الهاتف: 01234567890</li>
+                <li>كلمة المرور: 12345678</li>
+            </ul>
+            <p><strong>مستخدم 2:</strong></p>
+            <ul>
+                <li>الهاتف: 01111111111</li>
+                <li>كلمة المرور: password123</li>
+            </ul>
+        </div>
+        
+        <form id="loginForm">
+            <div class="form-group">
+                <label for="phone">رقم الهاتف:</label>
+                <input type="text" id="phone" name="phone" required value="01234567890">
+            </div>
+            
+            <div class="form-group">
+                <label for="password">كلمة المرور:</label>
+                <input type="password" id="password" name="password" required value="12345678">
+            </div>
+            
+            <button type="submit">تسجيل الدخول</button>
+        </form>
+        
+        <div id="result" class="result"></div>
+        
+        <div style="margin-top: 20px;">
+            <h3>سجل التصحيح:</h3>
+            <pre id="log"></pre>
+        </div>
+    </div>
+
+    <script type="module">
+        const log = (message) => {
+            const logEl = document.getElementById('log');
+            logEl.textContent += message + '\n';
+            console.log(message);
+        };
+
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const phone = document.getElementById('phone').value;
+            const password = document.getElementById('password').value;
+            const resultDiv = document.getElementById('result');
+            
+            // مسح السجل السابق
+            document.getElementById('log').textContent = '';
+            
+            try {
+                log('🔄 الاتصال بـ Supabase...');
+                
+                // استيراد Supabase
+                const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
+                
+                const SUPABASE_URL = 'https://wnqifmvgvlmxgswhcwnc.supabase.co';
+                const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InducWlmbXZndmxteGdzd2hjd25jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI0MzYwNTUsImV4cCI6MjA3ODAxMjA1NX0.LqWhTZYmr7nu-dIy2uBBqntOxoWM-waluYIR9bipC9M';
+                
+                const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+                
+                log(`🔍 البحث عن المستخدم برقم: ${phone}`);
+                
+                // البحث عن المستخدم
+                const { data: user, error } = await supabase
+                    .from('users')
+                    .select('*')
+                    .or(`phone.eq.${phone},email.eq.${phone}`)
+                    .single();
+                
+                log(`📊 نتيجة البحث: ${JSON.stringify({ user, error }, null, 2)}`);
+                
+                if (error || !user) {
+                    throw new Error('المستخدم غير موجود');
+                }
+                
+                // تشفير كلمة المرور
+                const encodedPassword = btoa(password);
+                
+                log(`🔐 مقارنة كلمة المرور:`);
+                log(`   - المدخلة: ${password}`);
+                log(`   - المدخلة (مشفرة): ${encodedPassword}`);
+                log(`   - المحفوظة: ${user.password}`);
+                log(`   - التطابق: ${user.password === encodedPassword}`);
+                
+                if (user.password !== encodedPassword) {
+                    throw new Error('كلمة المرور غير صحيحة');
+                }
+                
+                // نجاح تسجيل الدخول
+                resultDiv.className = 'result success';
+                resultDiv.style.display = 'block';
+                resultDiv.innerHTML = `
+                    <h3>✅ تسجيل الدخول نجح!</h3>
+                    <p>مرحباً ${user.name}</p>
+                    <p>الدور: ${user.role}</p>
+                `;
+                
+                log('✅ تسجيل الدخول نجح!');
+                
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.style.display = 'block';
+                resultDiv.innerHTML = `
+                    <h3>❌ فشل تسجيل الدخول</h3>
+                    <p>${error.message}</p>
+                `;
+                
+                log(`❌ خطأ: ${error.message}`);
+            }
+        });
+    </script>
+</body>
+</html>

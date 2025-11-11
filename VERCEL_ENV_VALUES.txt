@@ -1,0 +1,47 @@
+==========================================
+📋 قيم Environment Variables للنسخ واللصق
+==========================================
+
+انسخ هذه القيم والصقها في Vercel → Settings → Environment Variables
+
+==========================================
+المتغير 1:
+==========================================
+Name:
+NEXT_PUBLIC_SUPABASE_URL
+
+Value:
+https://wnqifmvgvlmxgswhcwnc.supabase.co
+
+Environments: اختر الكل (Production, Preview, Development)
+
+==========================================
+المتغير 2:
+==========================================
+Name:
+NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+Value:
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InducWlmbXZndmxteGdzd2hjd25jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI0MzYwNTUsImV4cCI6MjA3ODAxMjA1NX0.LqWhTZYmr7nu-dIy2uBBqntOxoWM-waluYIR9bipC9M
+
+Environments: اختر الكل (Production, Preview, Development)
+
+==========================================
+المتغير 3:
+==========================================
+Name:
+SUPABASE_SERVICE_ROLE_KEY
+
+Value:
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InducWlmbXZndmxteGdzd2hjd25jIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczMDgxMzI3MiwiZXhwIjoyMDQ2Mzg5MjcyfQ.UJa6LivB3H79x95cU8Y7Kt6YJqEpZNNCQ-Y7Hfcwxls
+
+Environments: اختر الكل (Production, Preview, Development)
+
+==========================================
+✅ بعد الإضافة:
+==========================================
+1. Save
+2. Deployments → Redeploy
+3. انتظر 3 دقائق
+4. افتح الموقع
+5. جرب التسجيل ✅
