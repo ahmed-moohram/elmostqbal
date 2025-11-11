@@ -158,7 +158,7 @@ export default function AdminCoursesPage() {
     setEditId(course._id);
     setEditTitle(course.title);
     setEditDescription(course.description);
-    setEditPrice(course.price);
+    setEditPrice(course.price ?? 0);
   };
 
   const handleSave = () => {
