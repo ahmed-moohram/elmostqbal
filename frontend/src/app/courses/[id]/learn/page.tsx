@@ -624,7 +624,7 @@ export default function CourseLearnPage() {
                 {/* مشغل الفيديو */}
                 <div className="aspect-video bg-black relative">
                   <VideoPlayer 
-                    src={currentLesson.videoUrl}
+                    src={currentLesson.videoUrl || ''}
                     courseId={courseId}
                     lessonId={currentLessonId}
                     savedTime={currentPosition}
