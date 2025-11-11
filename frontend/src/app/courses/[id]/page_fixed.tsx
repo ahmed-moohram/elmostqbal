@@ -20,7 +20,7 @@ function CoursePage() {
   const router = useRouter();
   const params = useParams();
   // تحويل معرف الدورة إلى نص للتوافق مع واجهة API
-  const courseId = params.id as string;
+  const courseId = params?.id as string;
 
   const [course, setCourse] = useState<Course | null>(null);
   const [isLoading, setIsLoading] = useState(true);
