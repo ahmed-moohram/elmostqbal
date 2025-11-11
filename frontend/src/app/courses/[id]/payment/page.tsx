@@ -236,7 +236,7 @@ export default function PaymentPage() {
       
       // حفظ في localStorage كـ backup
       const requestsStr = localStorage.getItem('enrollmentRequests');
-      let requests = [];
+      let requests: any[] = [];
       if (requestsStr) {
         try {
           requests = JSON.parse(requestsStr);

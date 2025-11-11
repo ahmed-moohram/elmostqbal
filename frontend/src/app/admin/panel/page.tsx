@@ -401,11 +401,11 @@ export default function AdminPanel() {
                 className="px-4 py-2 border rounded-lg focus:outline-none focus:border-purple-500"
               >
                 <option value="all">كل المواد</option>
-                {[...new Set([
+                {Array.from(new Set([
                   ...SUBJECTS_BY_GRADE.primary,
                   ...SUBJECTS_BY_GRADE.preparatory,
                   ...SUBJECTS_BY_GRADE.secondary
-                ])].map(subject => (
+                ])).map(subject => (
                   <option key={subject} value={subject}>{subject}</option>
                 ))}
               </select>

@@ -107,7 +107,7 @@ export default function SecuritySettingsPage() {
 
     // Load blocked IPs
     const blocked = mockLogs.filter(l => l.blocked).map(l => l.ip);
-    setBlockedIPs([...new Set(blocked)]);
+    setBlockedIPs(Array.from(new Set(blocked)));
   };
 
   const handleConfigChange = (key: keyof SecurityConfig, value: any) => {
