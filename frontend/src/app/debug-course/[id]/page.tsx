@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 
 export default function DebugCoursePage() {
   const params = useParams();
-  const courseId = params.id as string;
+  const courseId = params?.id as string;
   
   const [loading, setLoading] = useState(true);
   const [courseData, setCourseData] = useState<any>(null);

@@ -11,7 +11,7 @@ const supabase = createClient(
 
 export default function CourseDebugPage() {
   const params = useParams();
-  const courseId = params.id as string;
+  const courseId = params?.id as string;
   
   const [course, setCourse] = useState<any>(null);
   const [lessons, setLessons] = useState<any[]>([]);

@@ -24,7 +24,7 @@ interface Question {
 
 export default function QAPage() {
   const params = useParams();
-  const courseId = params.id as string;
+  const courseId = params?.id as string;
   
   const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(false);
