@@ -206,7 +206,7 @@ export default function ProfilePage() {
                 <div className="relative">
                   <div className="relative w-32 h-32">
                     <Image
-                      src={user.profileImage}
+                      src={user.profileImage || '/placeholder-avatar.png'}
                       alt={user.name}
                       fill
                       className="object-cover rounded-full border-4 border-primary"
@@ -350,7 +350,7 @@ export default function ProfilePage() {
                             <div className="md:flex items-center">
                               <div className="relative w-full md:w-32 h-24 md:h-20 mb-4 md:mb-0">
                                 <Image
-                                  src={course.image}
+                                  src={course.image || '/placeholder-course.png'}
                                   alt={course.title}
                                   fill
                                   className="object-cover rounded-lg"
@@ -393,7 +393,7 @@ export default function ProfilePage() {
                             <div className="md:flex items-center">
                               <div className="relative w-full md:w-32 h-24 md:h-20 mb-4 md:mb-0">
                                 <Image
-                                  src={course.image}
+                                  src={course.image || '/placeholder-course.png'}
                                   alt={course.title}
                                   fill
                                   className="object-cover rounded-lg"

@@ -121,7 +121,7 @@ function CoursePage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
         <div className="relative h-[400px] rounded-lg overflow-hidden">
           <Image
-            src={course.image}
+            src={course.image || '/placeholder-course.png'}
             alt={course.title}
             fill
             className="object-cover"
@@ -166,7 +166,7 @@ function CoursePage() {
         <div className="flex items-center gap-4 mb-4">
           <div className="w-16 h-16 rounded-full overflow-hidden">
             <Image
-              src={course.instructor.image}
+              src={course.instructor.image || '/placeholder-avatar.png'}
               alt={course.instructor.name}
               width={64}
               height={64}

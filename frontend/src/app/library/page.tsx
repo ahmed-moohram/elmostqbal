@@ -382,7 +382,7 @@ const LibraryPage = () => {
                   >
                     <div className="relative h-56 overflow-hidden">
                       <Image
-                        src={book.coverImage}
+                        src={book.coverImage || '/placeholder-book.png'}
                         alt={book.title}
                         fill
                         className="object-cover"

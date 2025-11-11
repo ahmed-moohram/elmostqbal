@@ -303,7 +303,7 @@ export default function TeachersManagement() {
                   <td className="px-4 py-3">
                     <div className="relative w-10 h-10 rounded-full overflow-hidden">
                       <Image 
-                        src={teacher.image} 
+                        src={teacher.image || '/placeholder-avatar.png'} 
                         alt={teacher.name}
                         fill
                         className="object-cover"
