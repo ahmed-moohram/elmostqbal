@@ -201,7 +201,7 @@ export default function AdminPage() {
     
     // تسجيل الاشتراك
     const enrolledCoursesStr = localStorage.getItem(`student_${studentPhone}_courses`);
-    let enrolledCourses = [];
+    let enrolledCourses: string[] = [];
     if (enrolledCoursesStr) {
       try {
         enrolledCourses = JSON.parse(enrolledCoursesStr);
@@ -250,7 +250,7 @@ export default function AdminPage() {
     
     // حفظ المدرس
     const teachersStr = localStorage.getItem('teachers');
-    let teachersList = [];
+    let teachersList: Teacher[] = [];
     if (teachersStr) {
       try {
         teachersList = JSON.parse(teachersStr);
