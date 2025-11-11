@@ -15,7 +15,8 @@ export default function CourseExamsPage() {
   const [answers, setAnswers] = useState<Record<string, any>>({});
   const [timeLeft, setTimeLeft] = useState(0);
   const router = useRouter();
-  const { id: courseId } = useParams();
+  const params = useParams();
+  const courseId = params?.id as string;
 
   // جلب الاختبارات للمادة
   useEffect(() => {
