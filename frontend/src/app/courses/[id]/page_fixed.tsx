@@ -166,19 +166,19 @@ function CoursePage() {
         <div className="flex items-center gap-4 mb-4">
           <div className="w-16 h-16 rounded-full overflow-hidden">
             <Image
-              src={course.instructor.image || '/placeholder-avatar.png'}
-              alt={course.instructor.name}
+              src={course.instructor?.image || '/placeholder-avatar.png'}
+              alt={course.instructor?.name || 'Instructor'}
               width={64}
               height={64}
               className="object-cover"
             />
           </div>
           <div>
-            <h3 className="font-semibold">{course.instructor.name}</h3>
-            <p className="text-gray-600">{course.instructor.title}</p>
+            <h3 className="font-semibold">{course.instructor?.name || 'Unknown Instructor'}</h3>
+            <p className="text-gray-600">{course.instructor?.title || ''}</p>
           </div>
         </div>
-        <p className="text-gray-600">{course.instructor.bio}</p>
+        <p className="text-gray-600">{course.instructor?.bio || ''}</p>
       </div>
 
       {/* قسم المتطلبات والميزات */}
@@ -252,8 +252,8 @@ function CoursePage() {
             courseId={String(course.id)}
             lessonId={activeLesson || ''}
             src={`/api/videos/${course.id}/${activeLesson}`}
-            title={course.lessons.find(l => String(l.id) === activeLesson)?.title || ''}
-            poster={course.image}
+            title={course.lessons?.find(l => String(l.id) === activeLesson)?.title || ''}
+            poster={course.image || '/placeholder-course.png'}
           />
         </div>
       )}
