@@ -23,7 +23,7 @@ export default function LoginPage() {
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const [scrolled, setScrolled] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
-  const typingTimeout = useRef<NodeJS.Timeout | null>(null);
+  const typingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
   const eyeRef = useRef<HTMLButtonElement>(null);
   const router = useRouter();
