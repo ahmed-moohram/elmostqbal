@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { join } from '../../../_store';
+import { join } from '../../_store';
 
 export async function POST(_req: NextRequest, { params }: { params: { sessionId: string } }) {
   const url = join(String(params.sessionId));
