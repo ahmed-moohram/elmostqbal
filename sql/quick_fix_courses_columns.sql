@@ -23,13 +23,5 @@ FROM information_schema.columns
 WHERE table_name = 'courses'
 ORDER BY ordinal_position;
 
--- الآن يمكنك إضافة البيانات التجريبية
-INSERT INTO courses (title, description, category, level, price, duration_hours, is_published) 
-VALUES 
-    ('أساسيات البرمجة بلغة Python', 'تعلم البرمجة من الصفر مع Python', 'برمجة', 'مبتدئ', 299, 20, true),
-    ('تطوير تطبيقات الويب', 'HTML, CSS, JavaScript من البداية للاحتراف', 'تطوير ويب', 'متوسط', 499, 30, true),
-    ('الذكاء الاصطناعي للمبتدئين', 'مقدمة في AI و Machine Learning', 'ذكاء اصطناعي', 'مبتدئ', 699, 40, true)
-ON CONFLICT DO NOTHING;
-
 -- رسالة النجاح
 SELECT '✅ تم إضافة الأعمدة المفقودة بنجاح!' as message;
