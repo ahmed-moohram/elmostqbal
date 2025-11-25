@@ -89,7 +89,7 @@ export default function AnalyticsPage() {
     </AdminLayout>
   );
 
-  const [isLoading, setIsLoading] = useState(true);
+  /*const [isLoading, setIsLoading] = useState(true);
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [timeRange, setTimeRange] = useState('month');
   
@@ -443,4 +443,5 @@ export default function AnalyticsPage() {
       </motion.div>
     </AdminLayout>
   );
-} 
+  */ 
+}
