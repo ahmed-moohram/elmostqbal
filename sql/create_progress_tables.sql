@@ -19,6 +19,18 @@ CREATE TABLE IF NOT EXISTS lesson_progress (
     UNIQUE(user_id, lesson_id)
 );
 
+-- في حال كان جدول lesson_progress موجوداً من سكربت قديم بدون عمود course_id
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'lesson_progress' AND column_name = 'course_id'
+    ) THEN
+        ALTER TABLE lesson_progress
+        ADD COLUMN course_id UUID REFERENCES courses(id) ON DELETE CASCADE;
+    END IF;
+END $$;
+
 -- 2. جدول نتائج الاختبارات
 CREATE TABLE IF NOT EXISTS quiz_results (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
@@ -116,8 +128,13 @@ BEGIN
     -- جلب كورس تجريبي
     SELECT id INTO test_course_id FROM courses WHERE is_published = true LIMIT 1;
     
-    -- جلب درس تجريبي
-    SELECT id INTO test_lesson_id FROM lessons WHERE course_id = test_course_id LIMIT 1;
+    -- جلب درس تجريبي: في السكيمة الحالية الدرس مرتبط بالقسم، والقسم مرتبط بالكورس
+    SELECT l.id
+    INTO test_lesson_id
+    FROM lessons l
+    JOIN sections s ON l.section_id = s.id
+    WHERE s.course_id = test_course_id
+    LIMIT 1;
     
     IF test_user_id IS NOT NULL AND test_lesson_id IS NOT NULL THEN
         -- إضافة تقدم تجريبي
