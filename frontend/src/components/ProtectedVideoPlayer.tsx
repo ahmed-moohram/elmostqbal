@@ -175,7 +175,22 @@ export default function ProtectedVideoPlayer({
     return (
       <div className="w-full aspect-video bg-black rounded-xl overflow-hidden">
         <iframe
-          src={videoUrl}
+          src={(() => {
+            const url = videoUrl;
+            if (!url) return '';
+            try {
+              if (url.includes('youtube.com/watch')) {
+                const urlObj = new URL(url);
+                const v = urlObj.searchParams.get('v');
+                if (v) return `https://www.youtube.com/embed/${v}`;
+              }
+              if (url.includes('youtu.be/')) {
+                const id = url.split('youtu.be/')[1]?.split(/[?&]/)[0];
+                if (id) return `https://www.youtube.com/embed/${id}`;
+              }
+            } catch (e) {}
+            return url;
+          })()}
           title="Course Video"
           className="w-full h-full"
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"

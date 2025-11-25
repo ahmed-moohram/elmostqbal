@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { API_BASE_URL } from '@/lib/api';
 import { useProgress } from '@/contexts/ProgressContext';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -58,7 +59,7 @@ export default function StudentDashboard() {
       if (!token) return;
 
       // جلب الكورسات المسجل فيها من الـ API
-      const response = await fetch('/api/courses/enrolled/my-courses', {
+      const response = await fetch(`${API_BASE_URL}/api/courses/enrolled/my-courses`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },

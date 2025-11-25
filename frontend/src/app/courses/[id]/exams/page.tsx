@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Exam, Question } from "../../../../types/exam";
 import { useRouter, useParams } from "next/navigation";
+import { API_BASE_URL } from '@/lib/api';
 import { FaClock, FaCheck, FaTimes, FaStar, FaShieldAlt, FaBook, FaPlay, FaArrowLeft, FaArrowRight, FaQuestionCircle } from "react-icons/fa";
 import { motion } from "framer-motion";
 import Link from "next/link";
@@ -22,9 +23,10 @@ export default function CourseExamsPage() {
   useEffect(() => {
     const fetchExams = async () => {
       try {
-        const response = await fetch(`/api/courses/${courseId}/exams`);
+        const response = await fetch('/api/exams');
         const data = await response.json();
-        setExams(data);
+        const filtered = Array.isArray(data) ? data.filter((e: any) => e.courseId === courseId) : [];
+        setExams(filtered);
       } catch (error) {
         console.error('Error fetching exams:', error);
       }

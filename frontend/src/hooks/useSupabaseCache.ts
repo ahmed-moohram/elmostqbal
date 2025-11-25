@@ -4,12 +4,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  'https://wnqifmvgvlmxgswhcwnc.supabase.co',
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InducWlmbXZndmxteGdzd2hjd25jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI0MzYwNTUsImV4cCI6MjA3ODAxMjA1NX0.LqWhTZYmr7nu-dIy2uBBqntOxoWM-waluYIR9bipC9M'
-);
+import supabase from '@/lib/supabase-client';
 
 export const useSupabaseCache = () => {
   const [userId, setUserId] = useState<string | null>(null);
@@ -181,9 +176,10 @@ export const useSupabaseCache = () => {
     try {
       if (!userId) {
         // Return localStorage keys
-        const keys = [];
+        const keys: string[] = [];
         for (let i = 0; i < localStorage.length; i++) {
-          keys.push(localStorage.key(i));
+          const key = localStorage.key(i);
+          if (key) keys.push(key);
         }
         return keys;
       }
@@ -212,7 +208,7 @@ export const useSupabaseCache = () => {
     if (!userId) return false;
 
     try {
-      const keys = [];
+      const keys: string[] = [];
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
         if (key) keys.push(key);

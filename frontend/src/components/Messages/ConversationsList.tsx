@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { API_BASE_URL } from '@/lib/api';
 import ChatBox from './ChatBox';
 
 interface Conversation {
@@ -44,7 +45,7 @@ const ConversationsList: React.FC<ConversationsListProps> = ({ isOpen, onClose }
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('/api/messages/conversations', {
+      const response = await fetch(`${API_BASE_URL}/api/messages/conversations`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -182,4 +183,4 @@ const ConversationsList: React.FC<ConversationsListProps> = ({ isOpen, onClose }
   );
 };
 
-export default ConversationsList; 
+export default ConversationsList;

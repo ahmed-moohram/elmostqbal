@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import { useState, useEffect } from 'react';
 import { 
@@ -9,6 +9,7 @@ import {
 import { toast } from 'react-hot-toast';
 import { apiLimiter, authLimiter, uploadLimiter } from '@/lib/security/rate-limiter';
 import { memoryCache, persistentCache } from '@/lib/performance/database-cache';
+import AdminLayout from '@/components/AdminLayout';
 
 interface SecurityLog {
   id: string;
@@ -33,6 +34,19 @@ interface SecurityConfig {
 }
 
 export default function SecuritySettingsPage() {
+  return (
+    <AdminLayout>
+      <div className="p-6 flex items-center justify-center min-h-[60vh]">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-8 max-w-md text-center">
+          <h1 className="text-2xl font-bold mb-3">هذه الصفحة غير متاحة حالياً</h1>
+          <p className="text-gray-600 dark:text-gray-300">
+            سيتم تفعيل إعدادات الأمان المتقدمة بعد الانتهاء من ضبط سياسات الأمان النهائية.
+          </p>
+        </div>
+      </div>
+    </AdminLayout>
+  );
+
   const [config, setConfig] = useState<SecurityConfig>({
     twoFactorAuth: false,
     rateLimiting: true,

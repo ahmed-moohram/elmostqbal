@@ -10,6 +10,7 @@ import {
   FaUpload, FaUserGraduate, FaMoneyBillWave, FaThList, FaThLarge,
   FaChartLine, FaUsers
 } from 'react-icons/fa';
+import supabase from '@/lib/supabase-client';
 import { toast } from 'react-hot-toast';
 import { motion } from 'framer-motion';
 import dynamic from 'next/dynamic';
@@ -296,15 +297,24 @@ export default function AdminPage() {
   
   // Arrays para selects en formularios
   const availableCategories = [
-    'تطوير الويب',
-    'تطوير التطبيقات',
-    'الذكاء الاصطناعي',
-    'علوم البيانات',
-    'التسويق الرقمي',
-    'التصميم',
-    'الأعمال',
-    'اللغات',
-    'أخرى'
+    'اللغة العربية',
+    'اللغة الإنجليزية',
+    'اللغة الفرنسية',
+    'الرياضيات',
+    'الفيزياء',
+    'الكيمياء',
+    'الأحياء',
+    'التاريخ',
+    'الجغرافيا',
+    'الفلسفة والمنطق',
+    'علم النفس والاجتماع',
+    'الاقتصاد والإحصاء',
+    'الحاسب الآلي',
+    'المحاسبة',
+    'إدارة الأعمال',
+    'القانون التجاري',
+    'مواد ثانوية أخرى',
+    'مواد تجارية أخرى',
   ];
   
   const availableLevels = [
@@ -334,8 +344,7 @@ export default function AdminPage() {
     setLoading(prev => ({ ...prev, courses: true }));
     try {
       const token = userStorage.getToken();
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-      const response = await fetch(`${API_URL}/api/courses`, {
+      const response = await fetch(`/api/courses`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -363,8 +372,7 @@ export default function AdminPage() {
     setLoading(prev => ({ ...prev, teachers: true }));
     try {
       const token = userStorage.getToken();
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-      const response = await fetch(`${API_URL}/api/teachers`, {
+      const response = await fetch(`/api/teachers`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -391,8 +399,7 @@ export default function AdminPage() {
     setLoading(prev => ({ ...prev, students: true }));
     try {
       const token = userStorage.getToken();
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-      const response = await fetch(`${API_URL}/api/students`, {
+      const response = await fetch(`/api/students`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -418,13 +425,9 @@ export default function AdminPage() {
   const fetchStats = async () => {
     setLoading(prev => ({ ...prev, stats: true }));
     try {
-      // استخدام Supabase لجلب الإحصائيات
-      const { createClient } = await import('@supabase/supabase-js');
-      const SUPABASE_URL = 'https://wnqifmvgvlmxgswhcwnc.supabase.co';
-      const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InducWlmbXZndmxteGdzd2hjd25jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI0MzYwNTUsImV4cCI6MjA3ODAxMjA1NX0.LqWhTZYmr7nu-dIy2uBBqntOxoWM-waluYIR9bipC9M';
-      
-      const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
-      
+      // استخدام Supabase لجلب الإحصائيات (العميل الموحد)
+      // supabase مستورد في أعلى الملف من '@/lib/supabase-client'
+
       // جلب الإحصائيات
       const [
         { count: studentsCount },
@@ -438,13 +441,47 @@ export default function AdminPage() {
         supabase.from('enrollments').select('*', { count: 'exact', head: true })
       ]);
       
+      const now = new Date();
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+      const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString();
+
+      const { data: paymentsData, error: paymentsError } = await supabase
+        .from('payments')
+        .select('amount, status, payment_date')
+        .gte('payment_date', monthStart)
+        .lt('payment_date', monthEnd);
+
+      if (paymentsError) {
+        console.error('خطأ في جلب بيانات المدفوعات للإحصائيات:', paymentsError);
+      }
+
+      const successfulPayments = (paymentsData || []).filter((p: any) =>
+        ['success', 'completed', 'paid'].includes(String(p.status || '').toLowerCase())
+      );
+
+      const monthlyRevenue = successfulPayments.reduce(
+        (sum: number, p: any) => sum + (Number(p.amount) || 0),
+        0
+      );
+
+      const totalStudentsSafe = studentsCount || 0;
+      const activeEnrollmentsSafe = enrollmentsCount || 0;
+
+      const conversionRate =
+        totalStudentsSafe > 0
+          ? Math.min(
+              100,
+              Math.round((activeEnrollmentsSafe / totalStudentsSafe) * 100)
+            )
+          : 0;
+
       setStats({
-        totalStudents: studentsCount || 0,
+        totalStudents: totalStudentsSafe,
         totalTeachers: teachersCount || 0,
         totalCourses: coursesCount || 0,
-        activeEnrollments: enrollmentsCount || 0,
-        monthlyRevenue: 15000, // قيمة تجريبية
-        conversionRate: 65 // قيمة تجريبية
+        activeEnrollments: activeEnrollmentsSafe,
+        monthlyRevenue,
+        conversionRate
       });
       
       setError('');
@@ -496,7 +533,7 @@ export default function AdminPage() {
     
     try {
       const token = userStorage.getToken();
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      
       const formData = new FormData();
       
       // Añadir datos del curso al FormData
@@ -516,7 +553,7 @@ export default function AdminPage() {
         formData.append('thumbnail', thumbnail);
       }
       
-      const response = await fetch(`${API_URL}/api/courses`, {
+      const response = await fetch(`/api/courses`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -565,7 +602,7 @@ export default function AdminPage() {
     
     try {
       const token = userStorage.getToken();
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      
       const formData = new FormData();
       
       // Añadir datos del curso al FormData
@@ -585,7 +622,7 @@ export default function AdminPage() {
         formData.append('thumbnail', thumbnail);
       }
       
-      const response = await fetch(`${API_URL}/api/courses/${currentCourse.id}`, {
+      const response = await fetch(`/api/courses/${currentCourse.id}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -620,8 +657,7 @@ export default function AdminPage() {
     
     try {
       const token = userStorage.getToken();
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-      const response = await fetch(`${API_URL}/api/courses/${courseId}`, {
+      const response = await fetch(`/api/courses/${courseId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -1088,6 +1124,7 @@ export default function AdminPage() {
                 <FaSearch className="absolute right-3 top-3 text-gray-400" />
               </div>
               <button
+                onClick={() => router.push('/admin/teachers')}
                 className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
               >
                 إضافة معلم

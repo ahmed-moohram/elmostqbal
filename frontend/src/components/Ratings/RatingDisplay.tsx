@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { API_BASE_URL } from '@/lib/api';
 import RatingStars from './RatingStars';
 import RatingForm from './RatingForm';
 
@@ -44,7 +45,7 @@ const RatingDisplay: React.FC<RatingDisplayProps> = ({
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`/api/ratings/${targetType}/${targetId}?page=${currentPage}&limit=10`, {
+      const response = await fetch(`${API_BASE_URL}/api/ratings/${targetType}/${targetId}?page=${currentPage}&limit=10`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -235,4 +236,4 @@ const RatingDisplay: React.FC<RatingDisplayProps> = ({
   );
 };
 
-export default RatingDisplay; 
+export default RatingDisplay;

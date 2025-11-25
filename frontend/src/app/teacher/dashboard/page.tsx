@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { toast } from 'react-hot-toast';
+import { useAuth } from '@/contexts/AuthContext';
+import supabase from '@/lib/supabase-client';
 import { 
   FaUsers, FaBookOpen, FaChartLine, FaDollarSign, 
   FaVideo, FaComments, FaBell, FaPlus, FaEdit, 
@@ -22,6 +24,7 @@ interface TeacherData {
   studentsCount: number;
   coursesCount: number;
   isVerified: boolean;
+  status?: 'pending' | 'approved' | 'rejected';
 }
 
 interface Course {
@@ -39,6 +42,8 @@ interface Course {
 
 interface Student {
   id: string;
+  userId: string;
+  courseId: string;
   name: string;
   email: string;
   avatar: string;
@@ -46,6 +51,15 @@ interface Student {
   progress: number;
   lastActive: string;
   courseName: string;
+}
+
+interface StudentDetailsState {
+  loading: boolean;
+  error: string | null;
+  quizResults: any[];
+  completedLessons: number;
+  totalLessons: number;
+  averageQuizScore: number;
 }
 
 interface Message {
@@ -60,6 +74,7 @@ interface Message {
 
 export default function TeacherDashboard() {
   const router = useRouter();
+  const { user, isAuthenticated, isLoading, logout } = useAuth();
   const [teacher, setTeacher] = useState<TeacherData | null>(null);
   const [activeTab, setActiveTab] = useState('overview');
   const [courses, setCourses] = useState<Course[]>([]);
@@ -73,146 +88,357 @@ export default function TeacherDashboard() {
     totalCourses: 0,
     averageRating: 0,
     totalLessons: 0,
-    completionRate: 0
+    completionRate: 0,
+    averageQuizScore: 0,
   });
+  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [studentDetails, setStudentDetails] = useState<StudentDetailsState>({
+    loading: false,
+    error: null,
+    quizResults: [],
+    completedLessons: 0,
+    totalLessons: 0,
+    averageQuizScore: 0,
+  });
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.replace('/login?redirect=/teacher/dashboard');
+    }
+  }, [isLoading, isAuthenticated, router]);
 
   useEffect(() => {
-    // تحميل بيانات المدرس
-    const teacherData = localStorage.getItem('teacher');
-    if (!teacherData) {
+    if (isLoading || !isAuthenticated || !user) return;
+
+    if (user.role !== 'teacher') {
       toast.error('يجب تسجيل الدخول كمدرس');
-      router.push('/teacher/login');
+      router.replace('/');
       return;
     }
 
-    const parsedTeacher = JSON.parse(teacherData);
-    setTeacher(parsedTeacher);
+    const loadDashboard = async () => {
+      try {
+        // ملف المدرس من جدول teachers
+        const { data: teacherRow, error: teacherError } = await supabase
+          .from('teachers')
+          .select('*')
+          .eq('user_id', user.id)
+          .maybeSingle();
 
-    // تحميل البيانات التجريبية
-    loadMockData();
-  }, []);
+        if (teacherError) {
+          console.error('Error loading teacher profile:', teacherError);
+        }
 
-  const loadMockData = () => {
-    // كورسات تجريبية
-    setCourses([
-      {
-        id: '1',
-        title: 'أساسيات البرمجة بلغة JavaScript',
-        description: 'تعلم أساسيات JavaScript من الصفر',
-        thumbnail: '/course1.jpg',
-        price: 299,
-        studentsCount: 156,
-        lessonsCount: 24,
-        rating: 4.8,
-        isPublished: true,
-        createdAt: '2024-01-15'
-      },
-      {
-        id: '2',
-        title: 'React.js المتقدم',
-        description: 'احترف React وبناء تطبيقات ويب احترافية',
-        thumbnail: '/course2.jpg',
-        price: 399,
-        studentsCount: 89,
-        lessonsCount: 32,
-        rating: 4.9,
-        isPublished: true,
-        createdAt: '2024-02-10'
-      },
-      {
-        id: '3',
-        title: 'Node.js والـ Backend',
-        description: 'بناء APIs احترافية باستخدام Node.js',
-        thumbnail: '/course3.jpg',
-        price: 349,
-        studentsCount: 67,
-        lessonsCount: 28,
-        rating: 4.7,
-        isPublished: false,
-        createdAt: '2024-03-05'
+        const teacherData: TeacherData = {
+          id: teacherRow?.id || user.id,
+          name: user.name,
+          email: user.email || '',
+          bio: teacherRow?.bio || '',
+          specialization: teacherRow?.specialization || 'مدرس',
+          profileImage: (user as any).avatar_url || '/default-avatar.png',
+          rating: teacherRow?.average_rating || 0,
+          studentsCount: teacherRow?.total_students || 0,
+          coursesCount: teacherRow?.total_courses || 0,
+          isVerified: true,
+          status: (teacherRow as any)?.status || 'approved',
+        };
+
+        setTeacher(teacherData);
+
+        // إذا كان حساب المدرس غير مقبول بعد، نعرض رسالة انتظار فقط
+        if (teacherData.status && teacherData.status !== 'approved') {
+          return;
+        }
+
+        // كورسات المدرس من جدول courses
+        const { data: coursesRows, error: coursesError } = await supabase
+          .from('courses')
+          .select(
+            'id, title, short_description, thumbnail, price, students_count, total_lessons, rating, status, created_at'
+          )
+          .eq('instructor_id', user.id)
+          .order('created_at', { ascending: false });
+
+        if (coursesError) {
+          console.error('Error loading teacher courses:', coursesError);
+          setCourses([]);
+          setStudents([]);
+          return;
+        }
+
+        const mappedCourses: Course[] = (coursesRows || []).map((c: any) => ({
+          id: c.id,
+          title: c.title,
+          description: c.short_description || '',
+          thumbnail: c.thumbnail || '/placeholder-course.jpg',
+          price: c.price ?? 0,
+          studentsCount: c.students_count ?? 0,
+          lessonsCount: c.total_lessons ?? 0,
+          rating: c.rating ?? 0,
+          isPublished: c.status === 'published',
+          createdAt: c.created_at,
+        }));
+
+        setCourses(mappedCourses);
+
+        // تحديث الإحصائيات بناءً على الكورسات
+        const totalStudents = mappedCourses.reduce(
+          (sum, course) => sum + (course.studentsCount || 0),
+          0
+        );
+        const totalLessons = mappedCourses.reduce(
+          (sum, course) => sum + (course.lessonsCount || 0),
+          0
+        );
+        const avgRating = mappedCourses.length
+          ? mappedCourses.reduce((sum, course) => sum + (course.rating || 0), 0) /
+            mappedCourses.length
+          : 0;
+
+        // متوسط درجات اختبارات طلاب هذا المدرس
+        let avgQuizScore = 0;
+
+        if (mappedCourses.length > 0) {
+          const courseIdsForQuiz = mappedCourses.map((c) => c.id);
+
+          const { data: quizResultsForTeacher, error: quizResultsError } = await supabase
+            .from('quiz_results')
+            .select('score, course_id')
+            .in('course_id', courseIdsForQuiz);
+
+          if (quizResultsError) {
+            console.error('Error loading quiz results for teacher courses:', quizResultsError);
+          } else if (quizResultsForTeacher && quizResultsForTeacher.length > 0) {
+            const totalScore = quizResultsForTeacher.reduce(
+              (sum: number, r: any) => sum + (Number(r.score) || 0),
+              0
+            );
+            avgQuizScore = totalScore / quizResultsForTeacher.length;
+          }
+        }
+
+        setStats((prev) => ({
+          ...prev,
+          totalStudents,
+          totalCourses: mappedCourses.length,
+          totalLessons,
+          averageRating: Number(avgRating.toFixed(1)),
+          averageQuizScore: Number(avgQuizScore.toFixed(1)),
+        }));
+
+        // تحميل الطلاب المسجلين في كورسات هذا المدرس
+        if (mappedCourses.length > 0) {
+          const courseIds = mappedCourses.map((c) => c.id);
+
+          const { data: enrollments, error: enrollmentsError } = await supabase
+            .from('enrollments')
+            .select('id, user_id, course_id, enrolled_at, progress, last_accessed')
+            .in('course_id', courseIds);
+
+          if (enrollmentsError || !enrollments) {
+            console.error('Error loading enrollments:', enrollmentsError);
+            setStudents([]);
+            return;
+          }
+
+          const userIds = Array.from(
+            new Set(enrollments.map((e: any) => e.user_id))
+          );
+
+          if (userIds.length === 0) {
+            setStudents([]);
+            return;
+          }
+
+          const { data: usersRows, error: usersError } = await supabase
+            .from('users')
+            .select('id, name, email, avatar_url')
+            .in('id', userIds);
+
+          if (usersError || !usersRows) {
+            console.error('Error loading students:', usersError);
+            setStudents([]);
+            return;
+          }
+
+          const courseMap = new Map(mappedCourses.map((c) => [c.id, c.title]));
+          const usersMap = new Map(usersRows.map((u: any) => [u.id, u]));
+
+          const mappedStudents: Student[] = (enrollments || []).map((enr: any) => {
+            const u = usersMap.get(enr.user_id);
+            const courseTitle = courseMap.get(enr.course_id) || '';
+
+            return {
+              id: enr.id,
+              userId: enr.user_id,
+              courseId: enr.course_id,
+              name: u?.name || 'طالب',
+              email: u?.email || '',
+              avatar: u?.avatar_url || '/default-avatar.png',
+              enrolledDate: enr.enrolled_at
+                ? new Date(enr.enrolled_at).toLocaleDateString('ar-EG')
+                : '',
+              progress: Number(enr.progress ?? 0),
+              lastActive: enr.last_accessed
+                ? new Date(enr.last_accessed).toLocaleString('ar-EG')
+                : 'غير معروف',
+              courseName: courseTitle,
+            };
+          });
+
+          setStudents(mappedStudents);
+        } else {
+          setStudents([]);
+        }
+      } catch (error) {
+        console.error('Error loading teacher dashboard:', error);
       }
-    ]);
+    };
 
-    // طلاب تجريبيين
-    setStudents([
-      {
-        id: '1',
-        name: 'أحمد محمد',
-        email: 'ahmad@example.com',
-        avatar: '/avatar1.jpg',
-        enrolledDate: '2024-01-20',
-        progress: 75,
-        lastActive: 'منذ ساعة',
-        courseName: 'JavaScript أساسيات'
-      },
-      {
-        id: '2',
-        name: 'فاطمة علي',
-        email: 'fatma@example.com',
-        avatar: '/avatar2.jpg',
-        enrolledDate: '2024-02-15',
-        progress: 45,
-        lastActive: 'منذ يومين',
-        courseName: 'React.js المتقدم'
-      },
-      {
-        id: '3',
-        name: 'محمود حسن',
-        email: 'mahmoud@example.com',
-        avatar: '/avatar3.jpg',
-        enrolledDate: '2024-03-01',
-        progress: 90,
-        lastActive: 'الآن',
-        courseName: 'Node.js والـ Backend'
+    loadDashboard();
+  }, [isLoading, isAuthenticated, user, router]);
+
+  const handleLogout = () => {
+    logout();
+    toast.success('تم تسجيل الخروج بنجاح');
+    router.push('/login');
+  };
+
+  const handleViewStudent = async (student: Student) => {
+    setSelectedStudent(student);
+    setStudentDetails({
+      loading: true,
+      error: null,
+      quizResults: [],
+      completedLessons: 0,
+      totalLessons: 0,
+      averageQuizScore: 0,
+    });
+
+    try {
+      // جلب دروس الكورس الخاص بهذا الطالب
+      const { data: lessons, error: lessonsError } = await supabase
+        .from('lessons')
+        .select('id')
+        .eq('course_id', student.courseId);
+
+      if (lessonsError) {
+        console.error('Error loading lessons for student details:', lessonsError);
+        setStudentDetails((prev) => ({
+          ...prev,
+          loading: false,
+          error: 'تعذر تحميل تفاصيل الدروس لهذا الطالب',
+        }));
+        return;
       }
-    ]);
 
-    // رسائل تجريبية
-    setMessages([
-      {
-        id: '1',
-        studentName: 'أحمد محمد',
-        studentAvatar: '/avatar1.jpg',
-        content: 'استاذ، لدي سؤال عن الدرس الخامس',
-        time: 'منذ 10 دقائق',
-        isRead: false,
-        courseTitle: 'JavaScript أساسيات'
-      },
-      {
-        id: '2',
-        studentName: 'فاطمة علي',
-        studentAvatar: '/avatar2.jpg',
-        content: 'شكراً على الشرح الرائع!',
-        time: 'منذ ساعة',
-        isRead: true,
-        courseTitle: 'React.js المتقدم'
+      const lessonIds = (lessons || []).map((l: any) => l.id);
+      let completedLessons = 0;
+
+      if (lessonIds.length > 0) {
+        const { count, error: progressError } = await supabase
+          .from('lesson_progress')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', student.userId)
+          .in('lesson_id', lessonIds)
+          .eq('is_completed', true);
+
+        if (progressError) {
+          console.error('Error loading lesson_progress for student details:', progressError);
+        } else {
+          completedLessons = count || 0;
+        }
       }
-    ]);
 
-    // إحصائيات
-    setStats({
-      totalRevenue: 45600,
-      monthlyRevenue: 8900,
-      totalStudents: 312,
-      activeStudents: 186,
-      totalCourses: 3,
-      averageRating: 4.8,
-      totalLessons: 84,
-      completionRate: 78
+      const { data: quizData, error: quizError } = await supabase
+        .from('quiz_results')
+        .select('*')
+        .eq('user_id', student.userId)
+        .eq('course_id', student.courseId)
+        .order('attempted_at', { ascending: false });
+
+      if (quizError) {
+        console.error('Error loading quiz results for student:', quizError);
+        setStudentDetails({
+          loading: false,
+          error: 'تعذر تحميل نتائج الاختبارات لهذا الطالب',
+          quizResults: [],
+          completedLessons,
+          totalLessons: lessonIds.length,
+          averageQuizScore: 0,
+        });
+        return;
+      }
+
+      const averageQuizScore =
+        quizData && quizData.length > 0
+          ? quizData.reduce((sum: number, q: any) => sum + (Number(q.score) || 0), 0) /
+            quizData.length
+          : 0;
+
+      setStudentDetails({
+        loading: false,
+        error: null,
+        quizResults: quizData || [],
+        completedLessons,
+        totalLessons: lessonIds.length,
+        averageQuizScore: Number(averageQuizScore.toFixed(1)),
+      });
+    } catch (error) {
+      console.error('Error loading student details:', error);
+      setStudentDetails((prev) => ({
+        ...prev,
+        loading: false,
+        error: 'حدث خطأ أثناء تحميل تفاصيل الطالب',
+      }));
+    }
+  };
+
+  const handleCloseStudentDetails = () => {
+    setSelectedStudent(null);
+    setStudentDetails({
+      loading: false,
+      error: null,
+      quizResults: [],
+      completedLessons: 0,
+      totalLessons: 0,
+      averageQuizScore: 0,
     });
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('teacher');
-    localStorage.removeItem('userRole');
-    toast.success('تم تسجيل الخروج بنجاح');
-    router.push('/teacher/login');
-  };
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-16 w-16 border-4 border-purple-600 border-t-transparent"></div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated || user?.role !== 'teacher') {
+    return null;
+  }
 
   if (!teacher) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-16 w-16 border-4 border-purple-600 border-t-transparent"></div>
+      </div>
+    );
+  }
+
+  if (teacher.status && teacher.status !== 'approved') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="bg-white rounded-xl shadow-lg p-8 max-w-lg text-center">
+          <FaClock className="mx-auto text-4xl text-yellow-500 mb-4" />
+          <h1 className="text-2xl font-bold mb-2">حسابك كمدرس قيد المراجعة</h1>
+          <p className="text-gray-600 mb-4">
+            شكراً لانضمامك إلينا يا {teacher.name}. سيتم مراجعة طلبك من قبل الإدارة
+            وسنقوم بإبلاغك فور قبول الحساب.
+          </p>
+          <p className="text-sm text-gray-500">
+            يمكنك العودة لاحقاً أو التواصل مع الدعم في حال تأخّر المراجعة.
+          </p>
+        </div>
       </div>
     );
   }
@@ -364,7 +590,7 @@ export default function TeacherDashboard() {
         {activeTab === 'overview' && (
           <div>
             {/* الإحصائيات */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
               <div className="bg-white p-6 rounded-xl shadow-lg">
                 <div className="flex items-center justify-between mb-4">
                   <FaDollarSign className="text-3xl text-green-500" />
@@ -407,6 +633,20 @@ export default function TeacherDashboard() {
                 </div>
                 <h3 className="text-2xl font-bold">{stats.averageRating}</h3>
                 <p className="text-gray-500 text-sm">متوسط التقييم</p>
+              </div>
+
+              <div className="bg-white p-6 rounded-xl shadow-lg">
+                <div className="flex items-center justify-between mb-4">
+                  <FaGraduationCap className="text-3xl text-indigo-500" />
+                  <span className="text-xs text-indigo-600 bg-indigo-100 px-2 py-1 rounded">
+                    من نتائج اختبارات الطلاب
+                  </span>
+                </div>
+                <h3 className="text-2xl font-bold">
+                  {stats.averageQuizScore}
+                  <span className="text-sm mr-1">%</span>
+                </h3>
+                <p className="text-gray-500 text-sm">متوسط درجات الاختبارات</p>
               </div>
             </div>
 
@@ -458,7 +698,7 @@ export default function TeacherDashboard() {
                   alt={course.title}
                   className="w-full h-48 object-cover"
                   onError={(e) => {
-                    (e.target as HTMLImageElement).src = '/default-course.jpg';
+                    (e.target as HTMLImageElement).src = '/placeholder-course.jpg';
                   }}
                 />
                 <div className="p-6">
@@ -616,7 +856,10 @@ export default function TeacherDashboard() {
                         <button className="text-purple-600 hover:text-purple-900 ml-3">
                           <FaComments />
                         </button>
-                        <button className="text-blue-600 hover:text-blue-900">
+                        <button
+                          onClick={() => handleViewStudent(student)}
+                          className="text-blue-600 hover:text-blue-900"
+                        >
                           <FaEye />
                         </button>
                       </td>
@@ -629,7 +872,7 @@ export default function TeacherDashboard() {
         )}
 
         {/* الرسائل */}
-        {activeTab === 'messages' && (
+      {activeTab === 'messages' && teacher.status === 'approved' && (
           <div className="bg-white rounded-xl shadow-lg">
             <div className="p-6 border-b">
               <h2 className="text-xl font-bold">الرسائل والمحادثات</h2>
@@ -673,6 +916,112 @@ export default function TeacherDashboard() {
             </div>
           </div>
         )}
+      {selectedStudent && (
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full p-6 relative">
+            <button
+              onClick={handleCloseStudentDetails}
+              className="absolute top-3 left-3 text-gray-500 hover:text-gray-700"
+            >
+              ✕
+            </button>
+            <h2 className="text-xl font-bold mb-4">
+              تفاصيل الطالب: {selectedStudent.name}
+            </h2>
+
+            {studentDetails.loading ? (
+              <div className="flex justify-center py-10">
+                <div className="animate-spin rounded-full h-10 w-10 border-4 border-purple-600 border-t-transparent"></div>
+              </div>
+            ) : studentDetails.error ? (
+              <p className="text-red-600">{studentDetails.error}</p>
+            ) : (
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <h3 className="font-semibold mb-2">التقدم في الكورس</h3>
+                    <p className="text-sm text-gray-600 mb-2">
+                      الكورس: {selectedStudent.courseName}
+                    </p>
+                    <p className="text-sm text-gray-600 mb-1">
+                      نسبة التقدم العامة: {selectedStudent.progress}%
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      الدروس المكتملة:{' '}
+                      {studentDetails.totalLessons > 0
+                        ? `${studentDetails.completedLessons} من ${studentDetails.totalLessons}`
+                        : 'لا توجد بيانات دروس بعد'}
+                    </p>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <h3 className="font-semibold mb-2">ملخص الاختبارات</h3>
+                    <p className="text-sm text-gray-600 mb-1">
+                      عدد المحاولات: {studentDetails.quizResults.length}
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      متوسط الدرجة:{' '}
+                      {studentDetails.quizResults.length > 0
+                        ? `${studentDetails.averageQuizScore}%`
+                        : 'لا توجد اختبارات بعد'}
+                    </p>
+                  </div>
+                </div>
+
+                {studentDetails.quizResults.length > 0 && (
+                  <div>
+                    <h3 className="font-semibold mb-2">تفاصيل نتائج الاختبارات</h3>
+                    <div className="max-h-64 overflow-y-auto border rounded-lg">
+                      <table className="w-full text-sm">
+                        <thead className="bg-gray-100">
+                          <tr>
+                            <th className="px-4 py-2 text-right">الاختبار</th>
+                            <th className="px-4 py-2 text-right">الدرجة</th>
+                            <th className="px-4 py-2 text-right">الأسئلة</th>
+                            <th className="px-4 py-2 text-right">النتيجة</th>
+                            <th className="px-4 py-2 text-right">التاريخ</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {studentDetails.quizResults.map((q: any) => (
+                            <tr key={q.id} className="border-t">
+                              <td className="px-4 py-2">
+                                {q.quiz_title || 'اختبار'}
+                              </td>
+                              <td className="px-4 py-2">
+                                {q.score}
+                                <span className="text-xs text-gray-500 ml-1">درجة</span>
+                              </td>
+                              <td className="px-4 py-2">
+                                {q.total_questions || '-'}
+                              </td>
+                              <td className="px-4 py-2">
+                                <span
+                                  className={`px-2 py-1 text-xs rounded ${
+                                    q.passed
+                                      ? 'bg-green-100 text-green-600'
+                                      : 'bg-red-100 text-red-600'
+                                  }`}
+                                >
+                                  {q.passed ? 'ناجح' : 'راسب'}
+                                </span>
+                              </td>
+                              <td className="px-4 py-2">
+                                {q.attempted_at
+                                  ? new Date(q.attempted_at).toLocaleString('ar-EG')
+                                  : '-'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
       </main>
     </div>
   );

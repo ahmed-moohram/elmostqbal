@@ -27,7 +27,7 @@ interface CourseReviewsProps {
 
 export default function CourseReviews({ 
   courseId, 
-  averageRating = 4.5, 
+  averageRating = 0,
   totalReviews = 0 
 }: CourseReviewsProps) {
   const { user, isAuthenticated } = useAuth();

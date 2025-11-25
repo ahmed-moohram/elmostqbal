@@ -1,8 +1,9 @@
-'use client';
+"use client";
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'react-hot-toast';
+import AdminLayout from '@/components/AdminLayout';
 import { 
   FaUsers, FaUserCheck, FaUserTimes, FaBookOpen, 
   FaGraduationCap, FaChartLine, FaSearch, FaFilter,
@@ -66,6 +67,19 @@ const SUBJECTS_BY_GRADE = {
 };
 
 export default function AdminPanel() {
+  return (
+    <AdminLayout>
+      <div className="p-6 flex items-center justify-center min-h-[60vh]">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-8 max-w-md text-center">
+          <h1 className="text-2xl font-bold mb-3">هذه الصفحة غير متاحة حالياً</h1>
+          <p className="text-gray-600 dark:text-gray-300">
+            سيتم تفعيل لوحة مراجعة واعتماد المدرسين بعد الانتهاء من نظام التقديم الحقيقي.
+          </p>
+        </div>
+      </div>
+    </AdminLayout>
+  );
+
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('pending');
   const [pendingTeachers, setPendingTeachers] = useState<PendingTeacher[]>([]);

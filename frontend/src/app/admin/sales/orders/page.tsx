@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import AdminLayout from '@/components/AdminLayout';
 import { FaClipboardList, FaSearch, FaEye, FaCheck, FaTimes } from 'react-icons/fa';
+import supabase from '@/lib/supabase-client';
 
 export default function OrdersPage() {
   const [orders, setOrders] = useState<any[]>([]);
@@ -14,18 +15,62 @@ export default function OrdersPage() {
   }, []);
 
   const fetchOrders = async () => {
-    const mockOrders = [
-      { id: 1, studentName: 'أحمد محمد', courseName: 'دورة React المتقدمة', amount: 500, status: 'completed', date: '2024-10-01', paymentMethod: 'بطاقة ائتمان' },
-      { id: 2, studentName: 'فاطمة علي', courseName: 'دورة Python للمبتدئين', amount: 350, status: 'pending', date: '2024-10-05', paymentMethod: 'فودافون كاش' },
-      { id: 3, studentName: 'محمد حسن', courseName: 'دورة UI/UX Design', amount: 600, status: 'completed', date: '2024-10-03', paymentMethod: 'بطاقة ائتمان' },
-      { id: 4, studentName: 'سارة أحمد', courseName: 'دورة JavaScript الشاملة', amount: 450, status: 'cancelled', date: '2024-09-28', paymentMethod: 'تحويل بنكي' },
-      { id: 5, studentName: 'خالد يوسف', courseName: 'دورة Node.js', amount: 550, status: 'completed', date: '2024-10-04', paymentMethod: 'بطاقة ائتمان' },
-      { id: 6, studentName: 'نور محمود', courseName: 'دورة SQL و قواعد البيانات', amount: 400, status: 'pending', date: '2024-10-06', paymentMethod: 'فودافون كاش' },
-    ];
-    setTimeout(() => {
-      setOrders(mockOrders);
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('payments')
+        .select(
+          `
+          id,
+          amount,
+          status,
+          payment_method,
+          payment_date,
+          transaction_id,
+          user:users ( id, name ),
+          course:courses ( id, title )
+        `
+        )
+        .order('payment_date', { ascending: false });
+
+      if (error) {
+        console.error('خطأ في جلب الطلبات:', error);
+        setOrders([]);
+        return;
+      }
+
+      const transformed = (data || []).map((row: any) => {
+        const rawStatus = (row.status || '').toLowerCase();
+        let status: 'completed' | 'pending' | 'cancelled' = 'pending';
+
+        if (['success', 'completed', 'paid'].includes(rawStatus)) {
+          status = 'completed';
+        } else if (['pending', 'processing', 'waiting'].includes(rawStatus)) {
+          status = 'pending';
+        } else if (rawStatus) {
+          status = 'cancelled';
+        }
+
+        return {
+          id: row.id,
+          studentName: row.user?.name || 'طالب',
+          courseName: row.course?.title || 'دورة',
+          amount: Number(row.amount) || 0,
+          status,
+          date: row.payment_date
+            ? new Date(row.payment_date).toLocaleString('ar-EG')
+            : '',
+          paymentMethod: row.payment_method || '',
+        };
+      });
+
+      setOrders(transformed);
+    } catch (error) {
+      console.error('خطأ غير متوقع في جلب الطلبات:', error);
+      setOrders([]);
+    } finally {
       setLoading(false);
-    }, 300);
+    }
   };
   return (
     <AdminLayout>

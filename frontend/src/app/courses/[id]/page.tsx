@@ -9,6 +9,7 @@ import { ImSpinner9 } from 'react-icons/im';
 import { toast } from 'react-hot-toast';
 import VideoProtection from '@/components/VideoProtection';
 import CourseChat from '@/components/CourseChat';
+import { achievementsService } from '@/services/achievements.service';
 
 interface CourseProgress {
   completedLessons: string[];
@@ -122,11 +123,8 @@ function CoursePage() {
         return;
       }
       
-      // استخدام Supabase مباشرة
-      const { createClient } = await import('@supabase/supabase-js');
-      const supabaseUrl = 'https://wnqifmvgvlmxgswhcwnc.supabase.co';
-      const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InducWlmbXZndmxteGdzd2hjd25jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI0MzYwNTUsImV4cCI6MjA3ODAxMjA1NX0.LqWhTZYmr7nu-dIy2uBBqntOxoWM-waluYIR9bipC9M';
-      const supabase = createClient(supabaseUrl, supabaseKey);
+      // استخدام عميل Supabase الموحد
+      const { default: supabase } = await import('@/lib/supabase-client');
       
       // جلب الكورس من Supabase
       console.log('🔄 محاولة جلب الكورس بـ ID صالح:', courseId);
@@ -169,22 +167,57 @@ function CoursePage() {
       
       console.log('✅ تم جلب بيانات الكورس:', courseData);
       
-      // جلب الدروس المرتبطة بالكورس
-      const { data: lessons, error: lessonsError } = await supabase
-        .from('lessons')
-        .select('*')
-        .eq('course_id', courseId)
-        .order('order_index', { ascending: true });
-      
-      console.log('📚 الدروس:', lessons);
-      console.log('📝 عدد الدروس:', lessons?.length || 0);
-      console.log('🔍 تفاصيل الدروس:', JSON.stringify(lessons, null, 2));
-      
-      if (lessonsError) {
-        console.error('❌ خطأ في جلب الدروس:', lessonsError);
+      // جلب الأقسام والدروس عبر section_id فقط
+      const { data: sections, error: sectionsError } = await supabase
+        .from('sections')
+        .select('id, title, order_index, created_at')
+        .eq('course_id', courseId);
+
+      if (sectionsError) {
+        console.warn('⚠️ خطأ في جلب الأقسام:', sectionsError);
+      }
+
+      let sectionsWithLessons: any[] = [];
+      if (sections && sections.length > 0) {
+        sections.sort((a: any, b: any) => {
+          const ao = a.order_index ?? 0;
+          const bo = b.order_index ?? 0;
+          if (ao !== bo) return ao - bo;
+          const ad = a.created_at ? Date.parse(a.created_at) : 0;
+          const bd = b.created_at ? Date.parse(b.created_at) : 0;
+          return ad - bd;
+        });
+        for (const section of sections) {
+          const { data: sectionLessons, error: sectionLessonsError } = await supabase
+            .from('lessons')
+            .select('*')
+            .eq('section_id', section.id);
+          if (sectionLessonsError) {
+            console.warn('⚠️ خطأ في جلب دروس القسم:', { sectionId: section.id, error: sectionLessonsError });
+            continue;
+          }
+          const orderedSectionLessons = (sectionLessons || []).sort((a: any, b: any) => {
+            const ao = a.order_index ?? a.order ?? 0;
+            const bo = b.order_index ?? b.order ?? 0;
+            return ao - bo;
+          });
+          sectionsWithLessons.push({
+            id: String(section.id),
+            title: section.title || 'قسم',
+            lessons: orderedSectionLessons.map((lesson: any) => ({
+              id: lesson.id,
+              title: lesson.title,
+              description: lesson.description,
+              duration: lesson.duration_minutes || lesson.duration || 0,
+              videoUrl: lesson.video_url || '',
+              isFree: !!lesson.is_free,
+              isPreview: !!lesson.is_preview || !!lesson.is_free,
+            })),
+          });
+        }
       }
       
-      // تحويل البيانات لتناسب الشكل المطلوب
+      // تحويل البيانات لتناسب الشكل المطلوب (بدون أي قيم تقييم وهمية)
       const formattedCourse = {
         ...courseData,
         id: courseData.id,
@@ -196,24 +229,17 @@ function CoursePage() {
           name: courseData.instructor_name || 'المدرس',
           image: '/default-instructor.svg'
         },
-        rating: courseData.rating || 4.5,
-        studentsCount: courseData.enrollment_count || 0,
+        // التقييم والعدد يعتمدان فقط على قيم الجدول، وإذا لم توجد = 0
+        rating: courseData.rating ?? 0,
+        ratingCount: (courseData as any).rating_count ?? 0,
+        // عدد الطلاب يعتمد على الحقل المخصص إن وجد وإلا 0
+        studentsCount:
+          (courseData as any).students_count ??
+          (courseData as any).enrollment_count ??
+          0,
         level: courseData.level,
         category: courseData.category,
-        sections: lessons && lessons.length > 0 ? [
-          {
-            id: 'main-section',
-            title: 'الدروس',
-            lessons: lessons.map((lesson: any) => ({
-              id: lesson.id,
-              title: lesson.title,
-              description: lesson.description,
-              duration: lesson.duration_minutes || 0,
-              videoUrl: lesson.video_url,
-              isFree: lesson.is_free
-            }))
-          }
-        ] : []
+        sections: sectionsWithLessons,
       };
       
       console.log('📂 الأقسام المحولة:', formattedCourse.sections);
@@ -282,7 +308,7 @@ function CoursePage() {
   };
 
   const handleLessonComplete = async (lessonId: string, isAuto = false) => {
-    if (!course || !progress) return;
+    if (!course || !progress || !isEnrolled) return;
     
     // تحقق إذا الدرس مكتمل قبل كده
     if (progress.completedLessons.includes(lessonId)) {
@@ -312,6 +338,45 @@ function CoursePage() {
       toast.success('🎉 تهانينا! تم إكمال الدرس تلقائياً بعد المشاهدة');
     } else {
       toast.success('تم إكمال الدرس بنجاح! ✅');
+    }
+    
+    // حفظ تقدم الدرس في قاعدة البيانات وتفعيل نظام الإنجازات
+    try {
+      const userJson = typeof window !== 'undefined' ? localStorage.getItem('user') : null;
+      if (userJson) {
+        const user = JSON.parse(userJson);
+        const userId = user.id;
+
+        if (userId) {
+          // استخدام Supabase لتسجيل التقدم في جدول lesson_progress
+          const { default: supabase } = await import('@/lib/supabase-client');
+
+          const { error: progressError } = await supabase
+            .from('lesson_progress')
+            .upsert(
+              {
+                user_id: userId,
+                lesson_id: lessonId,
+                is_completed: true,
+                completed_at: new Date().toISOString(),
+              },
+              { onConflict: 'user_id,lesson_id' }
+            );
+
+          if (progressError) {
+            console.error('❌ خطأ في حفظ تقدم الدرس في Supabase:', progressError);
+          } else {
+            // بعد حفظ التقدم، التحقق من الإنجازات ومنح الجديدة إن وجدت
+            try {
+              await achievementsService.checkAndGrantAchievements(userId, courseId);
+            } catch (achError) {
+              console.error('❌ خطأ في تفعيل نظام الإنجازات:', achError);
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.error('❌ خطأ غير متوقع أثناء حفظ التقدم وتفعيل الإنجازات:', e);
     }
     
     // الانتقال للدرس التالي تلقائياً بعد 3 ثواني
@@ -445,7 +510,7 @@ function CoursePage() {
   
   // تفعيل تتبع الفيديو عند تغيير الدرس أو حالة التشغيل
   useEffect(() => {
-    if (activeLesson && isVideoPlaying && course) {
+    if (activeLesson && isVideoPlaying && course && isEnrolled) {
       const selectedLesson = course.sections
         ?.flatMap((section: any) => section.lessons || [])
         ?.find((lesson: any) => String(lesson.id) === activeLesson);
@@ -455,7 +520,7 @@ function CoursePage() {
         return cleanup;
       }
     }
-  }, [activeLesson, isVideoPlaying]);
+  }, [activeLesson, isVideoPlaying, isEnrolled, course]);
 
   if (isLoading) {
     return (
@@ -663,10 +728,7 @@ function CoursePage() {
                     } mb-2`}
                     onClick={() => {
                       setActiveLesson(String(lesson.id));
-                      setIsVideoPlaying(true);
-                      // بدء تتبع الفيديو
-                      startVideoTracking(String(lesson.id), lesson.duration || 10);
-                      // رسالة ترحيب
+                      setIsVideoPlaying(false);
                       if (!progress?.completedLessons.includes(String(lesson.id))) {
                         toast(`🎬 بدء الدرس: ${lesson.title}`, { 
                           icon: '📺',
@@ -749,7 +811,12 @@ function CoursePage() {
                     ?.find((lesson: any) => String(lesson.id) === activeLesson);
                   return selectedLesson?.videoUrl || '';
                 })()}
-                isEnrolled={isEnrolled}
+                isEnrolled={(() => {
+                  const selectedLesson = course?.sections
+                    ?.flatMap((section: any) => section.lessons || [])
+                    ?.find((lesson: any) => String(lesson.id) === activeLesson);
+                  return !!selectedLesson?.isPreview || isEnrolled;
+                })()}
                 onEnroll={() => setIsEnrolled(true)}
               />
             </div>
@@ -888,95 +955,98 @@ function CoursePage() {
                 );
               }
             })()}
-          </div>
+            </div>
           )}
           {/* معلومات التقدم والتحكم */}
-          <div className="mt-6 space-y-4">
-            {/* شريط التقدم في المشاهدة */}
-            {activeLesson && (() => {
-              const selectedLesson = course?.sections
-                ?.flatMap((section: any) => section.lessons || [])
-                ?.find((lesson: any) => String(lesson.id) === activeLesson);
-              const duration = selectedLesson?.duration || 10;
-              const requiredTime = duration * 60 * 0.8; // 80% بالثواني
-              const watchedTime = videoProgress[activeLesson] || 0;
-              const watchProgress = Math.min(Math.round((watchedTime / requiredTime) * 100), 100);
-              const isCompleted = videoCompleted[activeLesson] || progress?.completedLessons.includes(activeLesson);
-              
-              return (
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-sm font-medium text-gray-700">
-                      {isCompleted ? (
-                        <span className="text-green-600">✅ تم إكمال هذا الدرس</span>
-                      ) : (
-                        `تقدم المشاهدة: ${watchProgress}%`
-                      )}
-                    </span>
-                    <span className="text-xs text-gray-500">
-                      {Math.floor(watchedTime / 60)}:{(watchedTime % 60).toString().padStart(2, '0')} / {duration}:00 دقيقة
-                    </span>
-                  </div>
-                  
-                  <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
-                    <div 
-                      className={`h-full transition-all duration-500 ${
-                        isCompleted 
-                          ? 'bg-green-500' 
-                          : watchProgress >= 80 
-                            ? 'bg-blue-600' 
-                            : 'bg-primary'
-                      }`}
-                      style={{ width: `${isCompleted ? 100 : watchProgress}%` }}
-                    />
-                  </div>
-                  
-                  {!isCompleted && watchProgress < 80 && (
-                    <p className="text-xs text-gray-500 mt-2">
-                      🎯 شاهد 80% من الفيديو لإكمال الدرس تلقائياً
-                    </p>
-                  )}
-                  {!isCompleted && watchProgress >= 80 && watchProgress < 100 && (
-                    <p className="text-xs text-yellow-600 mt-2 animate-pulse">
-                      ⏳ قريباً جداً من إكمال الدرس...
-                    </p>
-                  )}
-                </div>
-              );
-            })()}
-            
-            {/* أزرار التحكم */}
-            <div className="flex justify-between items-center">
-              <div className="flex gap-3">
-                <button 
-                  onClick={() => {
-                    setIsVideoPlaying(!isVideoPlaying);
-                    toast(isVideoPlaying ? '⏸️ تم إيقاف الفيديو مؤقتاً' : '▶️ تم استئناف التشغيل', { duration: 2000 });
-                  }}
-                  className="bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 flex items-center gap-2 font-bold shadow-lg transition"
-                >
-                  {isVideoPlaying ? '⏸️ إيقاف مؤقت' : '▶️ تشغيل'}
-                </button>
+          {isEnrolled && (
+            <div className="mt-6 space-y-4">
+              {/* شريط التقدم في المشاهدة */}
+              {activeLesson && (() => {
+                const selectedLesson = course?.sections
+                  ?.flatMap((section: any) => section.lessons || [])
+                  ?.find((lesson: any) => String(lesson.id) === activeLesson);
+                const duration = selectedLesson?.duration || 10;
+                const requiredTime = duration * 60 * 0.8; // 80% بالثواني
+                const watchedTime = videoProgress[activeLesson] || 0;
+                const watchProgress = Math.min(Math.round((watchedTime / requiredTime) * 100), 100);
+                const isCompleted = videoCompleted[activeLesson] || progress?.completedLessons.includes(activeLesson);
                 
-                <button 
-                  onClick={() => handleLessonComplete(activeLesson)}
-                  disabled={progress?.completedLessons.includes(activeLesson)}
-                  className={`px-8 py-3 rounded-xl flex items-center gap-2 font-bold shadow-lg transition ${
-                    progress?.completedLessons.includes(activeLesson)
-                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                      : 'bg-gradient-to-r from-green-500 to-green-600 text-white hover:from-green-600 hover:to-green-700'
-                  }`}
-                >
-                  <FaCheck /> {progress?.completedLessons.includes(activeLesson) ? 'مكتمل' : 'إكمال الدرس يدوياً'}
-                </button>
-              </div>
+                return (
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-sm font-medium text-gray-700">
+                        {isCompleted ? (
+                          <span className="text-green-600">✅ تم إكمال هذا الدرس</span>
+                        ) : (
+                          `تقدم المشاهدة: ${watchProgress}%`
+                        )}
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        {Math.floor(watchedTime / 60)}:{(watchedTime % 60).toString().padStart(2, '0')} / {duration}:00 دقيقة
+                      </span>
+                    </div>
+                    
+                    <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                      <div 
+                        className={`h-full transition-all duration-500 ${
+                          isCompleted 
+                            ? 'bg-green-500' 
+                            : watchProgress >= 80 
+                              ? 'bg-blue-600' 
+                              : 'bg-primary'
+                        }`}
+                        style={{ width: `${isCompleted ? 100 : watchProgress}%` }}
+                      />
+                    </div>
+                    
+                    {!isCompleted && watchProgress < 80 && (
+                      <p className="text-xs text-gray-500 mt-2">
+                        🎯 شاهد 80% من الفيديو لإكمال الدرس تلقائياً
+                      </p>
+                    )}
+                    {!isCompleted && watchProgress >= 80 && watchProgress < 100 && (
+                      <p className="text-xs text-yellow-600 mt-2 animate-pulse">
+                        ⏳ قريباً جداً من إكمال الدرس...
+                      </p>
+                    )}
+                  </div>
+                );
+              })()}
               
-              <div className="text-gray-600">
-                <span className="text-sm">تقدم الكورس: </span>
-                <span className="font-bold text-primary">{progress?.percentComplete || 0}%</span>
+              {/* أزرار التحكم */}
+              <div className="flex justify-between items-center">
+                <div className="flex gap-3">
+                  <button 
+                    onClick={() => {
+                      const nextState = !isVideoPlaying;
+                      setIsVideoPlaying(nextState);
+                      toast(nextState ? '▶️ تم استئناف التشغيل' : '⏸️ تم إيقاف الفيديو مؤقتاً', { duration: 2000 });
+                    }}
+                    className="bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 flex items-center gap-2 font-bold shadow-lg transition"
+                  >
+                    {isVideoPlaying ? '⏸️ إيقاف مؤقت' : '▶️ تشغيل'}
+                  </button>
+                  
+                  <button 
+                    onClick={() => handleLessonComplete(activeLesson)}
+                    disabled={progress?.completedLessons.includes(activeLesson)}
+                    className={`px-8 py-3 rounded-xl flex items-center gap-2 font-bold shadow-lg transition ${
+                      progress?.completedLessons.includes(activeLesson)
+                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                        : 'bg-gradient-to-r from-green-500 to-green-600 text-white hover:from-green-600 hover:to-green-700'
+                    }`}
+                  >
+                    <FaCheck /> {progress?.completedLessons.includes(activeLesson) ? 'مكتمل' : 'إكمال الدرس يدوياً'}
+                  </button>
+                </div>
+                
+                <div className="text-gray-600">
+                  <span className="text-sm">تقدم الكورس: </span>
+                  <span className="font-bold text-primary">{progress?.percentComplete || 0}%</span>
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
       )}
       

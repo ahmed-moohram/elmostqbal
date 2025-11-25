@@ -4,6 +4,7 @@ import { FaEdit, FaTrash, FaPlusCircle, FaClipboardList, FaBook } from "react-ic
 import Link from "next/link";
 import AdminLayout from "@/components/AdminLayout";
 import { toast } from "react-hot-toast";
+import supabase from '@/lib/supabase-client';
 
 interface Course {
   _id: string;
@@ -27,6 +28,7 @@ export default function AdminCoursesPage() {
   const [editTitle, setEditTitle] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [editPrice, setEditPrice] = useState<number>(0);
+  const [editImage, setEditImage] = useState<string>("");
 
   useEffect(() => {
     fetchCourses();
@@ -37,13 +39,7 @@ export default function AdminCoursesPage() {
     setError('');
     
     try {
-      // استخدام Supabase مباشرة
-      const { createClient } = await import('@supabase/supabase-js');
-      const SUPABASE_URL = 'https://wnqifmvgvlmxgswhcwnc.supabase.co';
-      const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InducWlmbXZndmxteGdzd2hjd25jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI0MzYwNTUsImV4cCI6MjA3ODAxMjA1NX0.LqWhTZYmr7nu-dIy2uBBqntOxoWM-waluYIR9bipC9M';
-      
-      const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
-      
+      // استخدام Supabase مباشرة (العميل الموحد)
       console.log('🔍 جاري جلب الدورات من Supabase...');
       
       // جلب الدورات من قاعدة البيانات
@@ -94,22 +90,21 @@ export default function AdminCoursesPage() {
 
   const handleTogglePublish = async (id: string, currentStatus: boolean) => {
     try {
-      const { createClient } = await import('@supabase/supabase-js');
-      const SUPABASE_URL = 'https://wnqifmvgvlmxgswhcwnc.supabase.co';
-      const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InducWlmbXZndmxteGdzd2hjd25jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI0MzYwNTUsImV4cCI6MjA3ODAxMjA1NX0.LqWhTZYmr7nu-dIy2uBBqntOxoWM-waluYIR9bipC9M';
-      
-      const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
-      
+      const nextPublished = !currentStatus;
       const { error } = await supabase
         .from('courses')
-        .update({ is_published: !currentStatus })
+        .update({ 
+          is_published: nextPublished,
+          status: nextPublished ? 'published' : 'draft',
+          is_active: nextPublished ? true : false,
+        })
         .eq('id', id);
       
       if (error) throw error;
       
       // تحديث القائمة المحلية
       setCourses(courses.map(c => 
-        c._id === id ? { ...c, isPublished: !currentStatus } : c
+        c._id === id ? { ...c, isPublished: nextPublished } : c
       ));
       toast.success(!currentStatus ? '✅ تم نشر الدورة!' : '⚠️ تم إلغاء نشر الدورة');
     } catch (error) {
@@ -119,38 +114,20 @@ export default function AdminCoursesPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (window.confirm('هل أنت متأكد من حذف هذه الدورة؟')) {
-      try {
-        const { createClient } = await import('@supabase/supabase-js');
-        const SUPABASE_URL = 'https://wnqifmvgvlmxgswhcwnc.supabase.co';
-        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InducWlmbXZndmxteGdzd2hjd25jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI0MzYwNTUsImV4cCI6MjA3ODAxMjA1NX0.LqWhTZYmr7nu-dIy2uBBqntOxoWM-waluYIR9bipC9M';
-        
-        const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
-        
-        const { error } = await supabase
-          .from('courses')
-          .delete()
-          .eq('id', id);
-        
-        if (!error) {
-          // ✅ حذف فوري من القائمة المحلية
-          setCourses(courses.filter(c => c._id !== id));
-          
-          // ✅ مسح أي Cache موجود
-          sessionStorage.clear();
-          localStorage.removeItem('coursesCache');
-          
-          console.log('✅ تم حذف الدورة فوراً!');
-          
-          // ✅ إشعار نجاح
-          alert('✅ تم حذف الدورة بنجاح! التغييرات ستظهر فوراً في جميع الصفحات.');
-        } else {
-          alert('❌ فشل حذف الدورة!');
-        }
-      } catch (error) {
-        console.error('❌ خطأ في حذف الدورة:', error);
-        alert('❌ حدث خطأ أثناء الحذف!');
+    if (!window.confirm('هل أنت متأكد من حذف هذه الدورة كاملة من قاعدة البيانات؟')) return;
+    try {
+      const res = await fetch(`/api/courses/${id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `فشل حذف الدورة (${res.status})`);
       }
+      setCourses(courses.filter(c => c._id !== id));
+      sessionStorage.clear();
+      localStorage.removeItem('coursesCache');
+      toast.success('✅ تم حذف الدورة وكل محتواها');
+    } catch (error: any) {
+      console.error('❌ خطأ في حذف الدورة:', error);
+      toast.error(error.message || '❌ حدث خطأ أثناء الحذف');
     }
   };
 
@@ -159,16 +136,44 @@ export default function AdminCoursesPage() {
     setEditTitle(course.title);
     setEditDescription(course.description);
     setEditPrice(course.price ?? 0);
+    setEditImage(course.image || "");
   };
 
-  const handleSave = () => {
-    setCourses(
-      courses.map((c) =>
-        c._id === editId ? { ...c, title: editTitle, description: editDescription, price: editPrice } : c
-      )
-    );
-    setEditId(null);
-    toast.success("تم تحديث الدورة بنجاح");
+  const handleSave = async () => {
+    if (!editId) return;
+
+    try {
+      // تحديث بيانات الكورس في Supabase
+      const { error: updateError } = await supabase
+        .from('courses')
+        .update({
+          title: editTitle,
+          description: editDescription,
+          price: editPrice,
+          thumbnail: editImage || null,
+        })
+        .eq('id', editId);
+
+      if (updateError) {
+        console.error('❌ خطأ في تحديث بيانات الكورس في Supabase:', updateError);
+        toast.error('حدث خطأ أثناء حفظ التعديلات في قاعدة البيانات');
+        return;
+      }
+
+      // تحديث الحالة المحلية بعد نجاح الحفظ
+      setCourses(
+        courses.map((c) =>
+          c._id === editId
+            ? { ...c, title: editTitle, description: editDescription, price: editPrice, image: editImage || c.image }
+            : c
+        )
+      );
+      setEditId(null);
+      toast.success('تم تحديث الدورة بنجاح');
+    } catch (err) {
+      console.error('❌ خطأ غير متوقع أثناء حفظ تعديلات الكورس:', err);
+      toast.error('حدث خطأ غير متوقع أثناء الحفظ');
+    }
   };
 
   return (
@@ -221,13 +226,33 @@ export default function AdminCoursesPage() {
               <tr key={course._id} className="hover:bg-gray-50">
                 <td className="px-4 py-3 text-sm">
                   {editId === course._id ? (
-                    <input 
-                      value={editTitle} 
-                      onChange={(e) => setEditTitle(e.target.value)} 
-                      className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-primary"
-                    />
+                    <div className="space-y-2">
+                      <input 
+                        value={editTitle} 
+                        onChange={(e) => setEditTitle(e.target.value)} 
+                        className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-primary"
+                        placeholder="عنوان الكورس"
+                      />
+                      <input
+                        value={editImage}
+                        onChange={(e) => setEditImage(e.target.value)}
+                        className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-primary"
+                        placeholder="رابط صورة الكورس (thumbnail)"
+                      />
+                    </div>
                   ) : (
-                    <span className="font-medium">{course.title}</span>
+                    <div className="flex items-center gap-2">
+                      {course.image && (
+                        // عرض صورة مصغرة للكورس إن وجدت
+                        // (نستخدم <img> العادي لتفادي الحاجة لاستيراد Image هنا)
+                        <img
+                          src={course.image}
+                          alt={course.title}
+                          className="w-10 h-10 rounded object-cover border border-gray-200"
+                        />
+                      )}
+                      <span className="font-medium">{course.title}</span>
+                    </div>
                   )}
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-600">
@@ -272,20 +297,36 @@ export default function AdminCoursesPage() {
                 </td>
                 <td className="px-4 py-3 text-center">
                   {editId === course._id ? (
-                    <button 
-                      onClick={handleSave} 
-                      className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 font-medium"
-                    >
-                      حفظ
-                    </button>
+                    <div className="flex items-center justify-center gap-2">
+                      <button 
+                        onClick={handleSave} 
+                        className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 font-medium"
+                      >
+                        حفظ بسيط
+                      </button>
+                      <Link
+                        href={`/admin/courses/${course._id}/edit`}
+                        className="inline-flex items-center px-3 py-2 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md border border-gray-300"
+                      >
+                        فتح صفحة التعديل الكاملة
+                      </Link>
+                    </div>
                   ) : (
-                    <button 
-                      onClick={() => handleEdit(course)} 
-                      className="text-blue-600 hover:text-blue-800 p-2"
-                      title="تعديل"
-                    >
-                      <FaEdit className="text-lg" />
-                    </button>
+                    <div className="flex items-center justify-center gap-2">
+                      <button 
+                        onClick={() => handleEdit(course)} 
+                        className="text-blue-600 hover:text-blue-800 p-2"
+                        title="تعديل سريع"
+                      >
+                        <FaEdit className="text-lg" />
+                      </button>
+                      <Link
+                        href={`/admin/courses/${course._id}/edit`}
+                        className="inline-flex items-center px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md border border-gray-300"
+                      >
+                        تعديل كامل
+                      </Link>
+                    </div>
                   )}
                 </td>
                 <td className="px-4 py-3 text-center">

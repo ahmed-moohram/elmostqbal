@@ -84,7 +84,7 @@ export default function CourseHelperPage() {
               <div>
                 <h3 className="text-lg font-bold mb-3">المعلومات التقنية:</h3>
                 <div className="bg-gray-100 rounded-lg p-4 font-mono text-sm">
-                  <div>📦 Supabase URL: https://wnqifmvgvlmxgswhcwnc.supabase.co</div>
+                  <div>📦 Supabase URL: https://chikfjvpkqtivtyhvvzt.supabase.co</div>
                   <div>📁 جدول الكورسات: courses</div>
                   <div>📁 جدول الدروس: lessons</div>
                   <div>🔑 Primary Key: id (UUID)</div>

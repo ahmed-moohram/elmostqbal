@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import AdminLayout from '@/components/AdminLayout';
 import { FaMoneyBillWave, FaCreditCard, FaMobileAlt, FaUniversity, FaCheckCircle } from 'react-icons/fa';
+import supabase from '@/lib/supabase-client';
 
 export default function PaymentsPage() {
   const [payments, setPayments] = useState<any[]>([]);
@@ -13,26 +14,74 @@ export default function PaymentsPage() {
   }, []);
 
   const fetchPayments = async () => {
-    const mockPayments = [
-      { id: 1, student: 'أحمد محمد', amount: 500, method: 'credit_card', status: 'success', date: '2024-10-01 14:30', transactionId: 'TXN001' },
-      { id: 2, student: 'فاطمة علي', amount: 350, method: 'vodafone_cash', status: 'success', date: '2024-10-05 09:15', transactionId: 'TXN002' },
-      { id: 3, student: 'محمد حسن', amount: 600, method: 'credit_card', status: 'success', date: '2024-10-03 16:45', transactionId: 'TXN003' },
-      { id: 4, student: 'خالد يوسف', amount: 550, method: 'bank_transfer', status: 'success', date: '2024-10-04 11:20', transactionId: 'TXN004' },
-      { id: 5, student: 'نور محمود', amount: 400, method: 'vodafone_cash', status: 'pending', date: '2024-10-06 10:00', transactionId: 'TXN005' },
-    ];
-    const totalRevenue = mockPayments.filter(p => p.status === 'success').reduce((sum, p) => sum + p.amount, 0);
-    const thisMonth = mockPayments.filter(p => p.status === 'success' && p.date.startsWith('2024-10')).reduce((sum, p) => sum + p.amount, 0);
-    const avgPayment = totalRevenue / mockPayments.filter(p => p.status === 'success').length;
-    
-    setTimeout(() => {
-      setPayments(mockPayments);
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('payments')
+        .select(
+          `
+          id,
+          amount,
+          payment_method,
+          status,
+          payment_date,
+          transaction_id,
+          user:users ( id, name )
+        `
+        )
+        .order('payment_date', { ascending: false });
+
+      if (error) {
+        console.error('خطأ في جلب المدفوعات:', error);
+        setPayments([]);
+        return;
+      }
+
+      const transformed = (data || []).map((row: any) => ({
+        id: row.id,
+        student: row.user?.name || 'طالب',
+        amount: Number(row.amount) || 0,
+        method: row.payment_method || '',
+        status: row.status || '',
+        rawDate: row.payment_date ? new Date(row.payment_date) : null,
+        date: row.payment_date
+          ? new Date(row.payment_date).toLocaleString('ar-EG')
+          : '',
+        transactionId: row.transaction_id || '',
+      }));
+
+      setPayments(transformed);
+    } catch (error) {
+      console.error('خطأ غير متوقع في جلب المدفوعات:', error);
+      setPayments([]);
+    } finally {
       setLoading(false);
-    }, 300);
+    }
   };
 
-  const totalRevenue = payments.filter(p => p.status === 'success').reduce((sum, p) => sum + p.amount, 0);
-  const thisMonth = payments.filter(p => p.status === 'success' && p.date.startsWith('2024-10')).reduce((sum, p) => sum + p.amount, 0);
-  const avgPayment = payments.filter(p => p.status === 'success').length > 0 ? totalRevenue / payments.filter(p => p.status === 'success').length : 0;
+  const successfulPayments = payments.filter((p: any) => {
+    const status = (p.status || '').toLowerCase();
+    return ['success', 'completed', 'paid'].includes(status);
+  });
+
+  const totalRevenue = successfulPayments.reduce(
+    (sum: number, p: any) => sum + (p.amount || 0),
+    0
+  );
+
+  const now = new Date();
+  const thisMonth = successfulPayments
+    .filter((p: any) =>
+      p.rawDate &&
+      p.rawDate.getFullYear() === now.getFullYear() &&
+      p.rawDate.getMonth() === now.getMonth()
+    )
+    .reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
+
+  const avgPayment =
+    successfulPayments.length > 0
+      ? totalRevenue / successfulPayments.length
+      : 0;
   return (
     <AdminLayout>
       <div className="p-6">

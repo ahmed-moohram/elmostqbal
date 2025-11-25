@@ -2,16 +2,10 @@
 
 import { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { createClient } from '@supabase/supabase-js';
 import { FaFilePdf, FaUpload, FaTrash, FaEye, FaDownload, FaBook } from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
-
-// Supabase client
-const supabase = createClient(
-  'https://wnqifmvgvlmxgswhcwnc.supabase.co',
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InducWlmbXZndmxteGdzd2hjd25jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI0MzYwNTUsImV4cCI6MjA3ODAxMjA1NX0.LqWhTZYmr7nu-dIy2uBBqntOxoWM-waluYIR9bipC9M'
-);
+import supabase from '@/lib/supabase-client';
 
 interface PDFBook {
   id: string;

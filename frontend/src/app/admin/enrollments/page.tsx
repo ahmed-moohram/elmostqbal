@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useEffect } from "react";
+import { API_BASE_URL } from '@/lib/api';
 import { FaCheckCircle, FaTimesCircle, FaSearch, FaUserCircle, FaBookOpen } from "react-icons/fa";
 import AdminLayout from "../../../components/AdminLayout";
 import Link from "next/link";
@@ -37,8 +38,8 @@ export default function EnrollmentRequestsPage() {
           return;
         }
 
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-        const res = await fetch(`${apiUrl}/api/enrollments`, {
+        const apiUrl = API_BASE_URL || '';
+        const res = await fetch(`${apiUrl}/api/admin/enrollments`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }
@@ -49,21 +50,20 @@ export default function EnrollmentRequestsPage() {
         }
 
         const data = await res.json();
-        
-        // تحويل البيانات إلى الشكل المطلوب
-        const formattedRequests = data.enrollments.map((enrollment: any) => ({
+        const list = Array.isArray(data) ? data : (data.data || data.enrollments || []);
+        const formattedRequests = list.map((enrollment: any) => ({
           _id: enrollment._id,
-          studentId: enrollment.student._id,
-          studentName: enrollment.student.name,
-          studentPhone: enrollment.student.phone || 'غير متوفر',
-          studentEmail: enrollment.student.email,
-          studentAvatar: enrollment.student.avatar,
-          courseTitle: enrollment.course.title,
-          courseId: enrollment.course._id,
-          paymentStatus: enrollment.paymentStatus,
-          requestStatus: enrollment.status,
-          requestDate: new Date(enrollment.createdAt).toISOString().split('T')[0],
-          createdAt: enrollment.createdAt
+          studentId: enrollment.studentId?._id || enrollment.studentId,
+          studentName: enrollment.studentId?.name || enrollment.studentInfo?.name || 'غير معروف',
+          studentPhone: enrollment.studentId?.phone || enrollment.studentInfo?.phone || 'غير متوفر',
+          studentEmail: enrollment.studentId?.email || enrollment.studentInfo?.email || 'غير متوفر',
+          studentAvatar: enrollment.studentId?.avatar,
+          courseTitle: enrollment.courseId?.title || 'كورس',
+          courseId: enrollment.courseId?._id || enrollment.courseId,
+          paymentStatus: (enrollment.paymentInfo?.status === 'completed' ? 'paid' : (enrollment.paymentInfo?.status || 'pending')),
+          requestStatus: enrollment.status === 'approved' ? 'accepted' : enrollment.status,
+          requestDate: new Date(enrollment.submittedAt || enrollment.createdAt).toISOString().split('T')[0],
+          createdAt: enrollment.submittedAt || enrollment.createdAt
         }));
 
         setRequests(formattedRequests);
@@ -86,9 +86,9 @@ export default function EnrollmentRequestsPage() {
         return;
       }
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-      const res = await fetch(`${apiUrl}/api/enrollments/${id}/accept`, {
-        method: 'PATCH',
+      const apiUrl = API_BASE_URL || '';
+      const res = await fetch(`${apiUrl}/api/admin/enrollments/${id}/approve`, {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
@@ -119,9 +119,9 @@ export default function EnrollmentRequestsPage() {
         return;
       }
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-      const res = await fetch(`${apiUrl}/api/enrollments/${id}/reject`, {
-        method: 'PATCH',
+      const apiUrl = API_BASE_URL || '';
+      const res = await fetch(`${apiUrl}/api/admin/enrollments/${id}/reject`, {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`

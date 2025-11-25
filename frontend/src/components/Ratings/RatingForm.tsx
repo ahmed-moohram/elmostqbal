@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { API_BASE_URL } from '@/lib/api';
 import RatingStars from './RatingStars';
 
 interface RatingFormProps {
@@ -28,7 +29,7 @@ const RatingForm: React.FC<RatingFormProps> = ({
   const fetchUserRating = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`/api/ratings/user/${targetType}/${targetId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/ratings/user/${targetType}/${targetId}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -64,8 +65,8 @@ const RatingForm: React.FC<RatingFormProps> = ({
     try {
       const token = localStorage.getItem('token');
       const url = existingRating 
-        ? `/api/ratings/${existingRating._id}`
-        : '/api/ratings';
+        ? `${API_BASE_URL}/api/ratings/${existingRating._id}`
+        : `${API_BASE_URL}/api/ratings`;
       
       const method = existingRating ? 'PUT' : 'POST';
       
@@ -155,4 +156,4 @@ const RatingForm: React.FC<RatingFormProps> = ({
   );
 };
 
-export default RatingForm; 
+export default RatingForm;

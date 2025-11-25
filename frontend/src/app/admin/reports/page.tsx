@@ -1,9 +1,10 @@
-'use client';
+"use client";
 
 import { useState, useEffect } from 'react';
 import AdminLayout from '@/components/AdminLayout';
 import { FaChartLine, FaDownload, FaCalendar, FaUsers, FaMoneyBillWave, FaGraduationCap, FaArrowUp } from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
+import supabase from '@/lib/supabase-client';
 
 export default function ReportsPage() {
   const [dateFrom, setDateFrom] = useState('2024-10-01');
@@ -11,38 +12,203 @@ export default function ReportsPage() {
   const [reportData, setReportData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
 
-  const generateReport = () => {
+  const generateReport = async () => {
     if (!dateFrom || !dateTo) {
       toast.error('يرجى اختيار التواريخ');
       return;
     }
     setLoading(true);
-    
-    // محاكاة توليد تقرير
-    setTimeout(() => {
-      const mockReport = {
-        newRegistrations: 24,
-        revenue: 12500,
-        coursesSold: 18,
-        growthRate: 15.8,
-        details: [
-          { date: '2024-10-01', registrations: 3, revenue: 1500, courses: 2 },
-          { date: '2024-10-05', registrations: 5, revenue: 2500, courses: 3 },
-          { date: '2024-10-10', registrations: 4, revenue: 2000, courses: 2 },
-          { date: '2024-10-15', registrations: 6, revenue: 3000, courses: 4 },
-          { date: '2024-10-20', registrations: 4, revenue: 2000, courses: 3 },
-          { date: '2024-10-25', registrations: 2, revenue: 1500, courses: 4 },
-        ],
-        topCourses: [
-          { name: 'دورة React المتقدمة', sales: 8, revenue: 4000 },
-          { name: 'دورة Python للمبتدئين', sales: 5, revenue: 1750 },
-          { name: 'دورة UI/UX Design', sales: 5, revenue: 3000 },
-        ],
+    try {
+      const fromDate = new Date(dateFrom);
+      const toDate = new Date(dateTo);
+      toDate.setHours(23, 59, 59, 999);
+
+      const fromIso = fromDate.toISOString();
+      const toIso = toDate.toISOString();
+
+      const [
+        { data: studentsData, error: studentsError },
+        { data: paymentsData, error: paymentsError },
+        { data: enrollmentsData, error: enrollmentsError }
+      ] = await Promise.all([
+        supabase
+          .from('users')
+          .select('id, created_at')
+          .eq('role', 'student')
+          .gte('created_at', fromIso)
+          .lte('created_at', toIso),
+        supabase
+          .from('payments')
+          .select('id, amount, status, course_id, payment_date')
+          .gte('payment_date', fromIso)
+          .lte('payment_date', toIso),
+        supabase
+          .from('enrollments')
+          .select('id, course_id, enrolled_at')
+          .gte('enrolled_at', fromIso)
+          .lte('enrolled_at', toIso),
+      ]);
+
+      if (studentsError) {
+        console.error('خطأ في جلب تسجيلات الطلاب للتقرير:', studentsError);
+      }
+      if (paymentsError) {
+        console.error('خطأ في جلب المدفوعات للتقرير:', paymentsError);
+      }
+      if (enrollmentsError) {
+        console.error('خطأ في جلب التسجيلات للتقرير:', enrollmentsError);
+      }
+
+      const safeStudents = (studentsData || []) as any[];
+      const safePayments = (paymentsData || []) as any[];
+      const safeEnrollments = (enrollmentsData || []) as any[];
+
+      const successfulPayments = safePayments.filter((p: any) =>
+        ['success', 'completed', 'paid'].includes(String(p.status || '').toLowerCase())
+      );
+
+      const newRegistrations = safeStudents.length;
+
+      const revenue = successfulPayments.reduce(
+        (sum: number, p: any) => sum + (Number(p.amount) || 0),
+        0
+      );
+
+      const soldCourseIds = new Set<string>();
+      successfulPayments.forEach((p: any) => {
+        if (p.course_id) {
+          soldCourseIds.add(String(p.course_id));
+        }
+      });
+      safeEnrollments.forEach((e: any) => {
+        if (e.course_id) {
+          soldCourseIds.add(String(e.course_id));
+        }
+      });
+
+      const coursesSold = soldCourseIds.size;
+
+      const dayMap = new Map<
+        string,
+        { registrations: number; revenue: number; courses: Set<string> }
+      >();
+
+      const addDayEntry = (
+        dateStr: string | null | undefined,
+        updater: (entry: {
+          registrations: number;
+          revenue: number;
+          courses: Set<string>;
+        }) => void
+      ) => {
+        if (!dateStr) return;
+        const d = new Date(dateStr);
+        if (Number.isNaN(d.getTime())) return;
+        const dayKey = d.toISOString().slice(0, 10);
+        if (!dayMap.has(dayKey)) {
+          dayMap.set(dayKey, {
+            registrations: 0,
+            revenue: 0,
+            courses: new Set<string>(),
+          });
+        }
+        const entry = dayMap.get(dayKey)!;
+        updater(entry);
       };
-      setReportData(mockReport);
-      setLoading(false);
+
+      safeStudents.forEach((s: any) => {
+        addDayEntry(s.created_at, (entry) => {
+          entry.registrations += 1;
+        });
+      });
+
+      successfulPayments.forEach((p: any) => {
+        addDayEntry(p.payment_date, (entry) => {
+          entry.revenue += Number(p.amount) || 0;
+          if (p.course_id) {
+            entry.courses.add(String(p.course_id));
+          }
+        });
+      });
+
+      safeEnrollments.forEach((e: any) => {
+        addDayEntry(e.enrolled_at, (entry) => {
+          if (e.course_id) {
+            entry.courses.add(String(e.course_id));
+          }
+        });
+      });
+
+      const details = Array.from(dayMap.entries())
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([date, value]) => ({
+          date,
+          registrations: value.registrations,
+          revenue: value.revenue,
+          courses: value.courses.size,
+        }));
+
+      const courseRevenueMap = new Map<
+        string,
+        { revenue: number; sales: number }
+      >();
+
+      successfulPayments.forEach((p: any) => {
+        if (!p.course_id) return;
+        const courseId = String(p.course_id);
+        const current = courseRevenueMap.get(courseId) || {
+          revenue: 0,
+          sales: 0,
+        };
+        current.revenue += Number(p.amount) || 0;
+        current.sales += 1;
+        courseRevenueMap.set(courseId, current);
+      });
+
+      let courseTitlesMap = new Map<string, string>();
+      const courseIds = Array.from(courseRevenueMap.keys());
+
+      if (courseIds.length > 0) {
+        const { data: coursesData, error: coursesError } = await supabase
+          .from('courses')
+          .select('id, title')
+          .in('id', courseIds);
+
+        if (coursesError) {
+          console.error('خطأ في جلب عناوين الكورسات للتقرير:', coursesError);
+        } else {
+          courseTitlesMap = new Map(
+            (coursesData || []).map((c: any) => [String(c.id), c.title as string])
+          );
+        }
+      }
+
+      const topCourses = Array.from(courseRevenueMap.entries())
+        .map(([courseId, info]) => ({
+          name: courseTitlesMap.get(courseId) || 'دورة بدون اسم',
+          sales: info.sales,
+          revenue: info.revenue,
+        }))
+        .sort((a, b) => b.revenue - a.revenue)
+        .slice(0, 5);
+
+      const report = {
+        newRegistrations,
+        revenue,
+        coursesSold,
+        growthRate: null,
+        details,
+        topCourses,
+      };
+
+      setReportData(report);
       toast.success('تم إنشاء التقرير بنجاح');
-    }, 800);
+    } catch (error) {
+      console.error('خطأ غير متوقع في إنشاء التقرير:', error);
+      toast.error('حدث خطأ أثناء إنشاء التقرير');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const exportToPDF = () => {
@@ -137,7 +303,10 @@ export default function ReportsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600">معدل النمو</p>
-                  <p className="text-3xl font-bold text-orange-600">{reportData.growthRate}%</p>
+                  <p className="text-3xl font-bold text-orange-600">
+                    {reportData.growthRate != null ? reportData.growthRate : '--'}
+                    {reportData.growthRate != null && '%'}
+                  </p>
                 </div>
                 <FaArrowUp className="text-4xl text-orange-600 opacity-20" />
               </div>

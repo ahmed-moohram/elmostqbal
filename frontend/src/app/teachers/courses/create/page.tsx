@@ -14,11 +14,13 @@ import {
   FaCheckCircle
 } from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
+import { createCourse } from '@/services/supabase-service';
 
 export default function CreateCoursePage() {
   const router = useRouter();
   const [step, setStep] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Course Basic Info
   const [title, setTitle] = useState('');
@@ -124,28 +126,51 @@ export default function CreateCoursePage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const userJson = localStorage.getItem('user');
+    if (!userJson) {
+      toast.error('يرجى تسجيل الدخول أولاً');
+      router.replace('/login');
+      return;
+    }
 
-    const courseData = {
+    const user = JSON.parse(userJson);
+
+    const baseData = {
       title,
       description,
       category,
       level,
-      price: parseFloat(price),
+      price: parseFloat(price) || 0,
       discountPrice: discountPrice ? parseFloat(discountPrice) : null,
-      requirements: requirements.filter(r => r.trim() !== ''),
-      targetAudience: targetAudience || null,
-      features: features.filter(f => f.trim() !== ''),
-      instructorBio: instructorBio || null
+    };
+
+    const courseDataForSupabase = {
+      ...baseData,
+      instructorId: user.id,
+      instructor: user.name || 'مدرس',
+      thumbnail: '/placeholder-course.jpg',
+      previewVideo: null,
+      duration: 0,
+      isPublished: false,
+      isFeatured: false,
     };
 
     try {
-      // TODO: Send to API
-      console.log('Course Data:', courseData);
-      
+      setIsSubmitting(true);
+      const result = await createCourse(courseDataForSupabase);
+
+      if (!result.success) {
+        toast.error('حدث خطأ أثناء إنشاء الكورس');
+        return;
+      }
+
       toast.success('تم إنشاء الكورس بنجاح! 🎉');
-      router.replace('/teachers/dashboard');
+      router.replace(`/teachers/${user.id}/dashboard`);
     } catch (error) {
+      console.error('Error creating course from teacher page:', error);
       toast.error('حدث خطأ أثناء إنشاء الكورس');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -530,9 +555,14 @@ export default function CreateCoursePage() {
               ) : (
                 <button
                   type="submit"
-                  className="mr-auto px-8 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition flex items-center gap-2 font-bold"
+                  disabled={isSubmitting}
+                  className="mr-auto px-8 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition flex items-center gap-2 font-bold disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <FaCheckCircle /> إنشاء الكورس
+                  {isSubmitting ? 'جاري الإنشاء...' : (
+                    <>
+                      <FaCheckCircle /> إنشاء الكورس
+                    </>
+                  )}
                 </button>
               )}
             </div>
