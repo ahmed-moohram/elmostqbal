@@ -1,12 +1,19 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import AdminLayout from '@/components/AdminLayout';
 import { FaChalkboardTeacher, FaPlus, FaEnvelope, FaPhone, FaStar } from 'react-icons/fa';
 
 export default function InstructorsPage() {
+  const router = useRouter();
   const [teachers, setTeachers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // إعادة توجيه تلقائية دائماً إلى صفحة المدرسين الجديدة
+  useEffect(() => {
+    router.replace('/admin/teachers');
+  }, [router]);
 
   useEffect(() => {
     fetchTeachers();
@@ -48,7 +55,10 @@ export default function InstructorsPage() {
             <FaChalkboardTeacher className="text-primary" />
             المدرسين
           </h1>
-          <button className="bg-primary text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-primary-dark">
+          <button
+            onClick={() => router.push('/admin/teachers')}
+            className="bg-primary text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-primary-dark"
+          >
             <FaPlus /> إضافة مدرس
           </button>
         </div>

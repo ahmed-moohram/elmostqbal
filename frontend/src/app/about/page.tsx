@@ -5,9 +5,11 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { FaGraduationCap, FaChalkboardTeacher, FaUsers, FaCertificate, FaAward, FaLaptop, FaBook, FaStar } from 'react-icons/fa';
+import supabase from '@/lib/supabase-client';
 
 export default function AboutPage() {
   const [isLoading, setIsLoading] = useState(true);
+  const [statsValues, setStatsValues] = useState({ students: 0, teachers: 0, courses: 0 });
 
   useEffect(() => {
     setIsLoading(false);
@@ -39,29 +41,68 @@ export default function AboutPage() {
   const stats = [
     {
       title: "طالب",
-      value: "1000+",
+      // عدد الطلاب الحقيقيين (role = 'student')
+      value: statsValues.students.toLocaleString(),
       icon: <FaUsers />,
       color: "from-blue-400 to-blue-600",
     },
     {
       title: "معلم",
-      value: "20+",
+      // عدد المدرسين الحقيقيين
+      value: statsValues.teachers.toLocaleString(),
       icon: <FaChalkboardTeacher />,
       color: "from-purple-400 to-purple-600",
     },
     {
       title: "دورة تعليمية",
-      value: "50+",
+      // عدد الكورسات المنشورة فعلياً
+      value: statsValues.courses.toLocaleString(),
       icon: <FaBook />,
       color: "from-green-400 to-green-600",
     },
     {
       title: "معدل الرضا",
-      value: "98%",
+      // يمكن لاحقاً ربطه بنظام التقييمات، حالياً نعرضه فقط إذا كان هناك داتا حقيقية
+      value: statsValues.courses > 0 ? "" : "--",
       icon: <FaStar />,
       color: "from-yellow-400 to-yellow-600",
     }
   ];
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const [studentsRes, teachersRes, coursesRes] = await Promise.all([
+          supabase
+            .from('users')
+            .select('id', { count: 'exact', head: true })
+            .eq('role', 'student'),
+          supabase
+            .from('users')
+            .select('id', { count: 'exact', head: true })
+            .eq('role', 'teacher'),
+          supabase
+            .from('courses')
+            .select('id', { count: 'exact', head: true })
+            .eq('is_published', true),
+        ]);
+
+        if (studentsRes.error) console.error('❌ خطأ في جلب عدد الطلاب:', studentsRes.error);
+        if (teachersRes.error) console.error('❌ خطأ في جلب عدد المدرسين:', teachersRes.error);
+        if (coursesRes.error) console.error('❌ خطأ في جلب عدد الكورسات:', coursesRes.error);
+
+        setStatsValues({
+          students: studentsRes.count || 0,
+          teachers: teachersRes.count || 0,
+          courses: coursesRes.count || 0,
+        });
+      } catch (error) {
+        console.error('❌ خطأ غير متوقع في جلب إحصائيات صفحة عن المنصة:', error);
+      }
+    };
+
+    fetchStats();
+  }, []);
 
   const testimonials = [
     {

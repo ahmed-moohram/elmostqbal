@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import supabase from '@/lib/supabase-client';
 
 interface CheckResult {
   name: string;
@@ -31,12 +32,6 @@ export default function SystemCheckPage() {
 
     // 1. فحص Supabase Connection
     try {
-      const { createClient } = await import('@supabase/supabase-js');
-      const supabase = createClient(
-        'https://wnqifmvgvlmxgswhcwnc.supabase.co',
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InducWlmbXZndmxteGdzd2hjd25jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI0MzYwNTUsImV4cCI6MjA3ODAxMjA1NX0.LqWhTZYmr7nu-dIy2uBBqntOxoWM-waluYIR9bipC9M'
-      );
-      
       const { data, error } = await supabase.from('courses').select('count').limit(1);
       
       checksToRun[0] = {
@@ -57,12 +52,6 @@ export default function SystemCheckPage() {
 
     // 2. فحص الجداول
     try {
-      const { createClient } = await import('@supabase/supabase-js');
-      const supabase = createClient(
-        'https://wnqifmvgvlmxgswhcwnc.supabase.co',
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InducWlmbXZndmxteGdzd2hjd25jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI0MzYwNTUsImV4cCI6MjA3ODAxMjA1NX0.LqWhTZYmr7nu-dIy2uBBqntOxoWM-waluYIR9bipC9M'
-      );
-
       const tables = ['courses', 'lessons', 'users', 'enrollments'];
       const tableChecks = await Promise.all(
         tables.map(async (table) => {
@@ -90,12 +79,6 @@ export default function SystemCheckPage() {
 
     // 3. فحص المصادقة
     try {
-      const { createClient } = await import('@supabase/supabase-js');
-      const supabase = createClient(
-        'https://wnqifmvgvlmxgswhcwnc.supabase.co',
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InducWlmbXZndmxteGdzd2hjd25jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI0MzYwNTUsImV4cCI6MjA3ODAxMjA1NX0.LqWhTZYmr7nu-dIy2uBBqntOxoWM-waluYIR9bipC9M'
-      );
-
       const { data: { user } } = await supabase.auth.getUser();
       checksToRun[2] = {
         name: 'Authentication',
@@ -115,12 +98,6 @@ export default function SystemCheckPage() {
 
     // 4. فحص عمليات الكورسات
     try {
-      const { createClient } = await import('@supabase/supabase-js');
-      const supabase = createClient(
-        'https://wnqifmvgvlmxgswhcwnc.supabase.co',
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InducWlmbXZndmxteGdzd2hjd25jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI0MzYwNTUsImV4cCI6MjA3ODAxMjA1NX0.LqWhTZYmr7nu-dIy2uBBqntOxoWM-waluYIR9bipC9M'
-      );
-
       const { data: courses, error } = await supabase
         .from('courses')
         .select('id, title, is_published')

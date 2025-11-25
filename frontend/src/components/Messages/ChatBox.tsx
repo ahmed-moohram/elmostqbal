@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import { API_BASE_URL } from '@/lib/api';
 
 interface Message {
   _id: string;
@@ -52,7 +53,7 @@ const ChatBox: React.FC<ChatBoxProps> = ({ userId, userName, userAvatar, onClose
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`/api/messages/conversation/${userId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/messages/conversation/${userId}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -86,7 +87,7 @@ const ChatBox: React.FC<ChatBoxProps> = ({ userId, userName, userAvatar, onClose
         formData.append('messageType', 'text');
       }
 
-      const response = await fetch('/api/messages/send', {
+      const response = await fetch(`${API_BASE_URL}/api/messages/send`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -232,4 +233,4 @@ const ChatBox: React.FC<ChatBoxProps> = ({ userId, userName, userAvatar, onClose
   );
 };
 
-export default ChatBox; 
+export default ChatBox;

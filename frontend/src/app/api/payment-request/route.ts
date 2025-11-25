@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://wnqifmvgvlmxgswhcwnc.supabase.co';
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InducWlmbXZndmxteGdzd2hjd25jIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MjQzNjA1NSwiZXhwIjoyMDc4MDEyMDU1fQ.OlrWLS7bjUqVh7rarNxa3cX9XrV-n-O24aiMvCs5sCU';
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://chikfjvpkqtivtyhvvzt.supabase.co';
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNoaWtmanZwa3F0aXZ0eWh2dnp0Iiwicm9zZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MzU5NDQzNSwiZXhwIjoyMDc5MTcwNDM1fQ.xOZE1xdbkGOZ99MNAni8XjnWm3-Uxw38ZkvVqJiIVjo';
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
     const { data: studentData } = await supabase
       .from('users')
       .select('id')
-      .eq('phone', studentPhone)
+      .eq('student_phone', studentPhone)
       .single();
 
     // إنشاء طلب الدفع

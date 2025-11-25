@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { API_BASE_URL } from '@/lib/api';
 import ConversationsList from './ConversationsList';
 
 const MessageButton: React.FC = () => {
@@ -19,7 +20,7 @@ const MessageButton: React.FC = () => {
       const token = localStorage.getItem('token');
       if (!token) return;
 
-      const response = await fetch('/api/messages/unread-count', {
+      const response = await fetch(`${API_BASE_URL}/api/messages/unread-count`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -57,4 +58,4 @@ const MessageButton: React.FC = () => {
   );
 };
 
-export default MessageButton; 
+export default MessageButton;

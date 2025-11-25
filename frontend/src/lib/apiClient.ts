@@ -1,14 +1,13 @@
 import axios from 'axios';
-import { API_URL, API_TIMEOUT, DEFAULT_HEADERS } from '../config/api.config';
 
-// إنشاء instance واحد للـ API
+const RAW_API_URL = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE_URL || '';
+
 const apiClient = axios.create({
-  baseURL: API_URL,
-  timeout: API_TIMEOUT,
-  headers: DEFAULT_HEADERS,
+  baseURL: RAW_API_URL ? `${RAW_API_URL}/api` : '/api',
+  timeout: 30000,
+  headers: { 'Content-Type': 'application/json' },
 });
 
-// Interceptor لإضافة التوكن
 apiClient.interceptors.request.use(
   (config) => {
     if (typeof window !== 'undefined') {
@@ -22,12 +21,10 @@ apiClient.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Interceptor للأخطاء
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Unauthorized - إزالة التوكن وإعادة التوجيه
       if (typeof window !== 'undefined') {
         localStorage.removeItem('token');
         localStorage.removeItem('user');

@@ -8,6 +8,7 @@ import { FaSearch, FaFilter, FaBook, FaStar, FaEye, FaDownload, FaBookOpen, FaGr
 import GlowingText from '../../components/GlowingText';
 import { toast } from 'react-hot-toast';
 import { useTheme } from 'next-themes';
+import supabase from '@/lib/supabase-client';
 
 // نموذج بيانات الكتب الرقمية
 interface Book {
@@ -49,119 +50,58 @@ const LibraryPage = () => {
   const [error, setError] = useState<string | null>(null);
   const { theme } = useTheme();
   
-  // جلب البيانات من Supabase أو استخدام بيانات وهمية
+  // جلب البيانات من Supabase (الكتب الحقيقية المرفوعة)
   useEffect(() => {
     const fetchBooks = async () => {
       try {
         setIsLoading(true);
-        
-        // محاولة جلب البيانات من Supabase
-        const SUPABASE_URL = 'https://wnqifmvgvlmxgswhcwnc.supabase.co';
-        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InducWlmbXZndmxteGdzd2hjd25jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI0MzYwNTUsImV4cCI6MjA3ODAxMjA1NX0.LqWhTZYmr7nu-dIy2uBBqntOxoWM-waluYIR9bipC9M';
-        
-        const response = await fetch(`${SUPABASE_URL}/rest/v1/books?select=*`, {
-          headers: {
-            'apikey': SUPABASE_KEY,
-            'Authorization': `Bearer ${SUPABASE_KEY}`,
-            'Content-Type': 'application/json'
-          }
-        });
-        
-        if (response.ok) {
-          const booksData = await response.json();
-          
-          // تحويل البيانات من snake_case إلى camelCase
-          const transformedBooks: Book[] = booksData.map((book: any) => ({
-            id: book.id,
-            title: book.title,
-            author: book.author,
-            coverImage: book.cover_image || 'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=400&q=80',
-            category: book.category,
-            rating: book.rating || 0,
-            downloads: book.downloads || 0,
-            views: book.views || 0,
-            isPremium: book.is_premium || false,
-            isNewRelease: book.is_new_release || false,
-            description: book.description || '',
-            year: book.year || new Date().getFullYear()
-          }));
-          
-          setBooks(transformedBooks);
-          setFilteredBooks(transformedBooks);
-        } else {
-          throw new Error('فشل في جلب البيانات من Supabase');
+        setError(null);
+
+        // استخدام Supabase لجلب الكتب العامة من جدول library_books
+        const { data, error } = await supabase
+          .from('library_books')
+          .select('*')
+          .eq('is_public', true)
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.error('خطأ في جلب بيانات الكتب:', error);
+          setBooks([]);
+          setFilteredBooks([]);
+          setError('حدث خطأ أثناء تحميل الكتب. حاول مرة أخرى لاحقاً.');
+          return;
         }
+
+        const transformedBooks: Book[] = (data || []).map((book: any) => ({
+          id: book.id,
+          title: book.title,
+          author: book.author,
+          coverImage:
+            book.cover_image ||
+            book.thumbnail_url ||
+            'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=400&q=80',
+          category: book.category || 'عام',
+          rating: book.rating || 0,
+          downloads: book.downloads || book.download_count || 0,
+          views: book.views || book.view_count || 0,
+          isPremium: book.is_premium || false,
+          isNewRelease: book.is_new_release || false,
+          description: book.description || '',
+          year: book.year || new Date().getFullYear(),
+        }));
+
+        setBooks(transformedBooks);
+        setFilteredBooks(transformedBooks);
       } catch (err) {
         console.error('خطأ في جلب بيانات الكتب:', err);
-        
-        // استخدام بيانات وهمية كبديل
-        const mockBooks: Book[] = [
-          {
-            id: '1',
-            title: 'الرياضيات للصف الثالث الثانوي',
-            author: 'د. أحمد محمد',
-            coverImage: 'https://images.unsplash.com/photo-1509228468518-180dd4864904?w=400&q=80',
-            category: 'رياضيات',
-            rating: 4.8,
-            downloads: 1250,
-            views: 5420,
-            isPremium: false,
-            isNewRelease: true,
-            description: 'كتاب شامل يغطي منهج الرياضيات للصف الثالث الثانوي',
-            year: 2024
-          },
-          {
-            id: '2',
-            title: 'الفيزياء الحديثة',
-            author: 'د. سارة أحمد',
-            coverImage: 'https://images.unsplash.com/photo-1636466497217-26a8cbeaf0aa?w=400&q=80',
-            category: 'فيزياء',
-            rating: 4.9,
-            downloads: 890,
-            views: 3200,
-            isPremium: true,
-            isNewRelease: true,
-            description: 'مرجع متقدم في الفيزياء الحديثة',
-            year: 2024
-          },
-          {
-            id: '3',
-            title: 'الكيمياء العضوية',
-            author: 'د. محمد علي',
-            coverImage: 'https://images.unsplash.com/photo-1532094349884-543bc11b234d?w=400&q=80',
-            category: 'كيمياء',
-            rating: 4.7,
-            downloads: 650,
-            views: 2100,
-            isPremium: false,
-            isNewRelease: false,
-            description: 'دليل شامل للكيمياء العضوية',
-            year: 2023
-          },
-          {
-            id: '4',
-            title: 'قواعد اللغة العربية',
-            author: 'أ. خالد سعيد',
-            coverImage: 'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=400&q=80',
-            category: 'لغة عربية',
-            rating: 4.9,
-            downloads: 2100,
-            views: 8900,
-            isPremium: false,
-            isNewRelease: true,
-            description: 'مرجع شامل في قواعد اللغة العربية',
-            year: 2024
-          }
-        ];
-        
-        setBooks(mockBooks);
-        setFilteredBooks(mockBooks);
-        setError(null); // إزالة رسالة الخطأ عند استخدام البيانات الوهمية
+        setBooks([]);
+        setFilteredBooks([]);
+        setError('حدث خطأ أثناء تحميل الكتب. حاول مرة أخرى لاحقاً.');
       } finally {
         setIsLoading(false);
       }
     };
-    
+
     fetchBooks();
   }, []);
   

@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
@@ -13,6 +13,7 @@ import {
 } from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
 import Link from 'next/link';
+import AdminLayout from '@/components/AdminLayout';
 
 interface WithdrawalRequest {
   id: string;
@@ -31,6 +32,19 @@ interface WithdrawalRequest {
 }
 
 export default function WithdrawalsManagement() {
+  return (
+    <AdminLayout>
+      <div className="p-6 flex items-center justify-center min-h-[60vh]">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-8 max-w-md text-center">
+          <h1 className="text-2xl font-bold mb-3">هذه الصفحة غير متاحة حالياً</h1>
+          <p className="text-gray-600 dark:text-gray-300">
+            سيتم تفعيل إدارة طلبات سحب الأرباح بعد الانتهاء من ربط عمليات الدفع والسحب.
+          </p>
+        </div>
+      </div>
+    </AdminLayout>
+  );
+
   const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>([]);
   const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'rejected' | 'completed'>('all');
   const [searchQuery, setSearchQuery] = useState('');

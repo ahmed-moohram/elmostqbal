@@ -6,6 +6,8 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { FaPlus, FaEdit, FaTrash, FaSearch, FaFilter, FaSortAmountDown, FaSortAmountUp } from 'react-icons/fa';
 import AdminLayout from '../../../components/AdminLayout';
+import supabase from '@/lib/supabase-client';
+import { hashPassword, validatePasswordStrength } from '@/lib/security/password-utils';
 
 // تم إزالة البيانات الوهمية - سيتم جلب البيانات من Backend
 const ignoredMockTeachers = [
@@ -91,6 +93,7 @@ export default function TeachersManagement() {
   const [teachers, setTeachers] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterSpecialty, setFilterSpecialty] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
   const [sortField, setSortField] = useState('name');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [showAddModal, setShowAddModal] = useState(false);
@@ -107,17 +110,43 @@ export default function TeachersManagement() {
         const result = await getUsers('teacher');
         
         if (result.success && result.data) {
-          const teachersData = result.data.map((teacher: any) => ({
-            id: teacher.id,
-            name: teacher.name || 'بدون اسم',
-            email: teacher.email,
-            phone: teacher.phone,
-            specialty: teacher.specialty || 'غير محدد',
-            rating: teacher.rating || 4.5,
-            studentsCount: teacher.students_count || 0,
-            isActive: teacher.is_active !== false,
-            image: teacher.avatar || '/default-teacher.png'
-          }));
+          const users = result.data;
+          const userIds = users.map((u: any) => u.id);
+
+          let teacherMetaMap = new Map<string, any>();
+
+          if (userIds.length > 0) {
+            const { data: teacherRows, error: teachersError } = await supabase
+              .from('teachers')
+              .select('*')
+              .in('user_id', userIds);
+
+            if (teachersError) {
+              console.error('❌ خطأ في جلب بيانات جدول teachers:', teachersError);
+            } else if (teacherRows) {
+              teacherMetaMap = new Map(
+                teacherRows.map((t: any) => [t.user_id, t])
+              );
+            }
+          }
+
+          const teachersData = users.map((u: any) => {
+            const meta = teacherMetaMap.get(u.id) || {};
+            return {
+              id: u.id,
+              name: u.name || 'بدون اسم',
+              email: u.email,
+              phone: u.phone,
+              specialty: meta.specialization || u.specialty || 'غير محدد',
+              rating: meta.average_rating ?? u.rating ?? 0,
+              studentsCount: meta.total_students ?? 0,
+              coursesCount: meta.total_courses ?? 0,
+              status: meta.status || 'approved',
+              isActive: u.status !== 'suspended',
+              image: (u as any).avatar_url || meta.avatar_url || '/default-teacher.png',
+            };
+          });
+
           console.log(`✅ تم جلب ${teachersData.length} مدرس من قاعدة البيانات`);
           setTeachers(teachersData);
         } else {
@@ -141,6 +170,7 @@ export default function TeachersManagement() {
   const filteredTeachers = teachers
     .filter(teacher => teacher.name.includes(searchQuery) || teacher.specialty.includes(searchQuery))
     .filter(teacher => filterSpecialty === '' || teacher.specialty === filterSpecialty)
+    .filter(teacher => filterStatus === '' || teacher.status === filterStatus)
     .sort((a, b) => {
       if (sortField === 'name') {
         return sortDirection === 'asc' 
@@ -160,11 +190,11 @@ export default function TeachersManagement() {
       return 0;
     });
 
-  const handleDeleteTeacher = async (id: number) => {
+  const handleDeleteTeacher = async (id: string) => {
     if (window.confirm('هل أنت متأكد من حذف هذا المدرس؟')) {
       try {
         const { deleteUser } = await import('@/lib/supabase-admin');
-        const result = await deleteUser(id.toString());
+        const result = await deleteUser(id);
         
         if (result.success) {
           setTeachers(teachers.filter(teacher => teacher.id !== id));
@@ -185,10 +215,37 @@ export default function TeachersManagement() {
     setShowEditModal(true);
   };
 
-  const handleToggleStatus = (id: number) => {
-    setTeachers(teachers.map(teacher => 
-      teacher.id === id ? { ...teacher, isActive: !teacher.isActive } : teacher
-    ));
+  const handleTeacherStatusChange = async (id: string, newStatus: 'approved' | 'rejected') => {
+    try {
+      const { error: teacherError } = await supabase
+        .from('teachers')
+        .update({ status: newStatus })
+        .eq('user_id', id);
+
+      if (teacherError) {
+        console.error('❌ خطأ في تحديث حالة المدرس:', teacherError);
+        alert('فشل تحديث حالة المدرس. تأكد من وجود عمود status في جدول teachers.');
+        return;
+      }
+
+      const { error: userError } = await supabase
+        .from('users')
+        .update({ status: newStatus === 'approved' ? 'active' : 'suspended' })
+        .eq('id', id);
+
+      if (userError) {
+        console.error('⚠️ خطأ في تحديث حالة المستخدم:', userError);
+      }
+
+      setTeachers(prev =>
+        prev.map(teacher =>
+          teacher.id === id ? { ...teacher, status: newStatus } : teacher
+        )
+      );
+    } catch (error) {
+      console.error('❌ خطأ غير متوقع أثناء تحديث حالة المدرس:', error);
+      alert('حدث خطأ أثناء تحديث حالة المدرس');
+    }
   };
 
   const handleSortChange = (field: string) => {
@@ -244,6 +301,22 @@ export default function TeachersManagement() {
                 <FaFilter />
               </span>
             </div>
+
+            <div className="relative">
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="px-4 py-2 pr-10 border rounded-lg border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200 appearance-none"
+              >
+                <option value="">كل الحالات</option>
+                <option value="pending">في الانتظار</option>
+                <option value="approved">مقبول</option>
+                <option value="rejected">مرفوض</option>
+              </select>
+              <span className="absolute top-1/2 right-3 transform -translate-y-1/2 text-gray-400 pointer-events-none">
+                <FaFilter />
+              </span>
+            </div>
           </div>
         </div>
 
@@ -287,7 +360,7 @@ export default function TeachersManagement() {
                     )}
                   </button>
                 </th>
-                <th className="px-4 py-3 text-right text-sm font-medium text-gray-500 dark:text-gray-300">الحالة</th>
+                <th className="px-4 py-3 text-right text-sm font-medium text-gray-500 dark:text-gray-300">حالة الطلب</th>
                 <th className="px-4 py-3 text-center text-sm font-medium text-gray-500 dark:text-gray-300">إجراءات</th>
               </tr>
             </thead>
@@ -320,19 +393,40 @@ export default function TeachersManagement() {
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">{teacher.studentsCount}</td>
                   <td className="px-4 py-3">
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input 
-                        type="checkbox" 
-                        value="" 
-                        className="sr-only peer" 
-                        checked={teacher.isActive}
-                        onChange={() => handleToggleStatus(teacher.id)}
-                      />
-                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:right-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
-                    </label>
+                    <span
+                      className={`px-2 py-1 text-xs rounded-full ${
+                        teacher.status === 'pending'
+                          ? 'bg-yellow-100 text-yellow-700'
+                          : teacher.status === 'rejected'
+                          ? 'bg-red-100 text-red-700'
+                          : 'bg-green-100 text-green-700'
+                      }`}
+                    >
+                      {teacher.status === 'pending'
+                        ? 'في الانتظار'
+                        : teacher.status === 'rejected'
+                        ? 'مرفوض'
+                        : 'مقبول'}
+                    </span>
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex justify-center gap-2">
+                      {teacher.status === 'pending' && (
+                        <>
+                          <button
+                            onClick={() => handleTeacherStatusChange(teacher.id, 'approved')}
+                            className="text-green-600 hover:text-green-800 text-xs px-2 py-1 border border-green-200 rounded"
+                          >
+                            قبول
+                          </button>
+                          <button
+                            onClick={() => handleTeacherStatusChange(teacher.id, 'rejected')}
+                            className="text-yellow-600 hover:text-yellow-800 text-xs px-2 py-1 border border-yellow-200 rounded"
+                          >
+                            رفض
+                          </button>
+                        </>
+                      )}
                       <button 
                         onClick={() => handleEditTeacher(teacher)}
                         className="text-blue-600 hover:text-blue-800 dark:text-blue-500 dark:hover:text-blue-400"
@@ -350,6 +444,12 @@ export default function TeachersManagement() {
                         className="text-primary hover:text-primary-700"
                       >
                         عرض
+                      </Link>
+                      <Link 
+                        href={`/teachers/${teacher.id}/dashboard`}
+                        className="text-green-600 hover:text-green-800 text-xs border border-green-200 rounded px-2 py-1"
+                      >
+                        لوحة المدرس
                       </Link>
                     </div>
                   </td>
@@ -381,7 +481,7 @@ export default function TeachersManagement() {
         <AddTeacherModal 
           onClose={() => setShowAddModal(false)}
           onAdd={(newTeacher) => {
-            setTeachers([...teachers, { ...newTeacher, id: Date.now() }]);
+            setTeachers([...teachers, newTeacher]);
             setShowAddModal(false);
           }}
         />
@@ -426,32 +526,84 @@ function AddTeacherModal({ onClose, onAdd }: any) {
     setError('');
 
     try {
-      const response = await fetch('http://localhost:5000/api/users/teachers', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify(formData)
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        onAdd({
-          ...data.data,
-          image: '/teachers/default.jpg',
-          rating: 0,
-          studentsCount: 0,
-          coursesCount: 0,
-          isActive: true,
-          joinedDate: new Date().toISOString().split('T')[0]
-        });
-      } else {
-        setError(data.message || 'حدث خطأ أثناء إضافة المدرس');
+      if (formData.password.length < 8) {
+        setError('كلمة المرور يجب أن تكون 8 أحرف على الأقل');
+        setIsSubmitting(false);
+        return;
       }
-    } catch (err) {
-      setError('حدث خطأ في الاتصال بالخادم');
+
+      const { isValid, errors } = validatePasswordStrength(formData.password);
+      if (!isValid) {
+        setError(errors.join('، '));
+        setIsSubmitting(false);
+        return;
+      }
+
+      // التحقق من عدم وجود مستخدم بنفس الإيميل أو الهاتف
+      const { data: existingUser } = await supabase
+        .from('users')
+        .select('id')
+        .or(`email.eq.${formData.email},phone.eq.${formData.phone}`)
+        .maybeSingle();
+
+      if (existingUser) {
+        setError('هذا البريد الإلكتروني أو رقم الهاتف مسجل مسبقاً');
+        setIsSubmitting(false);
+        return;
+      }
+
+      const passwordHash = await hashPassword(formData.password);
+
+      // إنشاء المستخدم كمدرس في جدول users
+      const { data: newUser, error: userError } = await supabase
+        .from('users')
+        .insert({
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phone,
+          password_hash: passwordHash,
+          role: 'teacher',
+          specialty: formData.specialty || null,
+        })
+        .select()
+        .single();
+
+      if (userError || !newUser) {
+        setError(userError?.message || 'حدث خطأ أثناء إضافة المدرس');
+        setIsSubmitting(false);
+        return;
+      }
+
+      // إنشاء ملف المدرس في جدول teachers
+      const { error: teacherError } = await supabase
+        .from('teachers')
+        .insert({
+          user_id: newUser.id,
+          bio: '',
+          specialization: formData.specialty || 'مدرس',
+          experience_years: 0,
+        });
+
+      if (teacherError) {
+        console.error('خطأ في إنشاء ملف المدرس:', teacherError);
+      }
+
+      onAdd({
+        id: newUser.id,
+        name: newUser.name || formData.name,
+        email: newUser.email,
+        phone: newUser.phone,
+        specialty: formData.specialty,
+        image: '/teachers/default.jpg',
+        rating: 0,
+        studentsCount: 0,
+        coursesCount: 0,
+        isActive: true,
+        joinedDate: new Date().toISOString().split('T')[0]
+      });
+    } catch (err: any) {
+      console.error('Error while adding teacher:', err);
+      setError(err.message || 'حدث خطأ في الاتصال بالخادم');
     } finally {
       setIsSubmitting(false);
     }

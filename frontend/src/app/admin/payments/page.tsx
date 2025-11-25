@@ -1,8 +1,9 @@
-'use client';
+"use client";
 
 import { useState, useEffect } from 'react';
 import { FaWhatsapp, FaCheckCircle, FaTimesCircle, FaClock, FaSearch, FaMoneyBillWave } from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
+import AdminLayout from '@/components/AdminLayout';
 
 interface PaymentRequest {
   id: string;
@@ -19,6 +20,19 @@ interface PaymentRequest {
 }
 
 export default function PaymentsManagement() {
+  return (
+    <AdminLayout>
+      <div className="p-6 flex items-center justify-center min-h-[60vh]">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-8 max-w-md text-center">
+          <h1 className="text-2xl font-bold mb-3">هذه الصفحة غير متاحة حالياً</h1>
+          <p className="text-gray-600 dark:text-gray-300">
+            سيتم تفعيل إدارة طلبات الدفع اليدوية بعد الانتهاء من نظام الاشتراك عبر الواتساب.
+          </p>
+        </div>
+      </div>
+    </AdminLayout>
+  );
+
   const [payments, setPayments] = useState<PaymentRequest[]>([]);
   const [filter, setFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');

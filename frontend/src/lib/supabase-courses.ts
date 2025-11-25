@@ -1,38 +1,78 @@
-// دوال مساعدة للتعامل مع الكورسات في Supabase
-import { createClient } from '@supabase/supabase-js';
-
-const SUPABASE_URL = 'https://wnqifmvgvlmxgswhcwnc.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InducWlmbXZndmxteGdzd2hjd25jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI0MzYwNTUsImV4cCI6MjA3ODAxMjA1NX0.LqWhTZYmr7nu-dIy2uBBqntOxoWM-waluYIR9bipC9M';
-
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+// دوال مساعدة للتعامل مع الكورسات في Supabase (مشروع chikf)
+import supabase from '@/lib/supabase-client';
 
 // إنشاء كورس جديد مع الدروس
 export const createCourseWithLessons = async (courseData: any, sections: any[]) => {
   try {
     console.log('📝 بيانات الكورس المرسلة:', courseData);
     
-    // تحضير البيانات الأساسية فقط
-    const courseToInsert: any = {
-      title: courseData.title,
-      description: courseData.description || '',
-      instructor_name: courseData.instructor_name || 'مدرس المنصة',
-      price: Number(courseData.price) || 0,
-      duration_hours: Number(courseData.duration_hours) || 1,
-      level: courseData.level || 'beginner',
-      category: courseData.category || 'general',
-      thumbnail: courseData.thumbnail || '/placeholder-course.png',
-      is_published: courseData.is_published !== undefined ? courseData.is_published : false,
-      is_featured: courseData.is_featured !== undefined ? courseData.is_featured : false
-    };
+    const title = courseData.title || 'دورة بدون عنوان';
 
-    // إضافة الحقول الاختيارية إذا كان الجدول يدعمها
-    const optionalFields = ['preview_video', 'discount_price', 'enrollment_count', 'rating', 'language', 'requirements', 'what_will_learn', 'has_certificate'];
-    
-    for (const field of optionalFields) {
-      if (courseData[field] !== undefined) {
-        courseToInsert[field] = courseData[field];
+    // توليد slug فريد مبني على العنوان
+    let baseSlug = (courseData.slug || title)
+      .toString()
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, '-')
+      .replace(/[^a-z0-9\-ء-ي]+/g, '');
+
+    if (!baseSlug) {
+      baseSlug = `course-${Date.now()}`;
+    }
+
+    const slug = `${baseSlug}-${Math.random().toString(36).substring(2, 8)}`;
+
+    // تحديد المدرّس المرتبط بالكورس
+    let instructorId = courseData.instructor_id;
+
+    if (!instructorId) {
+      const defaultInstructorId = process.env.NEXT_PUBLIC_DEFAULT_INSTRUCTOR_ID;
+
+      if (defaultInstructorId) {
+        instructorId = defaultInstructorId;
+      } else {
+        const { data: teacher, error: teacherError } = await supabase
+          .from('users')
+          .select('id')
+          .eq('role', 'teacher')
+          .limit(1)
+          .single();
+
+        if (teacherError || !teacher) {
+          console.error('لا يمكن العثور على مدرس افتراضي لإنشاء الكورس:', teacherError);
+          throw new Error('لا يمكن إنشاء الكورس: لم يتم العثور على مدرس افتراضي (instructor_id) في قاعدة البيانات.');
+        }
+
+        instructorId = teacher.id;
       }
     }
+
+    const shortDescription =
+      courseData.short_description ||
+      courseData.shortDescription ||
+      (courseData.description || '').slice(0, 200);
+
+    const status =
+      courseData.status || (courseData.is_published ? 'published' : 'draft');
+
+    // تحضير البيانات الأساسية بما يتوافق مع بنية جدول الكورسات الحالية
+    const courseToInsert: any = {
+      title,
+      slug,
+      description: courseData.description || '',
+      short_description: shortDescription,
+      instructor_id: instructorId,
+      category: courseData.category || 'عام',
+      sub_category: courseData.sub_category || null,
+      level: courseData.level || 'all-levels',
+      language: courseData.language || 'ar',
+      price: Number(courseData.price) || 0,
+      discount_price: courseData.discount_price ?? null,
+      thumbnail: courseData.thumbnail || '/placeholder-course.png',
+      preview_video: courseData.preview_video || null,
+      status,
+      is_featured: courseData.is_featured !== undefined ? courseData.is_featured : false
+    };
 
     console.log('📤 إرسال البيانات إلى Supabase:', courseToInsert);
 
@@ -48,34 +88,36 @@ export const createCourseWithLessons = async (courseData: any, sections: any[]) 
       throw courseError;
     }
 
-    // 2. إضافة الدروس إذا كانت موجودة
+    // 2. إضافة الأقسام والدروس إذا كانت موجودة
     if (course && sections && sections.length > 0) {
-      let lessonOrder = 0;
-      
-      for (const section of sections) {
-        if (section.title && section.lessons && section.lessons.length > 0) {
-          for (const lesson of section.lessons) {
-            if (lesson.title) {
-              lessonOrder++;
-              
-              const { error: lessonError } = await supabase
-                .from('lessons')
-                .insert({
-                  course_id: course.id,
-                  title: lesson.title,
-                  description: lesson.description || '',
-                  video_url: lesson.videoUrl || lesson.video_url || '',
-                  duration_minutes: lesson.duration || 0,
-                  order_index: lessonOrder,
-                  is_free: lessonOrder === 1, // أول درس مجاني
-                  is_published: true
-                });
-
-              if (lessonError) {
-                console.error('خطأ في إضافة درس:', lessonError);
-              }
-            }
-          }
+      for (let sIndex = 0; sIndex < sections.length; sIndex++) {
+        const section = sections[sIndex];
+        if (!section || !section.title || !section.lessons || section.lessons.length === 0) {
+          continue;
+        }
+        const response = await fetch('/api/sections', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            courseId: course.id,
+            title: section.title,
+            description: section.description || '',
+            orderIndex: section.order ?? sIndex + 1,
+            lessons: section.lessons.map((lesson: any, idx: number) => ({
+              title: lesson.title,
+              description: lesson.description || '',
+              video_url: lesson.videoUrl || lesson.video_url || '',
+              duration: Math.max(1, Number(lesson.duration) || 0),
+              duration_minutes: Math.max(1, Number(lesson.duration) || 0),
+              order_index: lesson.order ?? idx + 1,
+              is_preview: !!lesson.isPreview || (sIndex === 0 && idx === 0),
+            }))
+          })
+        });
+        if (!response.ok) {
+          const err = await response.json().catch(() => ({}));
+          console.error('خطأ في إضافة قسم عبر API:', err);
+          continue;
         }
       }
     }
@@ -123,13 +165,21 @@ export const getAdminCourses = async () => {
 // حذف كورس
 export const deleteCourse = async (courseId: string) => {
   try {
-    // حذف الدروس المرتبطة أولاً
-    await supabase
-      .from('lessons')
-      .delete()
+    const { data: sections } = await supabase
+      .from('sections')
+      .select('id')
       .eq('course_id', courseId);
-
-    // حذف الكورس
+    const ids = (sections || []).map((s: any) => s.id);
+    if (ids.length > 0) {
+      await supabase
+        .from('lessons')
+        .delete()
+        .in('section_id', ids);
+      await supabase
+        .from('sections')
+        .delete()
+        .in('id', ids);
+    }
     const { error } = await supabase
       .from('courses')
       .delete()
@@ -156,6 +206,8 @@ export const updateCourse = async (courseId: string, updates: any) => {
         level: updates.level,
         category: updates.category,
         is_published: updates.isPublished,
+        status: updates.isPublished === true ? 'published' : updates.isPublished === false ? 'draft' : undefined,
+        is_active: updates.isPublished === true ? true : updates.isPublished === false ? false : undefined,
         thumbnail: updates.thumbnail,
         updated_at: new Date().toISOString()
       })
@@ -177,7 +229,11 @@ export const togglePublishCourse = async (courseId: string, isPublished: boolean
   try {
     const { error } = await supabase
       .from('courses')
-      .update({ is_published: isPublished })
+      .update({ 
+        is_published: isPublished,
+        status: isPublished ? 'published' : 'draft',
+        is_active: isPublished ? true : false,
+      })
       .eq('id', courseId);
 
     if (error) throw error;

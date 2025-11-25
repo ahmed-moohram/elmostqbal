@@ -10,6 +10,7 @@ import Link from 'next/link';
 import { FaChalkboardTeacher, FaBookOpen, FaStar, FaRocket, FaSmile, FaChartBar, FaGraduationCap, FaLaptop, FaCertificate, FaCheckCircle, FaPlay, FaCalendarAlt, FaUsers, FaFacebook, FaWhatsapp, FaEnvelope } from 'react-icons/fa';
 import { Cairo } from 'next/font/google';
 import { useAuth } from '@/contexts/AuthContext';
+import supabase from '@/lib/supabase-client';
 const cairo = Cairo({ subsets: ['latin'], weight: ['400', '700'] });
 
 // سيتم جلب الدورات المميزة من API
@@ -25,6 +26,7 @@ export default function Home() {
   const [featuredCourses, setFeaturedCourses] = useState<any[]>([]);
   const [showWelcome, setShowWelcome] = useState(false);
   const [userData, setUserData] = useState<any>(null);
+  const [stats, setStats] = useState({ students: 0, courses: 0, teachers: 0 });
 
   const features = [
     {
@@ -79,14 +81,9 @@ export default function Home() {
   useEffect(() => {
     const fetchFeaturedCourses = async () => {
       try {
-        console.log('🔄 جلب الكورسات المميزة من Supabase...');
-        
-        const { createClient } = await import('@supabase/supabase-js');
-        const supabaseUrl = 'https://wnqifmvgvlmxgswhcwnc.supabase.co';
-        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InducWlmbXZndmxteGdzd2hjd25jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI0MzYwNTUsImV4cCI6MjA3ODAxMjA1NX0.LqWhTZYmr7nu-dIy2uBBqntOxoWM-waluYIR9bipC9M';
-        const supabase = createClient(supabaseUrl, supabaseKey);
-        
-        // جلب الكورسات المميزة أو المنشورة
+        console.log('🔄 جلب الكورسات المميزة من Supabase (مشروع chikf)...');
+
+        // جلب الكورسات المميزة أو المنشورة من المشروع الجديد
         const { data: courses, error } = await supabase
           .from('courses')
           .select('*')
@@ -109,8 +106,8 @@ export default function Home() {
             price: course.price,
             thumbnail: course.thumbnail || '/placeholder-course.png',
             instructor: course.instructor_name || 'المدرس',
-            rating: course.rating || 4.5,
-            studentsCount: course.enrollment_count || 0
+            rating: course.rating ?? 0,
+            studentsCount: (course as any).students_count ?? (course as any).enrollment_count ?? 0
           }));
           
           setFeaturedCourses(formattedCourses);
@@ -122,6 +119,41 @@ export default function Home() {
     };
 
     fetchFeaturedCourses();
+  }, []);
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const [studentsRes, coursesRes, teachersRes] = await Promise.all([
+          supabase
+            .from('users')
+            .select('id', { count: 'exact', head: true })
+            .eq('role', 'student'),
+          supabase
+            .from('courses')
+            .select('id', { count: 'exact', head: true })
+            .eq('is_published', true),
+          supabase
+            .from('users')
+            .select('id', { count: 'exact', head: true })
+            .eq('role', 'teacher'),
+        ]);
+
+        if (studentsRes.error) console.error('❌ خطأ في حساب عدد الطلاب:', studentsRes.error);
+        if (coursesRes.error) console.error('❌ خطأ في حساب عدد الكورسات:', coursesRes.error);
+        if (teachersRes.error) console.error('❌ خطأ في حساب عدد المدرسين:', teachersRes.error);
+
+        setStats({
+          students: studentsRes.count || 0,
+          courses: coursesRes.count || 0,
+          teachers: teachersRes.count || 0,
+        });
+      } catch (error) {
+        console.error('❌ خطأ غير متوقع في جلب إحصائيات المنصة:', error);
+      }
+    };
+
+    fetchStats();
   }, []);
 
   const handleLogout = () => {
@@ -425,9 +457,9 @@ export default function Home() {
         <div className="container-custom">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
             {[
-              { number: "1000+", label: "طالب" },
-              { number: "50+", label: "دورة تعليمية" },
-              { number: "20+", label: "مدرس متميز" }
+              { number: stats.students.toLocaleString(), label: "طالب" },
+              { number: stats.courses.toLocaleString(), label: "دورة تعليمية" },
+              { number: stats.teachers.toLocaleString(), label: "مدرس متميز" }
             ].map((stat, index) => (
               <motion.div
                 key={index}

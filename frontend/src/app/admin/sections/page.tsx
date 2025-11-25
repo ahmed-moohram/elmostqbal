@@ -54,11 +54,8 @@ export default function SectionsManagement() {
 
   const fetchCourses = async () => {
     try {
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
       const token = localStorage.getItem('token');
-      
-      // ✅ تحديث فوري بدون Cache
-      const response = await fetch(`${API_URL}/api/courses?t=${Date.now()}`, {
+      const response = await fetch(`/api/courses?t=${Date.now()}`, {
         headers: {
           'Content-Type': 'application/json',
           ...(token && { 'Authorization': `Bearer ${token}` })
@@ -85,12 +82,12 @@ export default function SectionsManagement() {
 
   const fetchSections = async (courseId: string) => {
     try {
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      
       const token = localStorage.getItem('token');
       
       console.log('📡 جلب Sections للدورة:', courseId);
       
-      const response = await fetch(`${API_URL}/api/sections?courseId=${courseId}`, {
+      const response = await fetch(`/api/sections?courseId=${courseId}`, {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`

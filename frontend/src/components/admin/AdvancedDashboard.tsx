@@ -156,12 +156,7 @@ const AdvancedDashboard = () => {
       }
       
       // الحصول على عنوان API من متغيرات البيئة
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "";
-      
-      // التحقق من تعريف عنوان API
-      if (!apiUrl) {
-        throw new Error('لم يتم تعريف متغير البيئة NEXT_PUBLIC_API_URL');
-      }
+      const apiUrl = "";
       
       // تحضير خيارات الطلب
       const requestOptions = {
@@ -174,10 +169,10 @@ const AdvancedDashboard = () => {
       // طلبات متوازية لكل البيانات المطلوبة
       const [statsResponse, transactionsResponse, issuesResponse, chartsResponse] = 
         await Promise.all([
-          fetch(`${apiUrl}/api/admin/dashboard/stats?period=${dateRange}`, requestOptions),
-          fetch(`${apiUrl}/api/admin/dashboard/transactions?period=${dateRange}`, requestOptions),
-          fetch(`${apiUrl}/api/admin/dashboard/issues`, requestOptions),
-          fetch(`${apiUrl}/api/admin/dashboard/charts?period=${dateRange}`, requestOptions)
+          fetch(`/api/admin/dashboard/stats?period=${dateRange}`, requestOptions),
+          fetch(`/api/admin/dashboard/transactions?period=${dateRange}`, requestOptions),
+          fetch(`/api/admin/dashboard/issues`, requestOptions),
+          fetch(`/api/admin/dashboard/charts?period=${dateRange}`, requestOptions)
         ]);
       
       // التحقق من استجابة الإحصائيات
@@ -382,11 +377,7 @@ const AdvancedDashboard = () => {
       ));
       
       // إرسال الطلب إلى الخادم
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "";
-      if (!apiUrl) {
-        throw new Error('لم يتم تعريف متغير البيئة NEXT_PUBLIC_API_URL');
-      }
-      const response = await fetch(`${apiUrl}/api/admin/dashboard/issues/${id}/resolve`, {
+      const response = await fetch(`/api/admin/dashboard/issues/${id}/resolve`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -429,12 +420,7 @@ const AdvancedDashboard = () => {
       }));
       
       // إرسال الطلب إلى الخادم
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "";
-      if (!apiUrl) {
-        throw new Error('لم يتم تعريف متغير البيئة NEXT_PUBLIC_API_URL');
-      }
-      
-      const response = await fetch(`${apiUrl}/api/admin/dashboard/transactions/${id}/${action}`, {
+      const response = await fetch(`/api/admin/dashboard/transactions/${id}/${action}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,

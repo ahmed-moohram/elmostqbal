@@ -76,6 +76,19 @@ interface AnalyticsData {
 }
 
 export default function AnalyticsPage() {
+  return (
+    <AdminLayout>
+      <div className="p-6 flex items-center justify-center min-h-[60vh]">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-8 max-w-md text-center">
+          <h1 className="text-2xl font-bold mb-3">هذه الصفحة غير متاحة حالياً</h1>
+          <p className="text-gray-600 dark:text-gray-300">
+            سيتم تفعيل لوحة التحليلات بعد الانتهاء من إعداد نظام الإدارة المتقدم.
+          </p>
+        </div>
+      </div>
+    </AdminLayout>
+  );
+
   const [isLoading, setIsLoading] = useState(true);
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [timeRange, setTimeRange] = useState('month');

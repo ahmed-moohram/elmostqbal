@@ -94,9 +94,15 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (isAuthenticated && user) {
-      const dashboardPath = user.role === 'student' ? '/student/dashboard' : 
-                           user.role === 'admin' ? '/admin' : 
-                           '/teachers/dashboard';
+      if (typeof document !== 'undefined') {
+        document.cookie = `auth-token=${encodeURIComponent('local-' + Date.now())}; path=/`;
+        document.cookie = `user-role=${encodeURIComponent(user.role)}; path=/`;
+      }
+      const dashboardPath = user.role === 'student'
+        ? '/student/dashboard'
+        : user.role === 'admin'
+        ? '/admin'
+        : '/teacher/dashboard';
       router.replace(dashboardPath);
     }
   }, [isAuthenticated, user, router]);
@@ -137,32 +143,8 @@ export default function LoginPage() {
         return;
       }
       
-      // تحقق خاص لحساب الأدمن
-      if (loginPhone === "01005209667" && loginPassword === "Ahmed@010052") {
-        // دخول مباشر كأدمن
-        const adminUser = {
-          id: 'admin-001',
-          name: 'أحمد - مدير المنصة',
-          email: 'admin@platform.com',
-          phone: '01005209667',
-          role: 'admin',
-          avatar: '/admin-avatar.png'
-        };
-        
-        // حفظ بيانات الأدمن
-        localStorage.setItem('user', JSON.stringify(adminUser));
-        localStorage.setItem('token', 'admin-token-' + Date.now());
-        localStorage.setItem('userRole', 'admin');
-        
-        // توجيه مباشر للوحة الأدمن
-        setTimeout(() => {
-          router.push('/admin/dashboard');
-        }, 500);
-        
-        setLoading(false);
-        return;
-      }
-      
+      // لا نستخدم هنا منطقاً خاصاً للأدمن، AuthContext يتكفّل بحساب الأدمن الهاردكود
+
       if (loginPassword.length < 8) {
         setError("يجب أن تكون كلمة المرور أطول من 8 أحرف");
         setLoading(false);

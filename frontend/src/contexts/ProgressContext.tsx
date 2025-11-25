@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useAuth } from './AuthContext';
 import { apiClient, API_BASE_URL } from '@/lib/api';
+import supabase from '@/lib/supabase-client';
 
 interface CourseProgress {
   courseId: string;
@@ -59,14 +60,17 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
       }
       
       const user = JSON.parse(userData);
+
+      // لا نقوم بجلب تقدم الدروس أو نتائج الاختبارات لحسابات غير الطلاب
+      if (user.role && user.role !== 'student') {
+        setCoursesProgress({});
+        setQuizResults([]);
+        setIsLoading(false);
+        return;
+      }
       
-      // استخدام Supabase لجلب التقدم
-      const { createClient } = await import('@supabase/supabase-js');
-      const SUPABASE_URL = 'https://wnqifmvgvlmxgswhcwnc.supabase.co';
-      const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InducWlmbXZndmxteGdzd2hjd25jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI0MzYwNTUsImV4cCI6MjA3ODAxMjA1NX0.LqWhTZYmr7nu-dIy2uBBqntOxoWM-waluYIR9bipC9M';
-      
-      const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
-      
+      // استخدام Supabase لجلب التقدم من المشروع الجديد
+      // (العميل الموحد من '@/lib/supabase-client')
       // جلب تقدم الدروس
       const { data: progressData } = await supabase
         .from('lesson_progress')

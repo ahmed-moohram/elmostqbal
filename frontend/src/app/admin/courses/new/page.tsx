@@ -174,6 +174,12 @@ export default function EnhancedNewCoursePage() {
       return;
     }
 
+    // الحد الأقصى المسموح به للسعر حسب نوع الحقل DECIMAL(10,2)
+    if (price > 99999999) {
+      toast.error("⚠️ الحد الأقصى للسعر هو 99,999,999 جنيه");
+      return;
+    }
+
     console.log('📊 عدد الأقسام:', sections.length);
     console.log('📊 الأقسام:', sections);
     
@@ -206,13 +212,15 @@ export default function EnhancedNewCoursePage() {
         duration_hours: getTotalStats().totalDuration / 60,
         lessons_count: getTotalStats().totalLessons,
         is_published: publishImmediately,
-        rating: 5,
+        // لا نضع أي تقييم افتراضي للكورس الجديد
+        rating: 0,
+        // عدد الطلاب سيبقى 0 فعلياً حتى يبدأ الطلاب في الاشتراك
         students_count: 0,
         language: 'ar',
         short_description: shortDescription || description.substring(0, 200),
         preview_video: previewVideo,
-        thumbnail: imagePreview || thumbnail || '/default-course.jpg',
-        image: imagePreview || thumbnail || '/default-course.jpg',
+        thumbnail: imagePreview || thumbnail || '/placeholder-course.jpg',
+        image: imagePreview || thumbnail || '/placeholder-course.jpg',
         discount_price: null,
         requirements: [],
         what_will_learn: [],
@@ -385,10 +393,11 @@ export default function EnhancedNewCoursePage() {
                 <input
                   type="number"
                   min="0"
+                  max="99999999"
                   value={price}
                   onChange={(e) => setPrice(Number(e.target.value))}
                   className="input-field"
-                  placeholder="0 = مجاني"
+                  placeholder="0 = مجاني (الحد الأقصى 99,999,999)"
                 />
               </div>
 

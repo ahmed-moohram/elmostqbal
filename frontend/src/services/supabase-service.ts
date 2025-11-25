@@ -3,13 +3,11 @@
 // Unified Supabase Service
 // ========================================
 
-import { createClient } from '@supabase/supabase-js';
+// إعادة استخدام عميل Supabase الموحد من lib
+import supabase from '@/lib/supabase-client';
 
-// إعدادات Supabase
-const SUPABASE_URL = 'https://wnqifmvgvlmxgswhcwnc.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InducWlmbXZndmxteGdzd2hjd25jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI0MzYwNTUsImV4cCI6MjA3ODAxMjA1NX0.LqWhTZYmr7nu-dIy2uBBqntOxoWM-waluYIR9bipC9M';
-
-export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+// التصدير للاستخدام في أماكن أخرى إن لزم
+export { supabase };
 
 // ========================================
 // دوال الكورسات
@@ -18,9 +16,15 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 export const getCourses = async (isPublished?: boolean) => {
   try {
     let query = supabase.from('courses').select('*');
-    
+
+    // إذا طلبنا فقط الكورسات المنشورة، نستخدم حقل status ليتماشى مع RLS
+    // RLS تسمح بالعرض عندما يكون status = 'published' و is_active = TRUE
     if (isPublished !== undefined) {
-      query = query.eq('is_published', isPublished);
+      if (isPublished) {
+        query = query.eq('status', 'published');
+      } else {
+        query = query.neq('status', 'published');
+      }
     }
     
     const { data, error } = await query.order('created_at', { ascending: false });

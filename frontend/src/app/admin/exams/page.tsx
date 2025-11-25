@@ -27,8 +27,7 @@ export default function ExamsPage() {
           return;
         }
 
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-        const response = await fetch(`${apiUrl}/api/exams`, {
+        const response = await fetch(`/api/exams`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }
@@ -39,7 +38,7 @@ export default function ExamsPage() {
         }
 
         const data = await response.json();
-        setExams(data.exams || []);
+        setExams(Array.isArray(data) ? data : data.exams || []);
       } catch (error) {
         console.error('خطأ في تحميل الاختبارات:', error);
         setError("تعذر تحميل الاختبارات. يرجى المحاولة مرة أخرى لاحقًا.");
@@ -61,8 +60,7 @@ export default function ExamsPage() {
           return;
         }
 
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-        const response = await fetch(`${apiUrl}/api/exams/${examId}`, { 
+        const response = await fetch(`/api/exams/${examId}`, { 
           method: 'DELETE',
           headers: {
             'Authorization': `Bearer ${token}`
@@ -90,8 +88,7 @@ export default function ExamsPage() {
         return;
       }
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-      const response = await fetch(`${apiUrl}/api/exams`, {
+      const response = await fetch(`/api/exams`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -122,8 +119,7 @@ export default function ExamsPage() {
         return;
       }
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-      const response = await fetch(`${apiUrl}/api/exams/${examData.id}`, {
+      const response = await fetch(`/api/exams/${examData.id}`, {
         method: 'PUT',
         headers: { 
           'Content-Type': 'application/json',

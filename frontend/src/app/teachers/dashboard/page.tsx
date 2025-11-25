@@ -104,8 +104,8 @@ export default function TeacherDashboard() {
         return;
       }
 
-      setTeacher(user);
-      setIsLoading(false);
+      router.replace(`/teachers/${user.id}/dashboard`);
+      return;
     };
 
     checkTeacherAuth();

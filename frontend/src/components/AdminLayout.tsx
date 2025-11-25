@@ -92,8 +92,7 @@ const AdminLayout = memo(({ children }: AdminLayoutProps) => {
       submenu: [
         { title: 'جميع المستخدمين', path: '/admin/users', icon: <FaUsers /> },
         { title: 'جميع الطلاب', path: '/admin/all-students', icon: <FaGraduationCap /> },
-        { title: 'الطلاب', path: '/admin/users/students', icon: <FaGraduationCap /> },
-        { title: 'المدرسين', path: '/admin/users/instructors', icon: <FaChalkboardTeacher /> },
+        { title: 'المدرسين', path: '/admin/teachers', icon: <FaChalkboardTeacher /> },
         { title: 'المشرفين', path: '/admin/users/admins', icon: <FaCog /> },
       ],
     },

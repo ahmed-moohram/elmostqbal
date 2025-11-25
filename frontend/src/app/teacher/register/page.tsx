@@ -6,6 +6,8 @@ import { toast } from 'react-hot-toast';
 import Link from 'next/link';
 import { FaUser, FaEnvelope, FaPhone, FaLock, FaGraduationCap, FaBook, FaUpload, FaLinkedin, FaYoutube } from 'react-icons/fa';
 import { ImSpinner9 } from 'react-icons/im';
+import supabase from '@/lib/supabase-client';
+import { hashPassword, validatePasswordStrength } from '@/lib/security/password-utils';
 
 export default function TeacherRegister() {
   const router = useRouter();
@@ -75,43 +77,109 @@ export default function TeacherRegister() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // التحقق من كلمة المرور
     if (formData.password !== formData.confirmPassword) {
       toast.error('كلمات المرور غير متطابقة');
       return;
     }
 
-    if (formData.password.length < 6) {
-      toast.error('كلمة المرور يجب أن تكون 6 أحرف على الأقل');
+    if (formData.password.length < 8) {
+      toast.error('كلمة المرور يجب أن تكون 8 أحرف على الأقل');
       return;
     }
 
     setIsLoading(true);
 
     try {
-      // حفظ بيانات المدرس في localStorage مؤقتاً
-      const teacherData = {
-        ...formData,
-        role: 'teacher',
-        createdAt: new Date().toISOString(),
-        id: `teacher_${Date.now()}`,
-        rating: 0,
-        studentsCount: 0,
-        coursesCount: 0,
-        isVerified: false
-      };
+      // التحقق من قوة كلمة المرور
+      const { isValid, errors } = validatePasswordStrength(formData.password);
+      if (!isValid) {
+        toast.error(errors.join('، '));
+        setIsLoading(false);
+        return;
+      }
 
-      // حفظ في localStorage
-      localStorage.setItem('teacher', JSON.stringify(teacherData));
-      localStorage.setItem('userRole', 'teacher');
-      
-      toast.success('✅ تم إرسال طلبك بنجاح! سيتم مراجعته من الإدارة');
-      
-      // التوجيه إلى صفحة الانتظار
+      // التحقق من عدم وجود مستخدم بنفس الإيميل أو الهاتف
+      const { data: existingUser, error: existingError } = await supabase
+        .from('users')
+        .select('id')
+        .or(`email.eq.${formData.email},phone.eq.${formData.phone}`)
+        .maybeSingle();
+
+      if (existingError && existingError.code !== 'PGRST116') {
+        console.error('خطأ في التحقق من المستخدم الموجود:', existingError);
+      }
+
+      if (existingUser) {
+        toast.error('هذا البريد الإلكتروني أو رقم الهاتف مسجل مسبقاً');
+        setIsLoading(false);
+        return;
+      }
+
+      // تشفير كلمة المرور
+      const passwordHash = await hashPassword(formData.password);
+
+      // إنشاء المستخدم في جدول users بدور teacher
+      const { data: newUser, error: userError } = await supabase
+        .from('users')
+        .insert({
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phone,
+          password_hash: passwordHash,
+          role: 'teacher',
+          specialty: formData.specialization || null,
+        })
+        .select()
+        .single();
+
+      if (userError || !newUser) {
+        console.error('خطأ في إنشاء حساب المدرس:', userError);
+        toast.error(userError?.message || 'فشل إنشاء حساب المدرس');
+        setIsLoading(false);
+        return;
+      }
+
+      // إنشاء ملف المدرس في جدول teachers مع حالة pending (طلبات جديدة)
+      const { error: teacherError } = await supabase
+        .from('teachers')
+        .insert({
+          user_id: newUser.id,
+          bio: formData.bio,
+          specialization: formData.specialization || 'مدرس',
+          experience_years: Number(formData.experience) || 0,
+          linkedin_url: formData.linkedIn || null,
+          youtube_url: formData.youtube || null,
+          status: 'pending',
+        } as any);
+
+      if (teacherError) {
+        console.error('خطأ في إنشاء ملف المدرس (مع status):', teacherError);
+
+        // محاولة احتياطية بدون status في حال لم يكن العمود موجوداً بعد
+        const { error: fallbackError } = await supabase
+          .from('teachers')
+          .insert({
+            user_id: newUser.id,
+            bio: formData.bio,
+            specialization: formData.specialization || 'مدرس',
+            experience_years: Number(formData.experience) || 0,
+            linkedin_url: formData.linkedIn || null,
+            youtube_url: formData.youtube || null,
+          });
+
+        if (fallbackError) {
+          console.error('خطأ في إنشاء ملف المدرس (بدون status):', fallbackError);
+        }
+      }
+
+      toast.success('✅ تم إرسال طلبك كمدرس بنجاح! سيتم مراجعته من الإدارة ويمكنك تسجيل الدخول لمتابعة حالتك');
+
+      // التوجيه إلى صفحة تسجيل الدخول العامة
       setTimeout(() => {
-        router.push('/teacher/pending');
-      }, 2000);
+        router.push('/login');
+      }, 1500);
 
     } catch (error) {
       console.error('خطأ في التسجيل:', error);
@@ -437,7 +505,7 @@ export default function TeacherRegister() {
             </button>
             
             <Link
-              href="/teacher/login"
+              href="/login"
               className="px-8 py-3 bg-gray-200 text-gray-700 font-bold rounded-lg hover:bg-gray-300 transition"
             >
               لديك حساب بالفعل؟

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { API_BASE_URL } from '@/lib/api';
 import { useRouter } from 'next/navigation';
 
 interface User {
@@ -68,7 +69,7 @@ export default function MessagesPage() {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('/api/messages/conversations', {
+      const response = await fetch(`${API_BASE_URL}/api/messages/conversations`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -88,7 +89,7 @@ export default function MessagesPage() {
   const fetchUsers = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('/api/users', {
+      const response = await fetch(`${API_BASE_URL}/api/users`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -106,7 +107,7 @@ export default function MessagesPage() {
   const fetchMessages = async (userId: string) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`/api/messages/conversation/${userId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/messages/conversation/${userId}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -127,7 +128,7 @@ export default function MessagesPage() {
     setSending(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('/api/messages/send', {
+      const response = await fetch(`${API_BASE_URL}/api/messages/send`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -433,4 +434,4 @@ export default function MessagesPage() {
       )}
     </div>
   );
-} 
+}

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import AdminLayout from '@/components/AdminLayout';
 import { FaTicketAlt, FaPlus, FaEdit, FaTrash } from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
+import supabase from '@/lib/supabase-client';
 
 export default function CouponsPage() {
   const [coupons, setCoupons] = useState<any[]>([]);
@@ -15,40 +16,106 @@ export default function CouponsPage() {
   }, []);
 
   const fetchCoupons = async () => {
-    const mockCoupons = [
-      { id: 1, code: 'WELCOME2024', discount: 20, uses: 15, maxUses: 100, status: 'active' },
-      { id: 2, code: 'SUMMER50', discount: 50, uses: 8, maxUses: 50, status: 'active' },
-      { id: 3, code: 'NEWYEAR30', discount: 30, uses: 30, maxUses: 30, status: 'expired' },
-      { id: 4, code: 'STUDENT15', discount: 15, uses: 42, maxUses: 200, status: 'active' },
-    ];
-    setTimeout(() => {
-      setCoupons(mockCoupons);
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('coupons')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('خطأ في جلب الكوبونات:', error);
+        setCoupons([]);
+        return;
+      }
+
+      const transformed = (data || []).map((row: any) => ({
+        id: row.id,
+        code: row.code,
+        discount: row.discount || 0,
+        uses: row.uses || 0,
+        maxUses: row.max_uses || 0,
+        status: row.status || 'active',
+      }));
+
+      setCoupons(transformed);
+    } catch (error) {
+      console.error('خطأ غير متوقع في جلب الكوبونات:', error);
+      setCoupons([]);
+    } finally {
       setLoading(false);
-    }, 300);
+    }
   };
 
-  const handleAddCoupon = () => {
+  const handleAddCoupon = async () => {
     if (!newCoupon.code || !newCoupon.discount) {
       toast.error('يرجى ملء جميع الحقول');
       return;
     }
-    const coupon = {
-      id: coupons.length + 1,
-      code: newCoupon.code,
-      discount: parseInt(newCoupon.discount),
-      uses: 0,
-      maxUses: 100,
-      status: 'active'
-    };
-    setCoupons([...coupons, coupon]);
-    setNewCoupon({ code: '', discount: '' });
-    toast.success('تم إضافة الكوبون بنجاح');
+
+    const discountValue = parseInt(newCoupon.discount, 10);
+    if (isNaN(discountValue) || discountValue < 0 || discountValue > 100) {
+      toast.error('نسبة الخصم يجب أن تكون بين 0 و 100');
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('coupons')
+        .insert({
+          code: newCoupon.code,
+          discount: discountValue,
+          uses: 0,
+          max_uses: 100,
+          status: 'active',
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('خطأ في إضافة الكوبون:', error);
+        toast.error('فشل إضافة الكوبون');
+        return;
+      }
+
+      const coupon = {
+        id: data.id,
+        code: data.code,
+        discount: data.discount || discountValue,
+        uses: data.uses || 0,
+        maxUses: data.max_uses || 100,
+        status: data.status || 'active',
+      };
+
+      setCoupons([...coupons, coupon]);
+      setNewCoupon({ code: '', discount: '' });
+      toast.success('تم إضافة الكوبون بنجاح');
+    } catch (error) {
+      console.error('خطأ غير متوقع في إضافة الكوبون:', error);
+      toast.error('فشل إضافة الكوبون');
+    }
   };
 
-  const handleDelete = (id: number) => {
-    if (confirm('هل أنت متأكد من حذف هذا الكوبون؟')) {
+  const handleDelete = async (id: number) => {
+    if (!confirm('هل أنت متأكد من حذف هذا الكوبون؟')) return;
+
+    try {
+      const { error } = await supabase
+        .from('coupons')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        console.error('خطأ في حذف الكوبون:', error);
+        toast.error('فشل حذف الكوبون');
+        return;
+      }
+
       setCoupons(coupons.filter(c => c.id !== id));
       toast.success('تم حذف الكوبون');
+    } catch (error) {
+      console.error('خطأ غير متوقع في حذف الكوبون:', error);
+      toast.error('فشل حذف الكوبون');
     }
   };
 
@@ -60,7 +127,10 @@ export default function CouponsPage() {
             <FaTicketAlt className="text-primary" />
             الكوبونات
           </h1>
-          <button className="bg-primary text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-primary-dark">
+          <button
+            onClick={handleAddCoupon}
+            className="bg-primary text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-primary-dark"
+          >
             <FaPlus /> إضافة كوبون
           </button>
         </div>
@@ -73,6 +143,8 @@ export default function CouponsPage() {
               <label className="block text-sm font-medium mb-1">كود الكوبون</label>
               <input
                 type="text"
+                value={newCoupon.code}
+                onChange={(e) => setNewCoupon({ ...newCoupon, code: e.target.value })}
                 className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary"
                 placeholder="مثال: SUMMER2025"
               />
@@ -81,6 +153,8 @@ export default function CouponsPage() {
               <label className="block text-sm font-medium mb-1">نسبة الخصم (%)</label>
               <input
                 type="number"
+                value={newCoupon.discount}
+                onChange={(e) => setNewCoupon({ ...newCoupon, discount: e.target.value })}
                 className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary"
                 placeholder="10"
                 min="0"

@@ -100,105 +100,51 @@ const CoursesPage = () => {
           console.log(`✅ تم جلب ${result.data.length} كورس من قاعدة البيانات`);
           
           // البيانات جاهزة ومحولة بالفعل
-          const transformedCourses = result.data.map((course: any) => ({
+          const transformedCourses = result.data.map((course: any) => {
+            const rawThumb = course.thumbnail || course.image;
+            const thumbnail = rawThumb && String(rawThumb).includes('default-course.jpg') 
+              ? '/placeholder-course.jpg' 
+              : (rawThumb || '/placeholder-course.jpg');
+            return {
             id: course.id,
-          title: course.title,
-          description: course.description,
-          shortDescription: course.short_description || course.description,
-          instructor: {
-            name: course.instructor_name || 'مدرب المنصة',
-            image: course.instructor_image || '/default-instructor.jpg'
-          },
-          price: course.price || 0,
-          discountPrice: course.discount_price,
-          rating: course.rating || 0,
-          studentsCount: course.students_count || 0,
-          category: course.category || 'عام',
-          level: course.level || 'مبتدئ',
-          thumbnail: course.thumbnail || course.image || '/default-course.jpg',
-          isFeatured: course.is_featured || false,
-          // إضافة الحقول المطلوبة
-          slug: course.slug || course.title?.toLowerCase().replace(/\s+/g, '-'),
-          ratingCount: course.rating_count || 0,
-          tags: course.tags || []
-        }));
-        
-        // ⚠️ تحذير: إذا لم تكن هناك دورات حقيقية في قاعدة البيانات
-        if (!transformedCourses || transformedCourses.length === 0) {
-          console.warn('⚠️ لا توجد كورسات في قاعدة البيانات! سنعرض بيانات تجريبية');
-          
-          // بيانات تجريبية للعرض
-          const mockCourses: Course[] = [
-            {
-              id: '1',
-              title: 'دورة تطوير تطبيقات الويب الحديثة',
-              shortDescription: 'تعلم بناء تطبيقات ويب احترافية باستخدام React و Next.js',
-              instructor: { name: 'أحمد محمد', image: '/instructor1.jpg' },
-              price: 1500,
-              discountPrice: 999,
-              level: 'متوسط',
-              category: 'البرمجة',
-              thumbnail: '/course1.jpg',
-              rating: 4.8,
-              studentsCount: 1250,
-              isFeatured: true,
-              slug: 'web-development-react-nextjs',
-              ratingCount: 375,
-              tags: []
+            title: course.title,
+            description: course.description,
+            shortDescription: course.short_description || course.description,
+            instructor: {
+              name: course.instructor_name || 'مدرب المنصة',
+              image: course.instructor_image || '/default-instructor.jpg'
             },
-            {
-              id: '2',
-              title: 'أساسيات التصميم الجرافيكي',
-              shortDescription: 'احترف التصميم الجرافيكي من الصفر باستخدام Adobe Photoshop و Illustrator',
-              instructor: { name: 'سارة أحمد', image: '/instructor2.jpg' },
-              price: 1200,
-              discountPrice: 799,
-              level: 'مبتدئ',
-              category: 'التصميم',
-              thumbnail: '/course2.jpg',
-              rating: 4.9,
-              studentsCount: 2100,
-              isFeatured: true,
-              slug: 'graphic-design-basics',
-              ratingCount: 630,
-              tags: []
-            },
-            {
-              id: '3',
-              title: 'التسويق الرقمي المتقدم',
-              shortDescription: 'استراتيجيات التسويق الرقمي وإدارة الحملات الإعلانية',
-              instructor: { name: 'محمد علي', image: '/instructor3.jpg' },
-              price: 2000,
-              discountPrice: 1499,
-              level: 'متقدم',
-              category: 'التسويق',
-              thumbnail: '/course3.jpg',
-              rating: 4.7,
-              studentsCount: 890,
-              isFeatured: false,
-              slug: 'digital-marketing-advanced',
-              ratingCount: 267,
-              tags: []
-            }
-          ];
+            price: course.price || 0,
+            discountPrice: course.discount_price,
+            rating: course.rating || 0,
+            studentsCount: course.students_count || 0,
+            category: course.category || 'عام',
+            level: course.level || 'مبتدئ',
+            thumbnail,
+            isFeatured: course.is_featured || false,
+            // إضافة الحقول المطلوبة
+            slug: course.slug || course.title?.toLowerCase().replace(/\s+/g, '-'),
+            ratingCount: course.rating_count || 0,
+            tags: course.tags || []
+            };
+          });
           
-          setCourses(mockCourses);
-          setFilteredCourses(mockCourses);
+          const finalCourses = transformedCourses || [];
+          
+          setCourses(finalCourses);
+          setFilteredCourses(finalCourses);
+          setTotalPages(Math.max(1, Math.ceil(finalCourses.length / 9)));
+          
+          // استخراج الفئات والمستويات الفريدة من البيانات
+          const uniqueCategories = Array.from(new Set(finalCourses.map(course => course.category)));
+          const uniqueLevels = Array.from(new Set(finalCourses.map(course => course.level)));
+          console.log('📚 الفئات:', uniqueCategories);
+          console.log('📊 المستويات:', uniqueLevels);
+        } else {
+          // في حالة فشل الجلب من الخدمة، نفرغ القوائم بدون بيانات تجريبية
+          setCourses([]);
+          setFilteredCourses([]);
           setTotalPages(1);
-          setIsLoading(false);
-          return;
-        }
-        
-        // ✅ تعيين البيانات المحولة
-        setCourses(transformedCourses);
-        setFilteredCourses(transformedCourses);
-        setTotalPages(Math.ceil(transformedCourses.length / 9));
-        
-        // استخراج الفئات والمستويات الفريدة من البيانات
-        const uniqueCategories = Array.from(new Set(transformedCourses.map(course => course.category)));
-        const uniqueLevels = Array.from(new Set(transformedCourses.map(course => course.level)));
-        console.log('📚 الفئات:', uniqueCategories);
-        console.log('📊 المستويات:', uniqueLevels);
         }
       } catch (error: any) {
         console.error('❌ خطأ في جلب الدورات:', error);
@@ -207,67 +153,7 @@ const CoursesPage = () => {
           stack: error.stack,
           name: error.name
         });
-        
-        // عرض البيانات التجريبية حتى في حالة الخطأ
-        console.log('📌 سنعرض البيانات التجريبية بسبب الخطأ');
-        const mockCourses: Course[] = [
-          {
-            id: '1',
-            title: 'دورة تطوير تطبيقات الويب الحديثة',
-            shortDescription: 'تعلم بناء تطبيقات ويب احترافية باستخدام React و Next.js',
-            instructor: { name: 'أحمد محمد', image: '/instructor1.jpg' },
-            price: 1500,
-            discountPrice: 999,
-            level: 'متوسط',
-            category: 'البرمجة',
-            thumbnail: '/course1.jpg',
-            rating: 4.8,
-            studentsCount: 1250,
-            isFeatured: true,
-            slug: 'web-development-react-nextjs',
-            ratingCount: 375,
-            tags: []
-          },
-          {
-            id: '2',
-            title: 'أساسيات التصميم الجرافيكي',
-            shortDescription: 'احترف التصميم الجرافيكي من الصفر',
-            instructor: { name: 'سارة أحمد', image: '/instructor2.jpg' },
-            price: 1200,
-            discountPrice: 799,
-            level: 'مبتدئ',
-            category: 'التصميم',
-            thumbnail: '/course2.jpg',
-            rating: 4.9,
-            studentsCount: 2100,
-            isFeatured: true,
-            slug: 'graphic-design-basics',
-            ratingCount: 630,
-            tags: []
-          },
-          {
-            id: '3',
-            title: 'التسويق الرقمي المتقدم',
-            shortDescription: 'استراتيجيات التسويق الرقمي',
-            instructor: { name: 'محمد علي', image: '/instructor3.jpg' },
-            price: 2000,
-            discountPrice: 1499,
-            level: 'متقدم',
-            category: 'التسويق',
-            thumbnail: '/course3.jpg',
-            rating: 4.7,
-            studentsCount: 890,
-            isFeatured: false,
-            slug: 'digital-marketing-advanced',
-            ratingCount: 267,
-            tags: []
-          }
-        ];
-        
-        setCourses(mockCourses);
-        setFilteredCourses(mockCourses);
-        setTotalPages(1);
-        setError(null); // إزالة رسالة الخطأ لأننا نعرض بيانات تجريبية
+        setError('حدث خطأ أثناء تحميل الدورات. حاول مرة أخرى لاحقاً.');
       } finally {
         setIsLoading(false);
       }

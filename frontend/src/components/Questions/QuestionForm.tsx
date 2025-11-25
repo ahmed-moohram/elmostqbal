@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { API_BASE_URL } from '@/lib/api';
 
 interface QuestionFormProps {
   courseId: string;
@@ -31,7 +32,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('/api/questions', {
+      const response = await fetch(`${API_BASE_URL}/api/questions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -141,4 +142,4 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
   );
 };
 
-export default QuestionForm; 
+export default QuestionForm;

@@ -1,27 +1,8 @@
-import { createClient } from '@supabase/supabase-js';
+import supabase from './supabase-client';
 
-// إعدادات Supabase
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://wnqifmvgvlmxgswhcwnc.supabase.co';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InducWlmbXZndmxteGdzd2hjd25jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI0MzYwNTUsImV4cCI6MjA3ODAxMjA1NX0.LqWhTZYmr7nu-dIy2uBBqntOxoWM-waluYIR9bipC9M';
-
-// إنشاء عميل Supabase واحد
-let supabaseClient: ReturnType<typeof createClient> | null = null;
-
-export const getSupabase = () => {
-  if (!supabaseClient) {
-    supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
-      auth: {
-        persistSession: true,
-        detectSessionInUrl: true,
-        autoRefreshToken: true,
-      },
-    });
-  }
-  return supabaseClient;
-};
-
-// تصدير العميل مباشرة
-export const supabase = getSupabase();
+// إعادة استخدام العميل الموحد من supabase-client
+export const getSupabase = () => supabase;
+export { supabase };
 
 // دوال مساعدة للمصادقة
 export const getCurrentUser = async () => {
