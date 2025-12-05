@@ -60,11 +60,11 @@ class CSRFProtection {
   private cleanup(): void {
     const now = Date.now();
     
-    for (const [sessionId, data] of this.tokens.entries()) {
+    this.tokens.forEach((data, sessionId) => {
       if (now > data.expires) {
         this.tokens.delete(sessionId);
       }
-    }
+    });
   }
 }
 
