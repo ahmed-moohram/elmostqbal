@@ -83,11 +83,12 @@ export default function Home() {
       try {
         console.log('🔄 جلب الكورسات المميزة من Supabase (مشروع chikf)...');
 
-        // جلب الكورسات المميزة أو المنشورة من المشروع الجديد
+        // جلب الكورسات المميزة والمنشورة فقط من المشروع الجديد
         const { data: courses, error } = await supabase
           .from('courses')
           .select('*')
           .eq('is_published', true)
+          .eq('is_featured', true)
           .limit(3)
           .order('created_at', { ascending: false });
         
@@ -107,7 +108,19 @@ export default function Home() {
             thumbnail: course.thumbnail || '/placeholder-course.png',
             instructor: course.instructor_name || 'المدرس',
             rating: course.rating ?? 0,
-            studentsCount: (course as any).students_count ?? (course as any).enrollment_count ?? 0
+            studentsCount: (course as any).students_count ?? (course as any).enrollment_count ?? 0,
+            category: course.category || 'عام',
+            level: course.level || 'مبتدئ',
+            isBestseller: (course as any).is_bestseller || false,
+            features: (course as any).features || [],
+            paymentOptions: [
+              {
+                type: 'full',
+                price: course.price || 0,
+                currency: 'EGP',
+                discountPrice: (course as any).discount_price ?? null,
+              },
+            ],
           }));
           
           setFeaturedCourses(formattedCourses);

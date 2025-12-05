@@ -6,12 +6,16 @@ import { createClient } from '@supabase/supabase-js';
 
 // جرب هذه المفاتيح البديلة (مشروع chikf الجديد)
 const configs = [{
-    url: 'https://chikfjvpkqtivtyhvvzt.supabase.co',
-    key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNoaWtmanZwa3F0aXZ0eWh2dnp0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM1OTQ0MzUsImV4cCI6MjA3OTE3MDQzNX0.UhEmoTArWirw8-W3mozcHQFZxjKt31hiYZJv3L0j3SI'
+    url: process.env.NEXT_PUBLIC_SUPABASE_URL,
+    key: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
 }];
 
 // استخدم أول config
 const { url, key } = configs[0];
+
+if (!url || !key) {
+    throw new Error('❌ Missing Supabase public test configuration! Check your .env.local file');
+}
 
 console.log('🔐 Testing Supabase connection with:', { url });
 

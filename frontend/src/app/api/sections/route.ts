@@ -5,10 +5,13 @@ import { cookies } from 'next/headers';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 
 function getSupabaseWrite() {
-  const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://chikfjvpkqtivtyhvvzt.supabase.co';
+  const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
   const srk = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (srk) return createClient(url, srk);
-  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNoaWtmanZwa3F0aXZ0eWh2dnp0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM1OTQ0MzUsImV4cCI6MjA3OTE3MDQzNX0.UhEmoTArWirw8-W3mozcHQFZxjKt31hiYZJv3L0j3SI';
+  if (srk && url) return createClient(url, srk);
+  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !anon) {
+    throw new Error('❌ Missing Supabase configuration! Check your .env.local file');
+  }
   try {
     return createRouteHandlerClient({ cookies }, { supabaseUrl: url, supabaseKey: anon });
   } catch {

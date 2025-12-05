@@ -56,34 +56,55 @@ function CoursePage() {
     const checkEnrollment = async () => {
       // التحقق من localStorage أولاً (cache)
       const cachedEnrollment = localStorage.getItem(`enrollment_${courseId}`);
-      if (cachedEnrollment === 'true') {
-        setIsEnrolled(true);
-      }
+      let isCurrentlyEnrolled = cachedEnrollment === 'true';
       
       // التحقق الدوري من قاعدة البيانات
+      let phone: string | null = null;
       const studentInfo = localStorage.getItem('studentInfo');
-      if (studentInfo && courseId) {
-        const { phone } = JSON.parse(studentInfo);
-        
+      if (studentInfo) {
+        try {
+          const parsed = JSON.parse(studentInfo);
+          phone = parsed.phone || null;
+        } catch (e) {
+          console.error('Error parsing studentInfo:', e);
+        }
+      }
+
+      if (!phone) {
+        const userJson = localStorage.getItem('user');
+        if (userJson) {
+          try {
+            const user = JSON.parse(userJson);
+            phone = user.studentPhone || user.phone || null;
+          } catch (e) {
+            console.error('Error parsing user data when checking enrollment:', e);
+          }
+        }
+      }
+
+      if (phone && courseId) {
         try {
           // جلب طلبات الدفع المقبولة لهذا الطالب
-          const response = await fetch(`/api/payment-request?studentPhone=${phone}`);
+          const response = await fetch(`/api/payment-request?studentPhone=${encodeURIComponent(phone)}`);
           const requests = await response.json();
           
           if (Array.isArray(requests)) {
-            // التحقق من وجود طلب مقبول لهذا الكورس
+            // التحقق من وجود طلب مقبول ومُفَعَّل لهذا الكورس (is_active !== false)
             const approvedRequest = requests.find(
-              req => req.course_id === courseId && req.status === 'approved'
+              (req: any) =>
+                req.course_id === courseId &&
+                req.status === 'approved' &&
+                req.is_active !== false
             );
-            
+
             if (approvedRequest) {
-              setIsEnrolled(true);
-              localStorage.setItem(`enrollment_${courseId}`, 'true');
-              
-              // إظهار رسالة ترحيب عند التفعيل الجديد
               if (!cachedEnrollment) {
                 toast.success('🎉 مرحباً! تم تفعيل اشتراكك في الكورس');
               }
+              isCurrentlyEnrolled = true;
+              localStorage.setItem(`enrollment_${courseId}`, 'true');
+            } else {
+              isCurrentlyEnrolled = false;
             }
           }
         } catch (error) {
@@ -92,9 +113,17 @@ function CoursePage() {
       }
       
       // التحقق القديم من localStorage (للتوافق)
-      const oldEnrollmentStatus = localStorage.getItem(`enrolled_${courseId}`);
-      if (oldEnrollmentStatus === 'true') {
-        setIsEnrolled(true);
+      if (!isCurrentlyEnrolled) {
+        const oldEnrollmentStatus = localStorage.getItem(`enrolled_${courseId}`);
+        if (oldEnrollmentStatus === 'true') {
+          isCurrentlyEnrolled = true;
+        }
+      }
+
+      setIsEnrolled(isCurrentlyEnrolled);
+
+      if (!isCurrentlyEnrolled) {
+        localStorage.removeItem(`enrollment_${courseId}`);
       }
     };
 
@@ -303,9 +332,32 @@ function CoursePage() {
   }, [courseId]);
 
   const handleEnrollment = async () => {
-    if (!course) return;
-    router.replace(`/courses/${courseId}/payment`);
+    if (!courseId) {
+      toast.error('معرّف الكورس غير معروف، حدّث الصفحة وحاول مرة أخرى');
+      return;
+    }
+
+    try {
+      setIsEnrolling(true);
+      console.log('➡️ التحويل إلى صفحة الدفع للكورس:', courseId);
+      router.push(`/courses/${courseId}/payment`);
+    } catch (err) {
+      console.error('❌ خطأ أثناء التحويل لصفحة الدفع، سيتم استخدام تحويل مباشر:', err);
+      if (typeof window !== 'undefined') {
+        window.location.href = `/courses/${courseId}/payment`;
+      }
+    } finally {
+      setIsEnrolling(false);
+    }
   };
+
+  const motivationalMessages = [
+    'استمر، كل خطوة تقرّبك من هدفك! 💪',
+    'رائع! تعلمت شيئاً جديداً الآن 👏',
+    'كل فيديو تشاهده يبني مستقبلك خطوة بخطوة 🚀',
+    'ما شاء الله، محافظ على مجهودك! استمر 🌟',
+    'إصرارك اليوم هو نجاحك غداً ✅'
+  ];
 
   const handleLessonComplete = async (lessonId: string, isAuto = false) => {
     if (!course || !progress || !isEnrolled) return;
@@ -334,11 +386,13 @@ function CoursePage() {
     // حفظ في localStorage
     localStorage.setItem(`course_${courseId}_progress`, JSON.stringify(newProgress));
     
-    if (isAuto) {
-      toast.success('🎉 تهانينا! تم إكمال الدرس تلقائياً بعد المشاهدة');
-    } else {
-      toast.success('تم إكمال الدرس بنجاح! ✅');
-    }
+    const randomMsg = motivationalMessages[Math.floor(Math.random() * motivationalMessages.length)];
+    const baseMsg = isAuto
+      ? '🎉 تم إكمال الدرس تلقائياً بعد مشاهدة معظم الفيديو'
+      : '✅ أحسنت! تم إكمال الدرس بنجاح';
+
+    toast.success(`${baseMsg}
+${randomMsg}`);
     
     // حفظ تقدم الدرس في قاعدة البيانات وتفعيل نظام الإنجازات
     try {
@@ -368,7 +422,11 @@ function CoursePage() {
           } else {
             // بعد حفظ التقدم، التحقق من الإنجازات ومنح الجديدة إن وجدت
             try {
-              await achievementsService.checkAndGrantAchievements(userId, courseId);
+              const newAchievements = await achievementsService.checkAndGrantAchievements(userId, courseId);
+              if (newAchievements && newAchievements.length > 0) {
+                const titles = newAchievements.map(a => a.title).join('، ');
+                toast.success(`🏆 مبروك! حصلت على إنجازات جديدة في هذا الكورس: ${titles}`);
+              }
             } catch (achError) {
               console.error('❌ خطأ في تفعيل نظام الإنجازات:', achError);
             }
@@ -634,22 +692,29 @@ function CoursePage() {
               )}
             </div>
           </div>
-          <button 
-            className="bg-white text-primary px-8 py-4 rounded-xl font-bold text-lg hover:bg-blue-50 transition shadow-lg flex items-center gap-2"
-            onClick={handleEnrollment}
-            disabled={isEnrolling}
-          >
-            {isEnrolling ? (
-              <>
-                <ImSpinner9 className="animate-spin" />
-                جاري التسجيل...
-              </>
-            ) : (
-              <>
-                <FaCheck /> اشترك الآن
-              </>
-            )}
-          </button>
+          {isEnrolled ? (
+            <div className="bg-white/20 text-white px-6 py-3 rounded-xl font-bold text-lg flex items-center gap-2">
+              <FaCheck className="text-green-300" />
+              <span>تم تفعيل اشتراكك في هذا الكورس</span>
+            </div>
+          ) : (
+            <button 
+              className="bg-white text-primary px-8 py-4 rounded-xl font-bold text-lg hover:bg-blue-50 transition shadow-lg flex items-center gap-2"
+              onClick={handleEnrollment}
+              disabled={isEnrolling}
+            >
+              {isEnrolling ? (
+                <>
+                  <ImSpinner9 className="animate-spin" />
+                  جاري التسجيل...
+                </>
+              ) : (
+                <>
+                  <FaCheck /> اشترك الآن
+                </>
+              )}
+            </button>
+          )}
         </div>
       </div>
 
@@ -817,7 +882,7 @@ function CoursePage() {
                     ?.find((lesson: any) => String(lesson.id) === activeLesson);
                   return !!selectedLesson?.isPreview || isEnrolled;
                 })()}
-                onEnroll={() => setIsEnrolled(true)}
+                onEnroll={handleEnrollment}
               />
             </div>
           ) : (

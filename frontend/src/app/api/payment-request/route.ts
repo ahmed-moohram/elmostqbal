@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://chikfjvpkqtivtyhvvzt.supabase.co';
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNoaWtmanZwa3F0aXZ0eWh2dnp0Iiwicm9zZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MzU5NDQzNSwiZXhwIjoyMDc5MTcwNDM1fQ.xOZE1xdbkGOZ99MNAni8XjnWm3-Uxw38ZkvVqJiIVjo';
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!supabaseUrl || !supabaseServiceKey) {
+  throw new Error('❌ Missing Supabase configuration! Check your .env.local file');
+}
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
@@ -32,13 +36,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // البحث عن معرف الطالب إن وجد
-    const { data: studentData } = await supabase
-      .from('users')
-      .select('id')
-      .eq('student_phone', studentPhone)
-      .single();
-
     // إنشاء طلب الدفع
     const { data: paymentRequest, error } = await supabase
       .from('payment_requests')
@@ -46,7 +43,7 @@ export async function POST(request: NextRequest) {
         student_name: studentName,
         student_phone: studentPhone,
         student_email: studentEmail,
-        student_id: studentData?.id || null,
+        student_id: null,
         course_id: courseId,
         course_name: courseName,
         course_price: coursePrice,
@@ -128,7 +125,53 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json(data);
+    let enrichedData: any = data;
+
+    // عند طلب البيانات لطالب معيَّن، أضف حالة التفعيل الفعلية من جدول enrollments
+    if (studentPhone && Array.isArray(enrichedData) && enrichedData.length > 0) {
+      try {
+        const { data: userRow } = await supabase
+          .from('users')
+          .select('id')
+          .eq('phone', studentPhone)
+          .single();
+
+        if (userRow) {
+          const courseIds = Array.from(
+            new Set(
+              enrichedData
+                .map((r: any) => r.course_id)
+                .filter((id: any) => !!id)
+            )
+          );
+
+          if (courseIds.length > 0) {
+            const { data: enrollmentsData } = await supabase
+              .from('enrollments')
+              .select('course_id, is_active')
+              .eq('user_id', userRow.id)
+              .in('course_id', courseIds as any);
+
+            const enrollmentMap = new Map<string, boolean>();
+            (enrollmentsData || []).forEach((e: any) => {
+              enrollmentMap.set(String(e.course_id), e.is_active);
+            });
+
+            enrichedData = enrichedData.map((r: any) => ({
+              ...r,
+              // إذا لم توجد بيانات في enrollments نعتبره مُفَعَّلاً (للتوافق مع البيانات القديمة)
+              is_active: enrollmentMap.has(String(r.course_id))
+                ? enrollmentMap.get(String(r.course_id))
+                : true,
+            }));
+          }
+        }
+      } catch (enrichError) {
+        console.error('Error enriching payment requests with enrollment status:', enrichError);
+      }
+    }
+
+    return NextResponse.json(enrichedData);
 
   } catch (error) {
     console.error('Server error:', error);
@@ -199,7 +242,7 @@ export async function PATCH(request: NextRequest) {
         .single();
 
       if (studentData) {
-        // التحقق من وجود اشتراك سابق
+        // التحقق من وجود اشتراك سابق في نظام الدفع الجديد (course_enrollments)
         const { data: existingEnrollment } = await supabase
           .from('course_enrollments')
           .select('id')
@@ -208,7 +251,7 @@ export async function PATCH(request: NextRequest) {
           .single();
 
         if (!existingEnrollment) {
-          // إنشاء اشتراك جديد
+          // إنشاء اشتراك جديد في نظام الدفع
           await supabase
             .from('course_enrollments')
             .insert({
@@ -219,7 +262,7 @@ export async function PATCH(request: NextRequest) {
               access_type: 'full'
             });
         } else {
-          // تحديث الاشتراك الموجود
+          // تحديث الاشتراك الموجود في نظام الدفع
           await supabase
             .from('course_enrollments')
             .update({
@@ -229,10 +272,55 @@ export async function PATCH(request: NextRequest) {
             })
             .eq('id', existingEnrollment.id);
         }
+
+        // مزامنة الاشتراك مع جدول enrollments الخاص بالإنجازات/لوحة التحكم
+        try {
+          const { data: existingLegacyEnrollment } = await supabase
+            .from('enrollments')
+            .select('id')
+            .eq('user_id', studentData.id)
+            .eq('course_id', paymentRequest.course_id)
+            .single();
+
+          if (!existingLegacyEnrollment) {
+            await supabase
+              .from('enrollments')
+              .insert({
+                user_id: studentData.id,
+                course_id: paymentRequest.course_id,
+                progress: 0,
+                is_active: true,
+                enrolled_at: new Date().toISOString()
+              });
+          } else {
+            await supabase
+              .from('enrollments')
+              .update({
+                is_active: true
+              })
+              .eq('id', existingLegacyEnrollment.id);
+          }
+        } catch (legacyError) {
+          console.error('Error syncing enrollments for achievements:', legacyError);
+        }
+
+        // إنشاء إشعار للطالب في جدول notifications
+        try {
+          await supabase
+            .from('notifications')
+            .insert({
+              user_id: studentData.id,
+              title: 'تم قبول طلب الاشتراك',
+              message: `تم قبول طلب اشتراكك في كورس ${paymentRequest.course_name}`,
+              type: 'payment',
+              link: `/courses/${paymentRequest.course_id}`
+            });
+        } catch (notifError) {
+          console.error('Error creating approval notification:', notifError);
+        }
       }
 
-      // إنشاء إشعار للطالب (اختياري)
-      // يمكن إضافة نظام إشعارات SMS أو Email هنا
+      // يمكن مستقبلاً إضافة نظام إشعارات SMS أو Email هنا
     }
 
     return NextResponse.json({

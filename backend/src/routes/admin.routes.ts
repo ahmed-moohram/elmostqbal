@@ -214,7 +214,7 @@ router.get('/students/recent', async (req, res) => {
     const { limit = 5 } = req.query;
     
     const students = await Student.find()
-      .select('name email phone createdAt enrollments')
+      .select('name email phone grade courses createdAt updatedAt')
       .sort({ createdAt: -1 })
       .limit(parseInt(limit as string));
     
@@ -224,7 +224,7 @@ router.get('/students/recent', async (req, res) => {
       email: student.email,
       avatar: '/placeholder-avatar.png',
       joinDate: student.createdAt,
-      enrolledCourses: student.enrolledCourses?.length || 0
+      enrolledCourses: Array.isArray(student.courses) ? student.courses.length : 0
     }));
     
     res.json(formattedStudents);
@@ -300,6 +300,84 @@ router.post('/enrollments/:id/approve', async (req, res) => {
     }
     
     // TODO: Add student to course
+    
+    try {
+      // التأكد من وجود سجل للطالب
+      let student = await Student.findById(enrollment.studentId);
+      if (!student && enrollment.studentInfo?.phone) {
+        student = await Student.findOne({ phone: enrollment.studentInfo.phone });
+      }
+
+      if (!student && enrollment.studentInfo) {
+        student = new Student({
+          name: enrollment.studentInfo.name,
+          email: enrollment.studentInfo.email,
+          phone: enrollment.studentInfo.phone,
+          parentPhone: enrollment.studentInfo.parentPhone,
+          grade: 'غير محدد',
+          courses: []
+        });
+      }
+
+      if (student) {
+        const courseId = enrollment.courseId;
+
+        // إضافة الكورس إلى قائمة كورسات الطالب إذا لم يكن مضافًا
+        const hasCourse = Array.isArray(student.courses)
+          ? student.courses.some(
+              (c: any) => c.courseId?.toString() === courseId.toString()
+            )
+          : false;
+
+        if (!hasCourse) {
+          (student.courses as any[]).push({
+            courseId,
+            progress: 0,
+            completedLessons: [],
+            lastAccessed: new Date()
+          });
+        }
+
+        await student.save();
+
+        // إضافة الطالب إلى الكورس
+        const course = await Course.findById(courseId);
+        if (course) {
+          const isAlreadyStudent = Array.isArray(course.students)
+            ? course.students.some(
+                (s: any) => s.toString() === student!._id.toString()
+              )
+            : false;
+
+          if (!isAlreadyStudent) {
+            (course.students as any[]).push(student._id);
+            course.studentsCount = (course.studentsCount || 0) + 1;
+            await course.save();
+          }
+        }
+
+        // إنشاء إنجاز للطالب عند الاشتراك في الكورس
+        try {
+          await Achievement.create({
+            studentId: student._id,
+            courseId,
+            type: 'milestone_reached',
+            title: 'انضمام إلى الكورس',
+            description: 'تم تسجيل الطالب في الكورس بنجاح',
+            points: 10,
+            metadata: {
+              grade: (student as any).grade
+            },
+            earnedAt: new Date(),
+            isVisible: true
+          });
+        } catch (achievementError) {
+          console.error('Error creating enrollment achievement:', achievementError);
+        }
+      }
+    } catch (linkError) {
+      console.error('Error linking student with course on approval:', linkError);
+    }
     
     res.json({ success: true, data: enrollment });
   } catch (error: any) {

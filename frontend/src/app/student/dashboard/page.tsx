@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { API_BASE_URL } from '@/lib/api';
 import { useProgress } from '@/contexts/ProgressContext';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -14,6 +13,7 @@ import {
   FaPlay,
   FaCheckCircle,
 } from 'react-icons/fa';
+import CourseAchievements from '@/components/CourseAchievements';
 
 interface EnrolledCourse {
   id: string;
@@ -38,6 +38,37 @@ export default function StudentDashboard() {
     currentStreak: 5,
     totalPoints: 0,
   });
+  const [weeklyProgress, setWeeklyProgress] = useState(0);
+  const formatTimeAgo = (dateInput: any) => {
+    const date = new Date(dateInput);
+    if (isNaN(date.getTime())) return '';
+    const diffMs = Date.now() - date.getTime();
+    const diffMinutes = Math.floor(diffMs / 60000);
+    if (diffMinutes < 1) return 'الآن';
+    if (diffMinutes < 60) return `منذ ${diffMinutes} دقيقة`;
+    const diffHours = Math.floor(diffMinutes / 60);
+    if (diffHours < 24) return `منذ ${diffHours} ساعة`;
+    const diffDays = Math.floor(diffHours / 24);
+    return `منذ ${diffDays} يوم`;
+  };
+
+  const recentQuizActivities = ([...(quizResults || [])] as any[])
+    .map((quiz: any) => {
+      const when = quiz.completedAt || quiz.completed_at || quiz.submitted_at;
+      if (!when) return null;
+      const date = new Date(when);
+      if (isNaN(date.getTime())) return null;
+      return {
+        icon: <FaCheckCircle className="text-green-500" />,
+        title: quiz.passed ? 'أكملت اختبار' : 'محاولة اختبار',
+        description: 'اختبار تم حله في أحد الكورسات',
+        time: formatTimeAgo(date),
+        date,
+      };
+    })
+    .filter((item: any) => item !== null)
+    .sort((a: any, b: any) => b.date.getTime() - a.date.getTime())
+    .slice(0, 3);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -55,39 +86,76 @@ export default function StudentDashboard() {
 
   const loadStudentData = async () => {
     try {
-      const token = localStorage.getItem('token');
-      if (!token) return;
+      if (!user?.id) return;
 
       // جلب الكورسات المسجل فيها من الـ API
-      const response = await fetch(`${API_BASE_URL}/api/courses/enrolled/my-courses`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
+      const { getDashboardData } = await import('@/services/supabase-service');
+      const result = await getDashboardData(user.id);
 
-      if (response.ok) {
-        const data = await response.json();
-        const courses = data.courses || [];
-        
+      if (result.success && result.data) {
+        const active = Array.isArray(result.data.activeCourses)
+          ? result.data.activeCourses
+          : [];
+
+        const courses: EnrolledCourse[] = active
+          .filter((e: any) => e.course)
+          .map((e: any) => {
+            const course = e.course || {};
+            const totalLessons =
+              typeof course.total_lessons === 'number'
+                ? course.total_lessons
+                : typeof course.lessons_count === 'number'
+                  ? course.lessons_count
+                  : 0;
+            const progress = typeof e.progress === 'number' ? e.progress : 0;
+            const completedVideos =
+              totalLessons > 0 ? Math.round((progress / 100) * totalLessons) : 0;
+
+            return {
+              id: String(course.id),
+              title: course.title || 'كورس بدون اسم',
+              thumbnail: course.thumbnail || '/placeholder-course.jpg',
+              progress,
+              totalVideos: totalLessons,
+              completedVideos,
+              lastWatched: e.updated_at || e.enrolled_at,
+              instructor: course.instructor_name || 'مدرس',
+            };
+          });
+
         setEnrolledCourses(courses);
 
-        // حساب الإحصائيات
-        const totalCompleted = courses.filter((c: EnrolledCourse) => c.progress >= 90).length;
+        // حساب الإحصائيات العامة
+        const totalCompleted = courses.filter((c) => c.progress >= 90).length;
         const totalTime = Object.values(coursesProgress).reduce(
-          (sum, course) => sum + (course.totalWatchTime || 0),
+          (sum, course: any) => sum + (course.totalWatchTime || 0),
           0
         );
-        const totalQuizPoints = quizResults.reduce((sum, quiz) => sum + quiz.score, 0);
+        const totalQuizPoints = quizResults.reduce(
+          (sum: number, quiz: any) => sum + (quiz.score || 0),
+          0
+        );
 
         setStats({
           totalCourses: courses.length,
           completedCourses: totalCompleted,
-          totalWatchTime: Math.floor(totalTime / 3600), // ساعات
+          totalWatchTime: Math.floor(totalTime / 3600),
           currentStreak: 5,
           totalPoints: totalQuizPoints,
         });
+
+        // حساب تقدم هذا الأسبوع بشكل مبسط من متوسط تقدم الكورسات
+        if (courses.length === 0) {
+          setWeeklyProgress(0);
+        } else {
+          const sumProgress = courses.reduce(
+            (sum, c) => sum + (c.progress || 0),
+            0
+          );
+          const avgProgress = Math.round(sumProgress / courses.length);
+          setWeeklyProgress(avgProgress);
+        }
       } else {
-        console.error('Failed to fetch enrolled courses');
         setEnrolledCourses([]);
       }
     } catch (error) {
@@ -160,12 +228,12 @@ export default function StudentDashboard() {
           <div className="bg-white/20 rounded-full h-3 overflow-hidden">
             <motion.div
               initial={{ width: 0 }}
-              animate={{ width: '68%' }}
+              animate={{ width: `${weeklyProgress}%` }}
               transition={{ duration: 1, delay: 0.5 }}
               className="bg-white h-full rounded-full"
             />
           </div>
-          <p className="text-sm mt-2 text-white/90">68% من هدفك الأسبوعي</p>
+          <p className="text-sm mt-2 text-white/90">{weeklyProgress}% من هدفك الأسبوعي</p>
         </motion.div>
 
         {/* الكورسات المسجل فيها */}
@@ -210,6 +278,13 @@ export default function StudentDashboard() {
           )}
         </div>
 
+        {user?.id && (
+          <div className="mb-8">
+            <h2 className="text-2xl font-bold mb-4">إنجازاتك في الكورسات</h2>
+            <CourseAchievements userId={user.id} hideEmptyMessage />
+          </div>
+        )}
+
         {/* نشاط حديث */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -218,26 +293,23 @@ export default function StudentDashboard() {
           className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm"
         >
           <h2 className="text-xl font-bold mb-4">النشاط الأخير</h2>
-          <div className="space-y-4">
-            <ActivityItem
-              icon={<FaPlay className="text-blue-500" />}
-              title="بدأت مشاهدة"
-              description="الدرس الخامس - معادلات الدرجة الثانية"
-              time="منذ ساعة"
-            />
-            <ActivityItem
-              icon={<FaCheckCircle className="text-green-500" />}
-              title="أكملت"
-              description="اختبار الفصل الثالث - الفيزياء"
-              time="منذ 3 ساعات"
-            />
-            <ActivityItem
-              icon={<FaCheckCircle className="text-yellow-500" />}
-              title="حصلت على إنجاز"
-              description="شارة المثابرة - 5 أيام متتالية"
-              time="أمس"
-            />
-          </div>
+          {recentQuizActivities.length === 0 ? (
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              لا يوجد نشاط حديث حتى الآن. ابدأ بمشاهدة الدروس أو حل الاختبارات ليظهر نشاطك هنا.
+            </p>
+          ) : (
+            <div className="space-y-4">
+              {recentQuizActivities.map((activity: any, index: number) => (
+                <ActivityItem
+                  key={index}
+                  icon={activity.icon}
+                  title={activity.title}
+                  description={activity.description}
+                  time={activity.time}
+                />
+              ))}
+            </div>
+          )}
         </motion.div>
       </div>
     </div>

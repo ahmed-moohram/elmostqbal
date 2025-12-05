@@ -9,7 +9,7 @@ import { FaWhatsapp, FaCheckCircle, FaArrowLeft, FaInfoCircle, FaCopy, FaMobileA
 import { toast } from 'react-hot-toast';
 
 interface CourseDetails {
-  id: number;
+  id: string | number;
   title: string;
   price: number;
   discountPrice: number | null;
@@ -19,8 +19,8 @@ interface CourseDetails {
 export default function PaymentPage() {
   const params = useParams();
   const router = useRouter();
-  const courseId = Number(params?.id);
-  
+  const courseId = (params?.id as string) || '';
+
   const [course, setCourse] = useState<CourseDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [vodafoneNumber] = useState('01070333143');
@@ -28,6 +28,7 @@ export default function PaymentPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [studentName, setStudentName] = useState<string>('الطالب');
 
   // التحقق من تسجيل دخول المستخدم
   useEffect(() => {
@@ -35,6 +36,12 @@ export default function PaymentPage() {
     if (!userJson) {
       router.replace(`/login?redirect=/courses/${courseId}/payment`);
       return;
+    }
+    try {
+      const user = JSON.parse(userJson);
+      setStudentName(user.name || 'الطالب');
+    } catch (e) {
+      console.error('Error parsing user data:', e);
     }
     setIsLoggedIn(true);
   }, [courseId, router]);
@@ -44,47 +51,69 @@ export default function PaymentPage() {
     const fetchCourseDetails = async () => {
       setIsLoading(true);
       try {
-        // بيانات الكورسات الواقعية
-        const mockCourses: Record<number, CourseDetails> = {
-          1: {
-            id: 1,
-            title: "الرياضيات للثانوية العامة 2024",
-            price: 1200,
-            discountPrice: 999,
-            thumbnail: "/placeholder-course.jpg",
-          },
-          2: {
-            id: 2,
-            title: "الفيزياء المتقدمة للجامعات",
-            price: 1500,
-            discountPrice: 1299,
-            thumbnail: "/placeholder-course.jpg",
-          },
-          3: {
-            id: 3,
-            title: "الكيمياء الشاملة للثانوية",
-            price: 1100,
-            discountPrice: 950,
-            thumbnail: "/placeholder-course.jpg",
-          },
-        };
-        
-        await new Promise(resolve => setTimeout(resolve, 300));
-        
-        const courseData = mockCourses[courseId];
-        if (courseData) {
-          setCourse(courseData);
-        } else {
-          // إذا لم يتم العثور على الكورس
+        // محاولة جلب بيانات الكورس من Supabase أولاً
+        const { default: supabase } = await import('@/lib/supabase-client');
+
+        const { data: courseData, error } = await supabase
+          .from('courses')
+          .select('id, title, price, discount_price, thumbnail')
+          .eq('id', courseId)
+          .single();
+
+        if (!error && courseData) {
           setCourse({
-            id: courseId,
-            title: "كورس تعليمي",
-            price: 999,
-            discountPrice: 799,
-            thumbnail: "/placeholder-course.jpg",
+            id: courseData.id,
+            title: courseData.title,
+            price: (courseData as any).price || 0,
+            discountPrice: (courseData as any).discount_price ?? null,
+            thumbnail: (courseData as any).thumbnail || '/placeholder-course.jpg',
           });
+        } else {
+          console.warn('لم يتم العثور على الكورس في Supabase، سيتم استخدام القيم الافتراضية/القديمة:', error);
+
+          // بيانات الكورسات الواقعية (للأرقام فقط) - تُستخدم الآن فقط كـ fallback
+          const mockCourses: Record<number, CourseDetails> = {
+            1: {
+              id: 1,
+              title: "الرياضيات للثانوية العامة 2024",
+              price: 1200,
+              discountPrice: 999,
+              thumbnail: "/placeholder-course.jpg",
+            },
+            2: {
+              id: 2,
+              title: "الفيزياء المتقدمة للجامعات",
+              price: 1500,
+              discountPrice: 1299,
+              thumbnail: "/placeholder-course.jpg",
+            },
+            3: {
+              id: 3,
+              title: "الكيمياء الشاملة للثانوية",
+              price: 1100,
+              discountPrice: 950,
+              thumbnail: "/placeholder-course.jpg",
+            },
+          };
+
+          await new Promise(resolve => setTimeout(resolve, 300));
+
+          const numericCourseId = Number(courseId);
+          const fallbackCourse = mockCourses[numericCourseId];
+          if (fallbackCourse) {
+            setCourse(fallbackCourse);
+          } else {
+            // إذا لم يتم العثور على الكورس
+            setCourse({
+              id: courseId || 'unknown',
+              title: "كورس تعليمي",
+              price: 999,
+              discountPrice: 799,
+              thumbnail: "/placeholder-course.jpg",
+            });
+          }
         }
-        
+
         setIsLoading(false);
       } catch (error) {
         console.error('Error fetching course:', error);
@@ -93,7 +122,9 @@ export default function PaymentPage() {
       }
     };
 
-    fetchCourseDetails();
+    if (courseId) {
+      fetchCourseDetails();
+    }
   }, [courseId, router]);
 
   // نسخ رقم فودافون كاش
@@ -112,11 +143,11 @@ export default function PaymentPage() {
       const studentName = user.name || 'طالب جديد';
       const studentGrade = user.gradeLevel || user.grade || 'غير محدد';
       const studentPhone = user.studentPhone || user.phone || 'غير متوفر';
-      
+
       // تحضير الرسالة
       const courseName = course?.title || '';
       const coursePrice = course?.discountPrice || course?.price || 0;
-      
+
       const message = `
 *طلب اشتراك في كورس*
 
@@ -128,37 +159,37 @@ export default function PaymentPage() {
 
 سأرسل إيصال الدفع الآن لتأكيد الاشتراك ✅
 `;
-      
+
       // توجيه المستخدم إلى واتساب
       const waUrl = `https://wa.me/2${vodafoneNumber}?text=${encodeURIComponent(message)}`;
       window.open(waUrl, '_blank');
-      
+
       // تسجيل أن المستخدم ضغط على زر واتساب
       localStorage.setItem(`whatsapp_clicked_${courseId}`, 'true');
-      
+
       toast.success('تم فتح واتساب! أرسل صورة الإيصال ثم اضغط "تأكيد" أدناه 📸', {
         duration: 6000
       });
-      
+
     } catch (error) {
       console.error('خطأ في فتح محادثة واتساب:', error);
       toast.error('حدث خطأ أثناء محاولة فتح واتساب');
     }
   };
-  
+
   // وظيفة إرسال إشعار للمسؤول
   const sendAdminNotification = async (data) => {
     try {
       // في الحالة الفعلية، سنرسل البيانات إلى API
       console.log('إرسال إشعار للمسؤول:', data);
-      
+
       // محاكاة لاستدعاء API
       // await fetch('/api/admin/notifications', {
       //   method: 'POST',
       //   headers: { 'Content-Type': 'application/json' },
       //   body: JSON.stringify(data)
       // });
-      
+
       // تخزين محلي للعرض التوضيحي
       const adminNotifications = JSON.parse(localStorage.getItem('adminNotifications') || '[]');
       adminNotifications.push(data);
@@ -171,18 +202,35 @@ export default function PaymentPage() {
   // تأكيد إرسال الإيصال للأدمن
   const handleConfirmPayment = async () => {
     setIsSubmitting(true);
-    
+
     try {
       // التحقق من صحة البيانات قبل المتابعة
-      if (!course || !courseId) {
+      if (!course) {
         toast.error('بيانات الكورس غير متوفرة');
         return;
       }
-      
+
       // استخراج معلومات المستخدم
       const userJson = localStorage.getItem('user');
       const user = userJson ? JSON.parse(userJson) : {};
-      
+      const studentInfoJson = localStorage.getItem('studentInfo');
+      let studentInfo: any = null;
+      try {
+        studentInfo = studentInfoJson ? JSON.parse(studentInfoJson) : null;
+      } catch (e) {
+        console.error('Error parsing studentInfo:', e);
+      }
+
+      const finalStudentName = (studentInfo && studentInfo.name) || user.name || 'طالب';
+      const finalStudentEmail = (studentInfo && studentInfo.email) || user.email || `student${Date.now()}@temp.com`;
+      const finalStudentPhone = (studentInfo && studentInfo.phone) || user.studentPhone || user.phone || '';
+      const finalStudentGrade =
+        (studentInfo && (studentInfo.gradeLevel || studentInfo.grade)) ||
+        user.gradeLevel ||
+        user.grade ||
+        'غير محدد';
+      const nowIso = new Date().toISOString();
+
       // التأكد من أن المستخدم أرسل إلى واتساب أولاً
       const hasClickedWhatsapp = localStorage.getItem(`whatsapp_clicked_${courseId}`);
       if (!hasClickedWhatsapp) {
@@ -193,16 +241,24 @@ export default function PaymentPage() {
       
       // إنشاء طلب تسجيل للأدمن
       const enrollmentRequest = {
+        // معرف محلي للطلب ليستعمله الأدمن في الواجهة
+        id: `local-${courseId}-${Date.now()}`,
         studentId: user.id || user._id,
+        // حقول مسطّحة لواجهة الأدمن القديمة
+        studentName: finalStudentName,
+        studentPhone: finalStudentPhone,
+        studentGrade: finalStudentGrade,
+        courseName: course.title,
+        coursePrice: course.discountPrice || course.price,
+        date: nowIso,
+        // كائنات تفصيلية للاستخدامات الأخرى
         studentInfo: {
-          name: user.name || 'طالب',
-          email: user.email || `student${Date.now()}@temp.com`,
-          phone: user.studentPhone || user.phone || '',
+          name: finalStudentName,
+          email: finalStudentEmail,
+          phone: finalStudentPhone,
           parentPhone: user.parentPhone || ''
         },
         courseId: courseId,
-        courseName: course.title,
-        coursePrice: course.discountPrice || course.price,
         paymentInfo: {
           method: 'vodafone_cash',
           amount: course.discountPrice || course.price,
@@ -210,14 +266,14 @@ export default function PaymentPage() {
           phoneNumber: vodafoneNumber
         },
         status: 'pending',
-        submittedAt: new Date().toISOString()
+        submittedAt: nowIso
       };
       
-      // محاولة إرسال للـ backend
+      // محاولة إرسال للـ backend (API القديم إن وجد)
       try {
         const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
         const token = localStorage.getItem('token');
-        
+
         const response = await fetch(`${API_URL}/api/admin/enrollment-requests`, {
           method: 'POST',
           headers: {
@@ -226,14 +282,38 @@ export default function PaymentPage() {
           },
           body: JSON.stringify(enrollmentRequest)
         });
-        
+
         if (response.ok) {
           console.log('تم إرسال الطلب للسيرفر بنجاح');
         }
       } catch (apiError) {
         console.log('حفظ الطلب محلياً فقط', apiError);
       }
-      
+
+      // إنشاء طلب دفع في نظام المنصة (Supabase عبر /api/payment-request)
+      try {
+        await fetch('/api/payment-request', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            studentName: finalStudentName,
+            studentPhone: finalStudentPhone,
+            studentEmail: finalStudentEmail,
+            courseId: courseId,
+            courseName: course.title,
+            coursePrice: course.discountPrice || course.price,
+            teacherName: '',
+            teacherPhone: '',
+            paymentPhone: finalStudentPhone,
+            transactionId: undefined,
+          }),
+        });
+      } catch (paymentError) {
+        console.error('Error creating payment request:', paymentError);
+      }
+
       // حفظ في localStorage كـ backup
       const requestsStr = localStorage.getItem('enrollmentRequests');
       let requests: any[] = [];
@@ -244,7 +324,7 @@ export default function PaymentPage() {
           console.error('Error parsing enrollment requests:', e);
         }
       }
-      
+
       requests.push(enrollmentRequest);
       localStorage.setItem('enrollmentRequests', JSON.stringify(requests));
       
@@ -427,7 +507,7 @@ export default function PaymentPage() {
                 <div className="mb-6">
                   <p className="text-gray-600 dark:text-gray-400 mb-2 text-sm">اسم المستلم:</p>
                   <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg font-bold text-gray-800 dark:text-white border border-gray-100 dark:border-gray-600">
-                    MR
+                    {studentName}
                   </div>
                 </div>
                 

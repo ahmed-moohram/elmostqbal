@@ -131,7 +131,7 @@ router.get('/', requireAuth, isAdmin, async (req: Request, res: Response) => {
     console.log('Fetching students - User:', req.user?.email, 'Role:', req.user?.role);
     
     const students = await Student.find()
-      .select('name email phone createdAt')
+      .select('name email phone parentPhone grade courses createdAt updatedAt isActive')
       .limit(100)
       .lean();
     

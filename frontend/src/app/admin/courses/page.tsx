@@ -13,6 +13,7 @@ interface Course {
   price?: number;
   image?: string;
   isPublished?: boolean;
+  isFeatured?: boolean;
   paymentOptions?: Array<{
     type: string;
     price: number;
@@ -64,6 +65,7 @@ export default function AdminCoursesPage() {
         price: course.price || 0,
         image: course.thumbnail || '/course-placeholder.png',
         isPublished: course.is_published || false,
+        isFeatured: course.is_featured || false,
         instructor: course.instructor_name || 'غير محدد',
         category: course.category || 'عام',
         level: course.level || 'مبتدئ',
@@ -91,16 +93,18 @@ export default function AdminCoursesPage() {
   const handleTogglePublish = async (id: string, currentStatus: boolean) => {
     try {
       const nextPublished = !currentStatus;
-      const { error } = await supabase
-        .from('courses')
-        .update({ 
-          is_published: nextPublished,
-          status: nextPublished ? 'published' : 'draft',
-          is_active: nextPublished ? true : false,
-        })
-        .eq('id', id);
-      
-      if (error) throw error;
+      const formData = new FormData();
+      formData.append('isPublished', String(nextPublished));
+
+      const response = await fetch(`/api/courses/${id}`, {
+        method: 'PUT',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || 'فشل تحديث حالة النشر');
+      }
       
       // تحديث القائمة المحلية
       setCourses(courses.map(c => 
@@ -110,6 +114,32 @@ export default function AdminCoursesPage() {
     } catch (error) {
       console.error('❌ خطأ في تحديث حالة النشر:', error);
       toast.error('❌ حدث خطأ!');
+    }
+  };
+
+  const handleToggleFeatured = async (id: string, currentFeatured: boolean) => {
+    try {
+      const nextFeatured = !currentFeatured;
+      const formData = new FormData();
+      formData.append('isFeatured', String(nextFeatured));
+
+      const response = await fetch(`/api/courses/${id}`, {
+        method: 'PUT',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || 'فشل تحديث حالة التمييز');
+      }
+
+      setCourses(courses.map(c =>
+        c._id === id ? { ...c, isFeatured: nextFeatured } : c
+      ));
+      toast.success(!currentFeatured ? '✅ تم تعيين الدورة كـ مميزة' : '⚠️ تم إلغاء تمييز الدورة');
+    } catch (error) {
+      console.error('❌ خطأ في تحديث حالة التمييز:', error);
+      toast.error('❌ حدث خطأ في تمييز الدورة!');
     }
   };
 
@@ -186,7 +216,7 @@ export default function AdminCoursesPage() {
           </h1>
           <div className="flex gap-2">
             <Link
-              href="/admin/enrollments"
+              href="/admin/payment-requests"
               className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-5 py-2 rounded-lg shadow font-medium transition"
             >
               <FaClipboardList />
@@ -217,6 +247,7 @@ export default function AdminCoursesPage() {
               <th className="px-4 py-3 text-right text-sm font-medium text-gray-600">الوصف</th>
               <th className="px-4 py-3 text-right text-sm font-medium text-gray-600">السعر</th>
               <th className="px-4 py-3 text-center text-sm font-medium text-gray-600">الحالة</th>
+              <th className="px-4 py-3 text-center text-sm font-medium text-gray-600">دورة مميزة</th>
               <th className="px-4 py-3 text-center text-sm font-medium text-gray-600">تعديل</th>
               <th className="px-4 py-3 text-center text-sm font-medium text-gray-600">حذف</th>
             </tr>
@@ -293,6 +324,18 @@ export default function AdminCoursesPage() {
                     }`}
                   >
                     {course.isPublished ? '✅ منشورة' : '⏸️ غير منشورة'}
+                  </button>
+                </td>
+                <td className="px-4 py-3 text-center">
+                  <button
+                    onClick={() => handleToggleFeatured(course._id, course.isFeatured || false)}
+                    className={`px-3 py-1 rounded-full text-xs font-medium ${
+                      course.isFeatured
+                        ? 'bg-purple-100 text-purple-800 hover:bg-purple-200'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    {course.isFeatured ? '⭐ مميزة' : '☆ عادية'}
                   </button>
                 </td>
                 <td className="px-4 py-3 text-center">

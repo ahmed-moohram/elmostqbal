@@ -171,30 +171,49 @@ export default function ProtectedVideoPlayer({
   };
 
   if (isEnrolled) {
-    // عرض الفيديو للمشتركين
+    // عرض الفيديو للمشتركين مع تشديد بسيط للحماية حول YouTube
+    const getEmbeddedUrl = () => {
+      const url = videoUrl;
+      if (!url) return '';
+
+      try {
+        // روابط YouTube العادية
+        if (url.includes('youtube.com/watch')) {
+          const urlObj = new URL(url);
+          const v = urlObj.searchParams.get('v');
+          if (v) {
+            return `https://www.youtube.com/embed/${v}?autoplay=0&rel=0&modestbranding=1&controls=1&disablekb=1&fs=0&iv_load_policy=3`;
+          }
+        }
+
+        // روابط youtu.be القصيرة
+        if (url.includes('youtu.be/')) {
+          const id = url.split('youtu.be/')[1]?.split(/[?&]/)[0];
+          if (id) {
+            return `https://www.youtube.com/embed/${id}?autoplay=0&rel=0&modestbranding=1&controls=1&disablekb=1&fs=0&iv_load_policy=3`;
+          }
+        }
+
+        // إذا كان الرابط embed بالفعل نضيف له البارامترات
+        if (url.includes('youtube.com/embed/')) {
+          const hasQuery = url.includes('?');
+          const base = hasQuery ? url.split('?')[0] : url;
+          return `${base}?autoplay=0&rel=0&modestbranding=1&controls=1&disablekb=1&fs=0&iv_load_policy=3`;
+        }
+      } catch (e) {}
+
+      // روابط غير YouTube تُستخدم كما هي
+      return url;
+    };
+
     return (
       <div className="w-full aspect-video bg-black rounded-xl overflow-hidden">
         <iframe
-          src={(() => {
-            const url = videoUrl;
-            if (!url) return '';
-            try {
-              if (url.includes('youtube.com/watch')) {
-                const urlObj = new URL(url);
-                const v = urlObj.searchParams.get('v');
-                if (v) return `https://www.youtube.com/embed/${v}`;
-              }
-              if (url.includes('youtu.be/')) {
-                const id = url.split('youtu.be/')[1]?.split(/[?&]/)[0];
-                if (id) return `https://www.youtube.com/embed/${id}`;
-              }
-            } catch (e) {}
-            return url;
-          })()}
+          src={getEmbeddedUrl()}
           title="Course Video"
           className="w-full h-full"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-          allowFullScreen
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope"
+          allowFullScreen={false}
         />
       </div>
     );
@@ -215,7 +234,13 @@ export default function ProtectedVideoPlayer({
           </p>
           
           <button
-            onClick={() => setShowPaymentModal(true)}
+            onClick={() => {
+              if (onEnroll) {
+                onEnroll();
+              } else {
+                setShowPaymentModal(true);
+              }
+            }}
             className="px-8 py-4 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-bold rounded-xl shadow-xl transition transform hover:scale-105 flex items-center gap-3"
           >
             <FaShoppingCart className="text-xl" />

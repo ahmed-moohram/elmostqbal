@@ -31,6 +31,35 @@ export const uploadCourseImage = async (file: File): Promise<{ success: boolean;
   }
 };
 
+// دالة رفع فيديوهات الدروس إلى Supabase Storage
+export const uploadLessonVideo = async (file: File): Promise<{ success: boolean; url?: string; error?: any }> => {
+  try {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
+    const filePath = `lessons/${fileName}`;
+
+    // ملاحظة: تأكد من وجود Bucket باسم "videos" في Supabase وأنه يسمح بالوصول العام أو حسب إعداداتك
+    const { data, error } = await supabase.storage
+      .from('videos')
+      .upload(filePath, file);
+
+    if (error) {
+      console.error('❌ خطأ في رفع الفيديو:', error);
+      throw error;
+    }
+
+    const { data: publicUrl } = supabase.storage
+      .from('videos')
+      .getPublicUrl(filePath);
+
+    console.log('✅ تم رفع الفيديو:', publicUrl.publicUrl);
+    return { success: true, url: publicUrl.publicUrl };
+  } catch (error) {
+    console.error('❌ فشل رفع الفيديو:', error);
+    return { success: false, error };
+  }
+};
+
 // دالة لتحويل base64 إلى File
 export const base64ToFile = (base64: string, filename: string): File => {
   // إزالة البادئة data:image/...;base64,

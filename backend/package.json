@@ -10,7 +10,8 @@
     "lint": "eslint src/**/*.ts",
     "test": "jest",
     "setup-admin": "ts-node src/lib/initDatabase.ts",
-    "create-indexes": "ts-node src/db/create-indexes.ts"
+    "create-indexes": "ts-node src/db/create-indexes.ts",
+    "export:mongo": "ts-node src/scripts/exportMongoToJson.ts"
   },
   "dependencies": {
     "express": "^5.1.0",

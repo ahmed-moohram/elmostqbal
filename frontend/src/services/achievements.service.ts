@@ -193,6 +193,31 @@ class AchievementsService {
       // جلب إحصائيات المستخدم
       const stats = await this.getUserStats(userId);
       
+      // إذا كان هناك كورس محدد، احسب عدد الدروس المكتملة في هذا الكورس فقط
+      let courseLessonsCompleted = 0;
+      if (courseId) {
+        try {
+          const { data: courseLessons, error: courseLessonsError } = await supabase
+            .from('lessons')
+            .select('id')
+            .eq('course_id', courseId);
+
+          if (!courseLessonsError && courseLessons && courseLessons.length > 0) {
+            const lessonIds = courseLessons.map(l => l.id);
+            const { count: completedInCourse } = await supabase
+              .from('lesson_progress')
+              .select('*', { count: 'exact', head: true })
+              .eq('user_id', userId)
+              .eq('is_completed', true)
+              .in('lesson_id', lessonIds);
+
+            courseLessonsCompleted = completedInCourse || 0;
+          }
+        } catch (courseStatsError) {
+          console.error('❌ خطأ في حساب تقدم الكورس للإنجازات:', courseStatsError);
+        }
+      }
+      
       // جلب جميع الإنجازات المتاحة
       const { data: allAchievements } = await supabase
         .from('achievements')
@@ -216,7 +241,13 @@ class AchievementsService {
 
         switch (achievement.requirement_type) {
           case 'lessons_completed':
-            earned = stats.lessons_completed >= achievement.requirement_value;
+            // إذا كان الإنجاز مرتبطاً بكورس محدد، استخدم عدد دروس هذا الكورس فقط
+            if (courseId && achievement.course_id === courseId) {
+              earned = courseLessonsCompleted >= achievement.requirement_value;
+            } else {
+              // إنجازات عامة تعتمد على مجموع الدروس المكتملة لكل الكورسات
+              earned = stats.lessons_completed >= achievement.requirement_value;
+            }
             break;
           case 'courses_completed':
             earned = stats.courses_completed >= achievement.requirement_value;

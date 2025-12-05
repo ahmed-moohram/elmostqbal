@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import { useState, useEffect } from 'react';
 import { 
@@ -14,9 +14,12 @@ import {
   FaCalendar,
   FaSearch,
   FaFilter,
-  FaSyncAlt
+  FaSyncAlt,
+  FaArrowLeft,
 } from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
+import Link from 'next/link';
+import AdminLayout from '@/components/AdminLayout';
 
 interface PaymentRequest {
   id: string;
@@ -172,19 +175,31 @@ export default function PaymentRequestsAdmin() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4">
-      <div className="max-w-7xl mx-auto">
+    <AdminLayout>
+      <div className="p-4">
+        <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <div className="flex items-center justify-between mb-6">
-            <h1 className="text-3xl font-bold text-gray-800">إدارة طلبات الدفع</h1>
-            <button
-              onClick={fetchRequests}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition"
-            >
-              <FaSyncAlt className={loading ? 'animate-spin' : ''} />
-              تحديث
-            </button>
+        <div className="bg-white rounded-lg shadow-sm p-6 mb-6 flex flex-col gap-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <h1 className="text-3xl font-bold text-gray-800">إدارة طلبات الدفع</h1>
+            </div>
+            <div className="flex items-center gap-3">
+              <Link
+                href="/admin/courses"
+                className="flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 transition"
+              >
+                <FaArrowLeft />
+                <span>العودة إلى الدورات</span>
+              </Link>
+              <button
+                onClick={fetchRequests}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition"
+              >
+                <FaSyncAlt className={loading ? 'animate-spin' : ''} />
+                تحديث
+              </button>
+            </div>
           </div>
 
           {/* الإحصائيات */}
@@ -545,7 +560,8 @@ export default function PaymentRequestsAdmin() {
             </div>
           </div>
         )}
+        </div>
       </div>
-    </div>
+    </AdminLayout>
   );
 }

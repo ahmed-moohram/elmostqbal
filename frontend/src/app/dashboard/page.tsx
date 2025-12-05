@@ -123,16 +123,32 @@ export default function Dashboard() {
           setActiveCourses(result.data.activeCourses || []);
           setCertificates(result.data.certificates || []);
           setOverallProgress(result.data.overallProgress || 0);
-          
+
           // تحديث البيانات الأخرى
           setTotalStudyTime(result.data.points || 0);
-          
-          // بيانات تجريبية للأحداث والنشاطات
-          setUpcomingEvents([
-            { id: '1', title: 'جلسة مراجعة Python', date: new Date(Date.now() + 86400000).toISOString(), time: '10:00 AM', type: 'exam' as const },
-            { id: '2', title: 'اختبار نهاية الأسبوع', date: new Date(Date.now() + 172800000).toISOString(), time: '2:00 PM', type: 'exam' as const }
-          ]);
-          
+
+          // الأحداث/الجلسات القادمة من Supabase
+          const events = Array.isArray(result.data.upcomingEvents) ? result.data.upcomingEvents : [];
+          const formattedEvents = events.map((event: any) => {
+            const dateObj = event.date ? new Date(event.date) : null;
+            const formattedDate = dateObj
+              ? dateObj.toLocaleDateString('ar-EG', { year: 'numeric', month: '2-digit', day: '2-digit' })
+              : event.date;
+            const formattedTime = dateObj
+              ? dateObj.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })
+              : (event.time || '');
+
+            return {
+              id: String(event.id),
+              title: event.title || 'حدث قادم',
+              date: formattedDate,
+              time: formattedTime,
+              type: event.type || 'exam',
+            } as UpcomingEvent;
+          });
+
+          setUpcomingEvents(formattedEvents);
+
           setRecentActivity([
             { id: 1, action: 'أكملت درس', course: 'Python للمبتدئين', time: '10 دقائق' },
             { id: 2, action: 'حصلت على شهادة', course: 'أساسيات البرمجة', time: 'أمس' }

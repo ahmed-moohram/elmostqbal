@@ -8,9 +8,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 interface CourseAchievementsProps {
   userId: string;
   courseId?: string;
+  hideEmptyMessage?: boolean;
 }
 
-export default function CourseAchievements({ userId, courseId }: CourseAchievementsProps) {
+export default function CourseAchievements({ userId, courseId, hideEmptyMessage }: CourseAchievementsProps) {
   const [courseProgress, setCourseProgress] = useState<CourseProgress[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCourse, setSelectedCourse] = useState<CourseProgress | null>(null);
@@ -251,7 +252,7 @@ export default function CourseAchievements({ userId, courseId }: CourseAchieveme
       ))}
 
       {/* رسالة فارغة */}
-      {courseProgress.length === 0 && (
+      {courseProgress.length === 0 && !hideEmptyMessage && (
         <div className="text-center py-12">
           <FaTrophy className="text-6xl text-gray-300 dark:text-gray-600 mx-auto mb-4" />
           <h3 className="text-xl font-bold text-gray-700 dark:text-gray-300 mb-2">

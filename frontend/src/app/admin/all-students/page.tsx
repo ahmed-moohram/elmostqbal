@@ -68,7 +68,7 @@ export default function AllStudentsPage() {
       
       // محاولة جلب من الـ Backend
       try {
-        const response = await fetch(`${API_URL}/api/users`, {
+        const response = await fetch(`${API_URL}/api/students`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }
@@ -76,25 +76,44 @@ export default function AllStudentsPage() {
 
         if (response.ok) {
           const result = await response.json();
-          const usersData = result.data || result || [];
+          const studentsData = Array.isArray(result) ? result : (result.data || []);
           
-          // تصفية المستخدمين لعرض الطلاب فقط
-          const students = Array.isArray(usersData) ? usersData.filter((u: any) => u.role === 'student') : [];
-          
-          // تحويل البيانات للصيغة المطلوبة
-          fetchedStudents = students.map((student: any) => ({
-            _id: student._id || student.id,
-            name: student.name || 'طالب',
-            email: student.email || '',
-            phone: student.studentPhone || student.phone || '',
-            parentPhone: student.parentPhone || '',
-            grade: student.gradeLevel || student.grade,
-            enrolledCourses: student.enrolledCourses?.length || 0,
-            totalProgress: student.totalProgress || 0,
-            joinDate: student.createdAt || student.joinDate || new Date().toISOString(),
-            lastActive: student.lastActive || student.updatedAt,
-            avatar: student.avatar || student.profilePicture
-          }));
+          // تحويل البيانات للصيغة المطلوبة من نموذج Student (Mongo)
+          fetchedStudents = studentsData.map((student: any) => {
+            const courses = Array.isArray(student.courses) ? student.courses : [];
+            const enrolledCourses = courses.length;
+
+            const totalProgress = enrolledCourses > 0
+              ? Math.round(
+                  courses.reduce(
+                    (sum: number, c: any) => sum + (c.progress || 0),
+                    0
+                  ) / enrolledCourses
+                )
+              : 0;
+
+            const lastCourseAccess = courses
+              .map((c: any) => c.lastAccessed)
+              .filter(Boolean)
+              .sort(
+                (a: string | Date, b: string | Date) =>
+                  new Date(b).getTime() - new Date(a).getTime()
+              )[0];
+
+            return {
+              _id: student._id || student.id,
+              name: student.name || 'طالب',
+              email: student.email || '',
+              phone: student.phone || '',
+              parentPhone: student.parentPhone || '',
+              grade: student.grade || '',
+              enrolledCourses,
+              totalProgress,
+              joinDate: student.createdAt || student.joinDate || new Date().toISOString(),
+              lastActive: lastCourseAccess || student.updatedAt,
+              avatar: student.avatar || student.profilePicture
+            };
+          });
           
           console.log(`تم جلب ${fetchedStudents.length} طالب من السيرفر`);
         }

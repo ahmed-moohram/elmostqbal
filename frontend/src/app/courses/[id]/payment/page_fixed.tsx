@@ -271,7 +271,7 @@ export default function PaymentPage() {
                 <div className="mb-6">
                   <p className="text-gray-600 dark:text-gray-400 mb-2 text-sm">اسم المستلم:</p>
                   <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg font-bold text-gray-800 dark:text-white border border-gray-100 dark:border-gray-600">
-                    MR
+                    اسم الطالب
                   </div>
                 </div>
                 

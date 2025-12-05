@@ -174,18 +174,84 @@ export default function AdminPage() {
   useEffect(() => {
     const loadEnrollmentRequests = () => {
       const requestsStr = localStorage.getItem('enrollmentRequests');
-      if (requestsStr) {
-        try {
-          const requests = JSON.parse(requestsStr);
-          setEnrollmentRequests(requests);
-        } catch (e) {
-          console.error('Error loading enrollment requests:', e);
-        }
+      if (!requestsStr) {
+        setEnrollmentRequests([]);
+        return;
+      }
+
+      try {
+        const rawRequests = JSON.parse(requestsStr);
+
+        const mapped: EnrollmentRequest[] = (Array.isArray(rawRequests) ? rawRequests : []).map((req: any) => {
+          const id = req.id || req._id || `local-${Date.now()}-${Math.random()}`;
+
+          const studentName =
+            req.studentName ||
+            req.student_info?.name ||
+            req.studentInfo?.name ||
+            'طالب';
+
+          const studentPhone =
+            req.studentPhone ||
+            req.student_info?.phone ||
+            req.studentInfo?.phone ||
+            '';
+
+          const studentGrade =
+            req.studentGrade ||
+            req.student_info?.gradeLevel ||
+            req.studentInfo?.gradeLevel ||
+            req.gradeLevel ||
+            req.grade ||
+            'غير محدد';
+
+          const courseName =
+            req.courseName ||
+            req.course?.title ||
+            '';
+
+          const coursePrice = Number(
+            req.coursePrice ??
+            req.paymentInfo?.amount ??
+            req.course?.price ??
+            0
+          );
+
+          const date =
+            req.date ||
+            req.submittedAt ||
+            req.createdAt ||
+            new Date().toISOString();
+
+          const paymentProof =
+            req.paymentProof ||
+            req.paymentInfo?.receiptImage ||
+            undefined;
+
+          return {
+            // نحافظ على الحقول الأصلية في الكائن
+            ...(req || {}),
+            id,
+            studentName,
+            studentPhone,
+            studentGrade,
+            courseName,
+            coursePrice,
+            status: (req.status as any) || 'pending',
+            date,
+            paymentProof
+          } as EnrollmentRequest;
+        });
+
+        setEnrollmentRequests(mapped);
+      } catch (e) {
+        console.error('Error loading enrollment requests:', e);
+        setEnrollmentRequests([]);
       }
     };
-    
+
     loadEnrollmentRequests();
-    
+
     // تحديث كل 10 ثواني للتحقق من طلبات جديدة
     const interval = setInterval(loadEnrollmentRequests, 10000);
     return () => clearInterval(interval);
@@ -480,6 +546,7 @@ export default function AdminPage() {
         totalTeachers: teachersCount || 0,
         totalCourses: coursesCount || 0,
         activeEnrollments: activeEnrollmentsSafe,
+        totalRevenue: monthlyRevenue,
         monthlyRevenue,
         conversionRate
       });

@@ -6,6 +6,9 @@ import Image from 'next/image';
 
 interface EnrollmentRequest {
   _id: string;
+  userId: string;
+  courseRawId: string;
+  isActive?: boolean;
   studentInfo: {
     name: string;
     email: string;
@@ -55,6 +58,9 @@ export default function StudentsManagement() {
         // تحويل البيانات من Supabase للصيغة المطلوبة
         formattedRequests = result.data.map((enrollment: any) => ({
           _id: enrollment.id,
+          userId: enrollment.user_id,
+          courseRawId: enrollment.course_id,
+          isActive: enrollment.is_active ?? true,
           studentInfo: {
             name: enrollment.user?.name || 'غير محدد',
             email: enrollment.user?.email || 'غير محدد',
@@ -428,7 +434,7 @@ export default function StudentsManagement() {
                       {/* Actions */}
                       <td className="px-6 py-4">
                         {request.status === 'pending' && (
-                          <div className="flex gap-2">
+                          <div className="flex gap-2 mb-2">
                             <button
                               onClick={() => handleApprove(request._id)}
                               className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2 text-sm"
@@ -443,6 +449,16 @@ export default function StudentsManagement() {
                             </button>
                           </div>
                         )}
+                        <button
+                          onClick={() => handleToggleAccess(request)}
+                          className={`mt-1 px-4 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 ${
+                            request.isActive
+                              ? 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200'
+                              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                          }`}
+                        >
+                          {request.isActive ? 'إيقاف الكورس لهذا الطالب' : 'إعادة تفعيل الكورس'}
+                        </button>
                       </td>
                     </tr>
                   ))

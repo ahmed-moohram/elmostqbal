@@ -1,11 +1,12 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { FaArrowRight, FaUpload, FaPlus, FaTrash, FaVideo, FaSave, FaEye } from "react-icons/fa";
 import userStorage from "@/services/userStorage";
 import AdminLayout from "@/components/AdminLayout";
 import { toast } from "react-hot-toast";
+import { uploadLessonVideo } from "@/lib/supabase-upload";
 
 interface Lesson {
   title: string;
@@ -53,6 +54,9 @@ export default function EnhancedNewCoursePage() {
   const [loading, setLoading] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
   const [publishImmediately, setPublishImmediately] = useState(true); // نشر الكورس مباشرة
+  const [uploadingVideoKey, setUploadingVideoKey] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
+  const uploadIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // إضافة قسم جديد
   const addSection = () => {
@@ -130,6 +134,57 @@ export default function EnhancedNewCoursePage() {
         setImagePreview(e.target?.result as string);
       };
       reader.readAsDataURL(file);
+    }
+  };
+
+  // رفع فيديو درس وربطه بحقل videoUrl
+  const handleLessonVideoFileChange = async (sectionIndex: number, lessonIndex: number, file: File | null) => {
+    if (!file) return;
+
+    try {
+      const key = `${sectionIndex}-${lessonIndex}`;
+      setUploadingVideoKey(key);
+      setUploadProgress(0);
+
+      // بدء تايمر لتحديث نسبة التقدم بشكل تقريبي أثناء الرفع
+      if (uploadIntervalRef.current) {
+        clearInterval(uploadIntervalRef.current);
+      }
+      uploadIntervalRef.current = setInterval(() => {
+        setUploadProgress((prev) => {
+          if (prev >= 90) {
+            if (uploadIntervalRef.current) {
+              clearInterval(uploadIntervalRef.current);
+              uploadIntervalRef.current = null;
+            }
+            return prev;
+          }
+          return prev + 5;
+        });
+      }, 500);
+
+      const { success, url, error } = await uploadLessonVideo(file);
+
+      if (!success || !url) {
+        console.error("❌ فشل رفع الفيديو:", error);
+        toast.error("فشل رفع الفيديو. حاول مرة أخرى.");
+        return;
+      }
+
+      // تحديث رابط الفيديو في الدرس بالرابط الناتج من Supabase
+      updateLesson(sectionIndex, lessonIndex, "videoUrl", url);
+      toast.success("✅ تم رفع الفيديو وربطه بالدرس بنجاح");
+      setUploadProgress(100);
+    } catch (err) {
+      console.error("❌ خطأ غير متوقع أثناء رفع الفيديو:", err);
+      toast.error("حدث خطأ غير متوقع أثناء رفع الفيديو");
+    } finally {
+      if (uploadIntervalRef.current) {
+        clearInterval(uploadIntervalRef.current);
+        uploadIntervalRef.current = null;
+      }
+      setUploadingVideoKey(null);
+      setTimeout(() => setUploadProgress(0), 800);
     }
   };
 
@@ -564,24 +619,56 @@ export default function EnhancedNewCoursePage() {
                               placeholder="وصف الدرس (اختياري)"
                             />
                             
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                              <input
-                                type="url"
-                                value={lesson.videoUrl}
-                                onChange={(e) => updateLesson(sIndex, lIndex, 'videoUrl', e.target.value)}
-                                className="input-field"
-                                placeholder="رابط الفيديو (YouTube/Vimeo)"
-                                required
-                              />
-                              <input
-                                type="number"
-                                min="0"
-                                value={lesson.duration}
-                                onChange={(e) => updateLesson(sIndex, lIndex, 'duration', Number(e.target.value))}
-                                className="input-field"
-                                placeholder="المدة (بالدقائق)"
-                                required
-                              />
+                            <div className="space-y-2">
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <input
+                                  type="url"
+                                  value={lesson.videoUrl}
+                                  onChange={(e) => updateLesson(sIndex, lIndex, 'videoUrl', e.target.value)}
+                                  className="input-field"
+                                  placeholder="رابط الفيديو (YouTube/Vimeo أو رابط ملف مرفوع)"
+                                  required
+                                />
+                                <input
+                                  type="number"
+                                  min="0"
+                                  value={lesson.duration}
+                                  onChange={(e) => updateLesson(sIndex, lIndex, 'duration', Number(e.target.value))}
+                                  className="input-field"
+                                  placeholder="المدة (بالدقائق)"
+                                  required
+                                />
+                              </div>
+                              <div className="flex flex-col md:flex-row md:items-center gap-2">
+                                <label className="text-sm font-medium text-gray-700">
+                                  أو ارفع ملف فيديو من جهازك:
+                                </label>
+                                <input
+                                  type="file"
+                                  accept="video/*"
+                                  onChange={(e) =>
+                                    handleLessonVideoFileChange(
+                                      sIndex,
+                                      lIndex,
+                                      e.target.files && e.target.files[0] ? e.target.files[0] : null
+                                    )
+                                  }
+                                  className="block w-full text-sm text-gray-700 file:mr-3 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                                />
+                              </div>
+                              {uploadingVideoKey === `${sIndex}-${lIndex}` && (
+                                <div className="mt-2">
+                                  <p className="text-xs text-blue-600 mb-1">
+                                    جاري رفع الفيديو... {uploadProgress}%
+                                  </p>
+                                  <div className="w-full bg-blue-100 rounded-full h-2 overflow-hidden">
+                                    <div
+                                      className="bg-blue-500 h-2 rounded-full transition-all duration-200"
+                                      style={{ width: `${uploadProgress}%` }}
+                                    />
+                                  </div>
+                                </div>
+                              )}
                             </div>
 
                             <div className="flex items-center gap-4">

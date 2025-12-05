@@ -2,7 +2,7 @@
 import Image from "next/image";
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { FaUser, FaLock, FaEye, FaEyeSlash, FaGoogle, FaFacebook, FaTwitter } from "react-icons/fa";
 import Link from "next/link";
 import { Cairo } from 'next/font/google';
@@ -27,6 +27,7 @@ export default function LoginPage() {
   const passwordRef = useRef<HTMLInputElement>(null);
   const eyeRef = useRef<HTMLButtonElement>(null);
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const calculateEyeRotation = (eyeRef: React.RefObject<HTMLButtonElement>, isTyping: boolean, passwordRef: React.RefObject<HTMLInputElement>) => {
     if (!eyeRef.current || !passwordRef.current) return { x: 0, y: 0 };
@@ -98,6 +99,13 @@ export default function LoginPage() {
         document.cookie = `auth-token=${encodeURIComponent('local-' + Date.now())}; path=/`;
         document.cookie = `user-role=${encodeURIComponent(user.role)}; path=/`;
       }
+
+      const redirect = searchParams.get('redirect');
+      if (redirect && redirect.startsWith('/')) {
+        router.replace(redirect);
+        return;
+      }
+
       const dashboardPath = user.role === 'student'
         ? '/student/dashboard'
         : user.role === 'admin'
@@ -105,7 +113,7 @@ export default function LoginPage() {
         : '/teacher/dashboard';
       router.replace(dashboardPath);
     }
-  }, [isAuthenticated, user, router]);
+  }, [isAuthenticated, user, router, searchParams]);
 
   useEffect(() => {
     // التأكد من تطابق العناصر

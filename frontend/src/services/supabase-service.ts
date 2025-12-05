@@ -21,9 +21,11 @@ export const getCourses = async (isPublished?: boolean) => {
     // RLS تسمح بالعرض عندما يكون status = 'published' و is_active = TRUE
     if (isPublished !== undefined) {
       if (isPublished) {
-        query = query.eq('status', 'published');
+        query = query
+          .eq('is_published', true)
+          .eq('is_active', true);
       } else {
-        query = query.neq('status', 'published');
+        query = query.eq('is_published', false);
       }
     }
     
@@ -336,11 +338,19 @@ export const getDashboardData = async (userId: string) => {
       .eq('user_id', userId);
     
     // جلب النقاط
-    const { data: userPoints } = await supabase
+    const { data: userPointsData, error: userPointsError } = await supabase
       .from('user_points')
       .select('*')
       .eq('user_id', userId)
-      .single();
+      .limit(1);
+
+    if (userPointsError) {
+      console.warn('Error fetching user_points (سيتم تجاهله واستخدام قيم افتراضية):', userPointsError.message);
+    }
+
+    const userPoints = Array.isArray(userPointsData) && userPointsData.length > 0
+      ? userPointsData[0]
+      : null;
     
     // جلب الإنجازات
     const { data: achievements } = await supabase
@@ -352,6 +362,59 @@ export const getDashboardData = async (userId: string) => {
       .eq('user_id', userId)
       .eq('is_completed', true);
     
+    // جلب الجلسات والاختبارات القادمة المرتبطة بكورسات الطالب
+    let upcomingEvents: any[] = [];
+    try {
+      const enrolledCourseIds = (enrollments || [])
+        .map((enrollment: any) => enrollment.course_id)
+        .filter((id: string | null | undefined) => !!id);
+
+      if (enrolledCourseIds.length > 0) {
+        const nowIso = new Date().toISOString();
+
+        // الجلسات المباشرة القادمة
+        const { data: liveSessions } = await supabase
+          .from('live_sessions')
+          .select('id, title, scheduled_at, status')
+          .in('course_id', enrolledCourseIds)
+          .gte('scheduled_at', nowIso)
+          .order('scheduled_at', { ascending: true })
+          .limit(10);
+
+        // الواجبات / الاختبارات القادمة
+        const { data: upcomingAssignments } = await supabase
+          .from('assignments')
+          .select('id, title, due_date')
+          .in('course_id', enrolledCourseIds)
+          .gte('due_date', nowIso)
+          .order('due_date', { ascending: true })
+          .limit(10);
+
+        const liveEvents = (liveSessions || []).map((session: any) => ({
+          id: session.id,
+          title: session.title,
+          date: session.scheduled_at,
+          time: null,
+          type: 'live'
+        }));
+
+        const assignmentEvents = (upcomingAssignments || []).map((assignment: any) => ({
+          id: assignment.id,
+          title: assignment.title,
+          date: assignment.due_date,
+          time: null,
+          // نعتبر جميع الواجبات/الاختبارات كأحداث من نوع exam لعرض "عرض التفاصيل" في الواجهة
+          type: 'exam'
+        }));
+
+        upcomingEvents = [...liveEvents, ...assignmentEvents]
+          .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+          .slice(0, 10);
+      }
+    } catch (eventsError) {
+      console.error('Error fetching upcoming events:', eventsError);
+    }
+
     return {
       success: true,
       data: {
@@ -360,7 +423,8 @@ export const getDashboardData = async (userId: string) => {
         points: userPoints?.total_points || 0,
         level: userPoints?.current_level || 1,
         achievements: achievements || [],
-        overallProgress: calculateOverallProgress(enrollments || [])
+        overallProgress: calculateOverallProgress(enrollments || []),
+        upcomingEvents
       }
     };
   } catch (error) {

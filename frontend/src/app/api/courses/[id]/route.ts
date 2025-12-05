@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://chikfjvpkqtivtyhvvzt.supabase.co';
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNoaWtmanZwa3F0aXZ0eWh2dnp0Iiwicm9zZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MzU5NDQzNSwiZXhwIjoyMDc5MTcwNDM1fQ.xOZE1xdbkGOZ99MNAni8XjnWm3-Uxw38ZkvVqJiIVjo';
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!supabaseUrl || !supabaseServiceKey) {
+  throw new Error('❌ Missing Supabase configuration! Check your .env.local file');
+}
+
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
@@ -21,6 +26,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     status: form.get('isPublished') != null ? (String(form.get('isPublished')) === 'true' ? 'published' : 'draft') : undefined,
     is_active: form.get('isPublished') != null ? (String(form.get('isPublished')) === 'true') : undefined,
     is_paid: form.get('isPaid') != null ? String(form.get('isPaid')) === 'true' : undefined,
+    is_featured: form.get('isFeatured') != null ? String(form.get('isFeatured')) === 'true' : undefined,
     category: form.get('category') != null ? String(form.get('category')) : undefined,
     level: form.get('level') != null ? String(form.get('level')) : undefined,
   };
