@@ -577,7 +577,7 @@ export default function TeacherDashboard() {
           {/* زر إضافة كورس */}
           {activeTab === 'courses' && (
             <Link
-              href="/teacher/courses/new"
+              href="/teachers/courses/create"
               className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white font-medium rounded-lg hover:from-purple-700 hover:to-blue-700 transition"
             >
               <FaPlus />
@@ -653,37 +653,32 @@ export default function TeacherDashboard() {
             {/* آخر النشاطات */}
             <div className="bg-white rounded-xl shadow-lg p-6">
               <h2 className="text-xl font-bold mb-4">آخر النشاطات</h2>
-              <div className="space-y-4">
-                <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
-                  <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-                    <FaCheckCircle className="text-green-600" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-medium">أحمد محمد أكمل درس "المتغيرات في JavaScript"</p>
-                    <p className="text-sm text-gray-500">منذ 15 دقيقة</p>
-                  </div>
+              {students.length === 0 ? (
+                <p className="text-gray-500 text-sm">
+                  لا توجد نشاطات حديثة حالياً. سيظهر هنا تفاعل طلابك مع الكورسات.
+                </p>
+              ) : (
+                <div className="space-y-4">
+                  {students.slice(0, 3).map((student) => (
+                    <div
+                      key={student.id}
+                      className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg"
+                    >
+                      <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                        <FaCheckCircle className="text-green-600" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-medium">
+                          {student.name} تفاعل في كورس {student.courseName || 'بدون اسم'}
+                        </p>
+                        <p className="text-sm text-gray-500">
+                          آخر نشاط: {student.lastActive || 'غير معروف'}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-
-                <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
-                  <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                    <FaUsers className="text-blue-600" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-medium">3 طلاب جدد انضموا لكورس React.js</p>
-                    <p className="text-sm text-gray-500">منذ ساعة</p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
-                  <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
-                    <FaComments className="text-purple-600" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-medium">لديك 2 رسائل جديدة من الطلاب</p>
-                    <p className="text-sm text-gray-500">منذ ساعتين</p>
-                  </div>
-                </div>
-              </div>
+              )}
             </div>
           </div>
         )}

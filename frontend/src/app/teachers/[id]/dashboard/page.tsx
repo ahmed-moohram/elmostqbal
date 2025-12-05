@@ -75,19 +75,52 @@ export default function TeacherDashboardById() {
 
       const user = JSON.parse(userJson);
 
-      if (user.role !== 'teacher') {
+      if (!teacherId) {
+        toast.error('رابط لوحة المدرس غير صالح');
+        router.replace('/admin/teachers');
+        return;
+      }
+
+      let targetTeacherUser: any = null;
+
+      if (user.role === 'teacher') {
+        if (user.id !== teacherId) {
+          toast.error('لا يمكنك الوصول إلى لوحة مدرس آخر');
+          router.replace('/');
+          return;
+        }
+        targetTeacherUser = user;
+      } else if (user.role === 'admin') {
+        const { data: teacherUser, error: teacherUserError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', teacherId)
+          .maybeSingle();
+
+        if (teacherUserError || !teacherUser) {
+          console.error('❌ لم يتم العثور على بيانات هذا المدرس:', teacherUserError);
+          toast.error('لم يتم العثور على هذا المدرس');
+          router.replace('/admin/teachers');
+          return;
+        }
+
+        targetTeacherUser = teacherUser;
+      } else {
         toast.error('ليس لديك صلاحية الوصول لهذه الصفحة');
         router.replace('/');
         return;
       }
 
-      if (!teacherId || user.id !== teacherId) {
-        toast.error('لا يمكنك الوصول إلى لوحة مدرس آخر');
-        router.replace('/');
-        return;
-      }
-
-      setTeacher(user);
+      setTeacher({
+        id: targetTeacherUser.id,
+        name: targetTeacherUser.name,
+        email: targetTeacherUser.email,
+        specialty:
+          targetTeacherUser.specialty ||
+          targetTeacherUser.specialization ||
+          'مدرس',
+        role: 'teacher',
+      });
 
       try {
         setDataLoading(true);
@@ -96,7 +129,7 @@ export default function TeacherDashboardById() {
         const { data: coursesData, error: coursesError } = await supabase
           .from('courses')
           .select('id, title, is_published')
-          .eq('instructor_id', user.id);
+          .eq('instructor_id', teacherId);
 
         if (coursesError) {
           console.error('❌ خطأ في جلب كورسات المدرس:', coursesError);
