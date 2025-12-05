@@ -262,7 +262,7 @@ export default function NotificationsPage() {
                             </p>
                             <div className="mt-2 flex items-center gap-4">
                               <span className="text-xs text-gray-500 dark:text-gray-500">
-                                {formatDate(notification.date)}
+                                {formatDate(notification.date || notification.createdAt || '')}
                               </span>
                               
                               {notification.link && (
