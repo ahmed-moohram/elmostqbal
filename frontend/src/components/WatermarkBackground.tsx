@@ -33,7 +33,7 @@ export default function WatermarkBackground() {
 
   // إنشاء العلامات المائية
   const generateWatermarks = (name: string, phone: string) => {
-    const marks = [];
+    const marks: JSX.Element[] = [];
     const spacing = 300; // المسافة بين العلامات المائية
     const rows = Math.ceil(5000 / spacing); // عدد الصفوف (نفترض ارتفاع الصفحة 5000px كحد أقصى)
     const cols = Math.ceil(window.innerWidth / spacing); // عدد الأعمدة
