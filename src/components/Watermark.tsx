@@ -43,13 +43,13 @@ export default function Watermark({
   return (
     <>
       {/* علامة مائية متعددة في أماكن مختلفة */}
-      {positions.map((pos, index) => (
+      {positions.map(({ rotate, ...position }, index) => (
         <div
           key={index}
           style={{
             position: 'fixed',
-            ...pos,
-            transform: `rotate(${pos.rotate}deg)`,
+            ...position,
+            transform: `rotate(${rotate}deg)`,
             color: isDark ? 'rgba(255, 255, 255, ' + opacity + ')' : 'rgba(0, 0, 0, ' + opacity + ')',
             fontSize: `${fontSize}px`,
             fontWeight: 500,
