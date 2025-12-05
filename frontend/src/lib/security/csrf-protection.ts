@@ -75,7 +75,7 @@ export const csrfProtection = new CSRFProtection();
  */
 export function useCSRFToken(): {
   token: string | null;
-  refreshToken: () => Promise<string>;
+  refreshToken: () => Promise<void>;
 } {
   const [token, setToken] = useState<string | null>(null);
   
