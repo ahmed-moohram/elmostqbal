@@ -147,7 +147,11 @@ const VideoPlayer = ({
           
           hlsRef.current = hls;
           hls.loadSource(src);
-          hls.attachMedia(videoRef.current);
+          const videoElement = videoRef.current;
+          if (!videoElement) {
+            throw new Error('Video element is not available for HLS attachment');
+          }
+          hls.attachMedia(videoElement);
           
           hls.on(Hls.Events.MANIFEST_PARSED, () => {
             setIsLoading(false);
@@ -180,20 +184,26 @@ const VideoPlayer = ({
           });
         } else {
           // استخدام التشغيل الأصلي للمتصفحات التي تدعم تنسيق الفيديو
-          videoRef.current.src = src;
-          
+          const videoElement = videoRef.current;
+          if (!videoElement) {
+            setIsLoading(false);
+            return;
+          }
+
+          videoElement.src = src;
+
           // تعيين الوقت المحفوظ مسبقًا
           if (savedTime > 0) {
-            videoRef.current.currentTime = savedTime;
+            videoElement.currentTime = savedTime;
           }
-          
+
           // التشغيل التلقائي إذا كان مطلوبًا
           if (autoPlay) {
-            videoRef.current.play().catch(error => {
+            videoElement.play().catch(error => {
               console.error('خطأ عند التشغيل التلقائي:', error);
             });
           }
-          
+
           setIsLoading(false);
         }
       } catch (err) {
