@@ -227,6 +227,39 @@ export default function StudentsManagement() {
     }
   };
 
+  const handleToggleAccess = async (request: EnrollmentRequest) => {
+    const nextIsActive = !request.isActive;
+    const confirmMessage = nextIsActive
+      ? 'هل تريد إعادة تفعيل الوصول للكورس لهذا الطالب؟'
+      : 'هل أنت متأكد من إيقاف الوصول للكورس لهذا الطالب؟';
+
+    if (!confirm(confirmMessage)) return;
+
+    try {
+      const { updateEnrollment } = await import('@/lib/supabase-admin');
+      const result = await updateEnrollment(request._id, { is_active: nextIsActive });
+
+      if (!result.success) {
+        console.log('Could not update enrollment access in Supabase, updating locally فقط');
+      }
+
+      setRequests(prev =>
+        prev.map(r =>
+          r._id === request._id ? { ...r, isActive: nextIsActive } : r
+        )
+      );
+
+      const localRequests = JSON.parse(localStorage.getItem('enrollmentRequests') || '[]');
+      const updatedLocalRequests = localRequests.map((req: any) =>
+        req.id === request._id ? { ...req, isActive: nextIsActive } : req
+      );
+      localStorage.setItem('enrollmentRequests', JSON.stringify(updatedLocalRequests));
+    } catch (error) {
+      console.error('Error toggling course access for student:', error);
+      alert('حدث خطأ أثناء تغيير حالة الوصول للكورس لهذا الطالب');
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     const styles = {
       pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
