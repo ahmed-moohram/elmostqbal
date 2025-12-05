@@ -1,0 +1,1048 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* تحسينات توافق الأجهزة المحمولة */
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+    scroll-behavior: smooth;
+  }
+  
+  body {
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* تحسين القراءة على الأجهزة المحمولة */
+  @media (max-width: 640px) {
+    html {
+      font-size: 14px;
+    }
+  }
+
+  /* تحسين ظهور الصفحة على الأجهزة المحمولة */
+  .container {
+    width: 100%;
+    padding-right: 1rem;
+    padding-left: 1rem;
+  }
+
+  /* تسريع وقت التنقل بين الصفحات بواسطة تحسين العناصر المتحركة */
+  * {
+    transition-property: background-color, border-color, color, fill, stroke, opacity, box-shadow, transform;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 200ms;
+  }
+}
+@layer base {
+     :root {
+        --background: 220 30% 99%;
+        --foreground: 217 60% 15%;
+        --card: 0 0% 100%;
+        --card-foreground: 217 60% 15%;
+        --popover: 0 0% 100%;
+        --popover-foreground: 217 60% 15%;
+        --primary: 260 73% 45%;
+        --primary-foreground: 210 20% 98%;
+        --secondary: 45 93% 50%;
+        --secondary-foreground: 30 40% 20%;
+        --muted: 217 15% 90%;
+        --muted-foreground: 217 30% 40%;
+        --accent: 43 75% 50%;
+        --accent-foreground: 210 20% 98%;
+        --destructive: 0 84.2% 60.2%;
+        --destructive-foreground: 210 20% 98%;
+        --border: 217 15% 85%;
+        --input: 217 15% 85%;
+        --ring: 260 73% 45%;
+        --radius: 1rem;
+    }
+    .dark {
+        --background: 217 60% 8%;
+        --foreground: 210 20% 98%;
+        --card: 217 50% 10%;
+        --card-foreground: 210 20% 98%;
+        --popover: 217 50% 10%;
+        --popover-foreground: 210 20% 98%;
+        --primary: 260 70% 50%;
+        --primary-foreground: 210 20% 98%;
+        --secondary: 45 90% 55%;
+        --secondary-foreground: 210 20% 98%;
+        --muted: 217 30% 18%;
+        --muted-foreground: 217 20% 70%;
+        --accent: 43 70% 55%;
+        --accent-foreground: 210 20% 98%;
+        --destructive: 0 62.8% 30.6%;
+        --destructive-foreground: 210 20% 98%;
+        --border: 217 30% 20%;
+        --input: 217 30% 20%;
+        --ring: 260 70% 50%;
+    }
+}
+
+@layer base {
+    * {
+        @apply border-border;
+    }
+    body {
+        @apply bg-background text-foreground antialiased;
+        font-feature-settings: "rlig" 1, "calt" 1;
+    }
+    /* Theme transition */
+    html.theme-transition,
+    html.theme-transition *,
+    html.theme-transition *:before,
+    html.theme-transition *:after {
+        transition-property: background-color, color, border-color, box-shadow, transform, opacity;
+        transition-duration: 750ms !important;
+        transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1) !important;
+        transition-delay: 0ms !important;
+    }
+}
+
+@layer components {
+    .container-custom {
+        @apply container mx-auto px-4 sm:px-6 lg:px-8;
+    }
+}
+
+
+/* Animated Background */
+
+@keyframes gradientAnimation {
+    0% {
+        background-position: 0% 50%;
+    }
+    50% {
+        background-position: 100% 50%;
+    }
+    100% {
+        background-position: 0% 50%;
+    }
+}
+
+
+/* Watermark Animation */
+
+@keyframes watermarkMove {
+    0% {
+        transform: translate(-50%, -50%) rotate(-30deg);
+    }
+    100% {
+        transform: translate(50%, 50%) rotate(-30deg);
+    }
+}
+
+.watermark-text {
+    animation: watermarkMove 60s linear infinite;
+}
+
+
+/* Student Watermark */
+
+.student-watermark {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 0;
+    overflow: hidden;
+}
+
+.student-watermark-content {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 200%;
+    height: 200%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8rem;
+    opacity: 0.07;
+    transform: rotate(-20deg);
+    font-size: 1.6rem;
+    color: currentColor;
+}
+
+.dark .student-watermark-content {
+    opacity: 0.09;
+}
+
+
+/* Logo text styling fix */
+
+.logo-text-highlight {
+    @apply text-transparent dark:text-transparent relative;
+    text-shadow: none;
+}
+
+
+/* إصلاح مشكلة كلمة "المستقبل" */
+
+.logo-text {
+    font-family: 'Cairo', sans-serif !important;
+    font-weight: 800 !important;
+    letter-spacing: 0 !important;
+    word-spacing: 0 !important;
+    white-space: nowrap !important;
+    text-rendering: geometricPrecision !important;
+}
+
+.glow-effect-strong {
+    text-shadow: 0 0 5px rgba(255, 255, 255, 0.8), 0 0 10px rgba(255, 255, 255, 0.7), 0 0 15px rgba(255, 255, 255, 0.6), 0 0 20px rgba(255, 255, 255, 0.5);
+    /* Optional: Add a subtle color to the glow if needed, e.g., a very light blue or gold */
+    /* Example with light blue tint: */
+    /* text-shadow: 
+    0 0 5px rgba(173, 216, 230, 0.7), 
+    0 0 10px rgba(173, 216, 230, 0.6), 
+    0 0 15px rgba(173, 216, 230, 0.5), 
+    0 0 20px rgba(173, 216, 230, 0.4); */
+}
+
+.nav-link-creative {
+    position: relative;
+    overflow: hidden;
+    /* To contain the shine within the link */
+    transition: color 0.3s ease;
+    /* Smooth color transition for text */
+}
+
+.nav-link-creative::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    /* Start off-screen to the left */
+    width: 50%;
+    /* Width of the shine element */
+    height: 100%;
+    background: linear-gradient( to right, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.05) 20%, rgba(255, 255, 255, 0.2) 50%, rgba(255, 255, 255, 0.05) 80%, rgba(255, 255, 255, 0) 100%);
+    transform: skewX(-25deg);
+    /* Angle the shine */
+    transition: left 0.5s cubic-bezier(0.23, 1, 0.32, 1);
+    /* Smooth transition for shine movement */
+    z-index: 1;
+    /* Ensure shine is above text background but below text itself if needed */
+}
+
+.nav-link-creative:hover::before {
+    left: 120%;
+    /* Move shine across and off-screen to the right */
+}
+
+
+/* Optional: Adjust text color on hover to make shine more visible or for better contrast */
+
+
+/* .nav-link-creative:hover {
+  color: #yourHoverTextColor; 
+} */
+
+
+/* Progress circle positioning fix */
+
+.progress-circle-container {
+    @apply relative top-6;
+    /* Push circle down more */
+}
+
+
+/* Modern Glassmorphism */
+
+.glass {
+    @apply bg-white/10 backdrop-blur-xl border border-white/15;
+    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+}
+
+.dark .glass {
+    @apply bg-gray-900/20 backdrop-blur-xl border border-gray-800/30;
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+}
+
+.glass-card {
+    @apply glass rounded-2xl p-6;
+}
+
+.glass-gold {
+    @apply backdrop-blur-xl border border-secondary/30;
+    box-shadow: 0 8px 32px 0 rgba(250, 204, 21, 0.2);
+}
+
+.dark .glass-gold {
+    @apply backdrop-blur-xl border border-secondary/20;
+    box-shadow: 0 8px 32px 0 rgba(250, 204, 21, 0.1);
+}
+
+.glass-royal {
+    @apply backdrop-blur-xl border border-primary/30;
+    box-shadow: 0 8px 32px 0 rgba(109, 40, 217, 0.2);
+}
+
+.dark .glass-royal {
+    @apply backdrop-blur-xl border border-primary/20;
+    box-shadow: 0 8px 32px 0 rgba(109, 40, 217, 0.1);
+}
+
+
+/* Enhanced Animations */
+
+.hover-glow {
+    @apply transition-all duration-300 hover:translate-y-[-2px];
+}
+
+.hover-glow:hover {
+    box-shadow: 0 0 25px rgba(109, 40, 217, 0.4);
+}
+
+.hover-glow-gold {
+    @apply transition-all duration-300 hover:translate-y-[-2px];
+}
+
+.hover-glow-gold:hover {
+    box-shadow: 0 0 25px rgba(250, 204, 21, 0.4);
+}
+
+.hover-scale {
+    @apply transition-transform duration-300 hover:scale-105;
+}
+
+
+/* Gradient Text */
+
+.gradient-text {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary via-indigo-500 to-purple-800 animate-gradient;
+}
+
+.gradient-text-gold {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-yellow-500 via-secondary to-orange-400 animate-gradient;
+}
+
+.gradient-text-royal {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary to-violet-700 animate-gradient;
+}
+
+
+/* Modern Button */
+
+.btn-modern {
+    @apply px-6 py-3 rounded-full bg-gradient-to-r from-primary to-indigo-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] relative overflow-hidden;
+}
+
+.btn-modern::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transform: translateX(-100%) skewX(-15deg);
+}
+
+.btn-modern:hover::before {
+    animation: shine 1.5s infinite;
+}
+
+.btn-gold {
+    @apply px-6 py-3 rounded-full bg-gradient-to-r from-yellow-400 to-amber-500 text-gray-800 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] relative overflow-hidden border border-yellow-300/20;
+}
+
+.btn-gold::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transform: translateX(-100%) skewX(-15deg);
+}
+
+.btn-gold:hover::before {
+    animation: shine 1.5s infinite;
+}
+
+.btn-royal {
+    @apply px-6 py-3 rounded-full bg-gradient-to-r from-primary to-violet-800 text-white shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] border border-purple-300/20 relative overflow-hidden;
+}
+
+.btn-royal::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transform: translateX(-100%) skewX(-15deg);
+}
+
+.btn-royal:hover::before {
+    animation: shine 1.5s infinite;
+}
+
+
+/* Animated shine effect */
+
+@keyframes shine {
+    100% {
+        transform: translateX(100%) skewX(-15deg);
+    }
+}
+
+.animate-shine {
+    animation: shine 1.5s infinite;
+}
+
+
+/* Animated gradient background */
+
+.animate-gradient {
+    background-size: 300% 300%;
+    animation: gradientAnimation 8s ease infinite;
+}
+
+
+/* Theme Switch Transition Animation */
+
+@keyframes dayToNight {
+    0% {
+        background-color: #87CEEB;
+    }
+    100% {
+        background-color: #193366;
+    }
+}
+
+@keyframes nightToDay {
+    0% {
+        background-color: #193366;
+    }
+    100% {
+        background-color: #87CEEB;
+    }
+}
+
+
+/* Day/Night Theme Overlay */
+
+.theme-overlay {
+    @apply fixed inset-0 pointer-events-none z-[9999] transition-opacity duration-1000;
+}
+
+.theme-overlay-day {
+    @apply bg-sky-400/20 opacity-0;
+    animation: nightToDay 1s forwards;
+}
+
+.theme-overlay-night {
+    @apply bg-navy-900/30 opacity-0;
+    animation: dayToNight 1s forwards;
+}
+
+
+/* Card Styles */
+
+.card-modern {
+    @apply rounded-2xl bg-white dark:bg-gray-800 p-6 shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-100 dark:border-gray-700;
+}
+
+.card-premium {
+    @apply rounded-2xl bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 p-6 shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-100/80 dark:border-gray-700/80;
+}
+
+.card-royal {
+    @apply rounded-2xl bg-gradient-to-br from-white to-purple-50/30 dark:from-gray-800 dark:to-purple-900/10 p-6 shadow-lg hover:shadow-xl transition-all duration-500 border border-purple-100/80 dark:border-purple-900/30;
+}
+
+
+/* Notification Badge */
+
+.notification-badge {
+    @apply absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center bg-red-500 text-white text-xs rounded-full animate-pulse shadow-lg shadow-red-500/30;
+}
+
+
+/* Admin Card */
+
+.admin-card {
+    @apply rounded-2xl bg-white dark:bg-gray-800 p-6 border border-gray-100 dark:border-gray-700 shadow-lg hover:shadow-xl transition-all duration-300 hover:border-purple-200 dark:hover:border-purple-800 relative overflow-hidden;
+}
+
+.admin-card-gradient {
+    @apply rounded-2xl bg-gradient-to-br from-primary/5 via-white to-primary/10 dark:from-gray-800 dark:via-gray-900 dark:to-primary/20 p-6 border border-purple-100/30 dark:border-purple-900/30 shadow-lg hover:shadow-xl transition-all duration-300 hover:border-purple-200 dark:hover:border-purple-800;
+}
+
+
+/* Custom Scrollbar */
+
+::-webkit-scrollbar {
+    width: 10px;
+}
+
+::-webkit-scrollbar-track {
+    @apply bg-transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    @apply bg-primary/30 rounded-full hover:bg-primary/50 transition-colors;
+}
+
+
+/* Layout Utilities */
+
+.container-custom {
+    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+}
+
+
+/* Hero Section */
+
+.hero-gradient {
+    @apply bg-gradient-to-br from-primary/10 via-indigo-500/5 to-background animate-gradient bg-size-200;
+}
+
+.hero-gradient-premium {
+    @apply bg-gradient-to-br from-primary/15 via-secondary/10 to-background animate-gradient bg-size-200;
+}
+
+.hero-gradient-royal {
+    @apply bg-gradient-to-br from-primary/20 via-violet-900/10 to-background animate-gradient bg-size-200;
+}
+
+
+/* Text Styles */
+
+.heading-1 {
+    @apply text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight;
+}
+
+.heading-2 {
+    @apply text-3xl md:text-4xl font-bold;
+}
+
+.body-text {
+    @apply text-base md:text-lg text-gray-600 dark:text-gray-300;
+}
+
+
+/* Gold Border */
+
+.gold-border {
+    @apply border border-secondary/30;
+}
+
+
+/* Royal Border */
+
+.royal-border {
+    @apply border border-primary/30;
+}
+
+
+/* Premium Badge */
+
+.premium-badge {
+    @apply bg-gradient-to-r from-yellow-400 to-amber-500 text-xs text-gray-800 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider animate-gradient bg-size-200;
+}
+
+
+/* Royal Badge */
+
+.royal-badge {
+    @apply bg-gradient-to-r from-primary to-violet-700 text-xs text-white px-2 py-0.5 rounded-full font-bold uppercase tracking-wider animate-gradient bg-size-200;
+}
+
+html,
+body {
+    overflow-x: hidden;
+    scroll-behavior: smooth;
+}
+
+
+/* Button Styles */
+
+.btn-primary {
+    @apply bg-primary text-white font-medium rounded-lg hover:bg-primary/90 transition-colors shadow-md hover:shadow-lg;
+}
+
+.btn-secondary {
+    @apply bg-secondary text-gray-800 font-medium rounded-lg hover:bg-secondary/90 transition-colors shadow-md hover:shadow-lg;
+}
+
+.btn-outline {
+    @apply border border-primary text-primary bg-transparent hover:bg-primary hover:text-white transition-colors rounded-lg;
+}
+
+
+/* Floating Animation */
+
+@keyframes float {
+    0% {
+        transform: translateY(0px);
+    }
+    50% {
+        transform: translateY(-10px);
+    }
+    100% {
+        transform: translateY(0px);
+    }
+}
+
+.animate-float {
+    animation: float 6s ease-in-out infinite;
+}
+
+@keyframes success-pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba(16, 185, 129, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+    }
+}
+
+.animate-success-pulse {
+    animation: success-pulse 2s infinite;
+}
+
+.bg-circles {
+    background-image: radial-gradient(circle, rgba(255, 255, 255, 0.1) 1px, transparent 1px);
+    background-size: 20px 20px;
+}
+
+.bg-diagonal-lines {
+    background-image: repeating-linear-gradient( 45deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.05) 1px, transparent 1px, transparent 10px);
+}
+
+.bg-size-200 {
+    background-size: 200% 200%;
+}
+
+.bg-gradient-primary {
+    @apply bg-gradient-to-r from-primary via-indigo-600 to-purple-800 text-white;
+}
+
+.bg-gradient-secondary {
+    @apply bg-gradient-to-r from-secondary via-amber-400 to-orange-500 text-gray-800;
+}
+
+.shadow-card {
+    box-shadow: 0 10px 30px -15px rgba(0, 0, 0, 0.2);
+}
+
+.dark .shadow-card {
+    box-shadow: 0 10px 30px -15px rgba(0, 0, 0, 0.5);
+}
+
+.shadow-card-hover:hover {
+    box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.3);
+}
+
+.dark .shadow-card-hover:hover {
+    box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.7);
+}
+
+.transition-custom {
+    @apply transition-all duration-300 ease-in-out;
+}
+
+
+/* 3D Button */
+
+.btn-3d {
+    @apply relative transform hover:-translate-y-1 active:translate-y-0 transition-transform duration-200 bg-primary text-white rounded-lg px-6 py-3 active:shadow-none;
+    box-shadow: 0 4px 0 0 rgb(76, 29, 149);
+}
+
+
+/* Growing underline effect */
+
+.link-underline {
+    @apply relative after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-0 after:bg-primary hover:after:w-full after:transition-all after:duration-300;
+}
+
+
+/* Reveal animation for content sections */
+
+.reveal-animation {
+    @apply opacity-0 translate-y-10 transition-all duration-500 ease-out;
+}
+
+.reveal-animation.revealed {
+    @apply opacity-100 translate-y-0;
+}
+
+
+/* Pulse animation */
+
+@keyframes pulse-animation {
+    0% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.05);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+.animate-pulse-slow {
+    animation: pulse-animation 3s infinite;
+}
+
+
+/* Dark mode specific styles */
+
+.dark-bg-white {
+    @apply bg-gray-800;
+}
+
+.dark-text-white {
+    @apply text-gray-200;
+}
+
+.dark-border-white {
+    @apply border-gray-700;
+}
+
+.dark-bg-white-10 {
+    @apply bg-gray-800/10;
+}
+
+.dark-bg-white-20 {
+    @apply bg-gray-800/20;
+}
+
+.dark-bg-white-90 {
+    @apply bg-gray-800/90;
+}
+
+
+/* Enhanced text visibility in dark mode */
+
+.dark-text-gray-600 {
+    @apply text-gray-300;
+}
+
+.dark-text-gray-700 {
+    @apply text-gray-200;
+}
+
+
+/* Better contrast for course titles and descriptions */
+
+.dark .card-modern h3 {
+    @apply text-gray-100;
+}
+
+.dark .card-modern p {
+    @apply text-gray-300;
+}
+
+
+/* Enhanced visibility for headings in dark mode */
+
+.dark .heading-2 {
+    @apply text-gray-100;
+}
+
+
+/* Add glow effect to secondary elements in dark mode */
+
+.dark .glass-gold {
+    box-shadow: 0 0 15px rgba(250, 204, 21, 0.15);
+}
+
+.dark .glass-royal {
+    box-shadow: 0 0 15px rgba(109, 40, 217, 0.15);
+}
+
+
+/* Better visibility for footer links */
+
+.dark footer a:hover {
+    @apply text-white;
+}
+
+
+/* Improved featured sections */
+
+.featured-title {
+    @apply text-2xl md:text-3xl font-bold mb-2 text-gray-800 dark:text-gray-100 relative;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.featured-title::after {
+    content: '';
+    @apply absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-primary to-indigo-500 rounded-full;
+    transform: scaleX(0.3);
+    transform-origin: left;
+    transition: transform 0.3s ease-out;
+}
+
+.featured-title:hover::after {
+    transform: scaleX(0.6);
+}
+
+
+/* Enhanced course cards */
+
+.course-card {
+    @apply rounded-2xl bg-white dark:bg-gray-800/80 overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-100 dark:border-gray-700 relative;
+}
+
+.course-card .course-title {
+    @apply text-xl font-bold text-gray-800 dark:text-gray-100;
+}
+
+.course-card .course-instructor {
+    @apply text-sm text-gray-600 dark:text-gray-300;
+}
+
+.course-card .course-features {
+    @apply text-gray-700 dark:text-gray-300;
+}
+
+
+/* Admin page enhancements */
+
+.admin-dashboard {
+    @apply p-6 bg-gray-50 dark:bg-gray-900 min-h-screen;
+}
+
+.admin-title {
+    @apply text-3xl font-bold text-gray-800 dark:text-gray-100 mb-8;
+}
+
+.admin-card {
+    @apply rounded-xl bg-white dark:bg-gray-800 p-6 shadow-lg;
+}
+
+
+/* Teacher section */
+
+.teacher-grid {
+    @apply grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6;
+}
+
+.teacher-card {
+    @apply rounded-xl bg-white dark:bg-gray-800 overflow-hidden shadow-lg transition-all duration-300 hover:shadow-xl;
+}
+
+.teacher-image {
+    @apply relative h-48 w-full overflow-hidden;
+}
+
+.teacher-info {
+    @apply p-4 border-t border-gray-100 dark:border-gray-700;
+}
+
+.teacher-name {
+    @apply text-lg font-bold text-gray-800 dark:text-gray-100;
+}
+
+.teacher-specialty {
+    @apply text-sm text-gray-600 dark:text-gray-300;
+}
+
+
+/* Simple light on/off animation */
+
+.light-on-off {
+    animation: light-on-off 2s infinite alternate;
+    color: #8a2be2; /* Base purple color in light mode */
+}
+
+.dark .light-on-off {
+    color: #bf7aff; /* Brighter purple color in dark mode */
+}
+
+@keyframes light-on-off {
+    0% {
+        opacity: 0.6;
+        text-shadow: none;
+    }
+    100% {
+        opacity: 1;
+        text-shadow: 0 0 10px #a855f7, 0 0 20px #a855f7;
+    }
+}
+
+/* أنماط السماء الليلية الواقعية */
+
+/* خلفية السماء الليلية وفق طلب المستخدم */
+.dark body {
+  background: #070723 !important; /* لون داكن لليل في حالة عدم عمل التدرج */
+  color: white;
+}
+
+/* إضافة طبقة خلفية منفصلة للسماء الليلية */
+.night-background {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background: linear-gradient(#091134, #000820);
+  opacity: 0.95;
+}
+
+/* إضافة طبقة لتدرج إضافي للسماء */
+.night-background:after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 80%, #102056 0%, rgba(9, 17, 52, 0) 60%);
+}
+
+.night-sky {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* قمر واقعي مشرق جداً مثل الصورة */
+.moon {
+  position: absolute;
+  width: 200px !important;
+  height: 200px !important;
+  border-radius: 50%;
+  top: 75px;
+  left: 75px;
+  /* تدرج لوني للقمر بمظهر ناصع ولامع */
+  background: radial-gradient(circle at 50% 50%, #ffffff 0%, #ffffff 20%, #f4f4f4 40%, #e0e0e0 60%, #d0d0d0 100%) !important;
+  /* هالة ضوئية كبيرة وقوية */
+  box-shadow: 0 0 80px 40px rgba(255, 255, 255, 0.8), 0 0 160px 80px rgba(255, 255, 255, 0.4) !important;
+  opacity: 1;
+  overflow: hidden;
+  z-index: 10;
+}
+
+/* فوهات القمر بشكل أخف لتناسب القمر المشرق */
+.moon-crater {
+  position: absolute;
+  border-radius: 50%;
+  background-color: rgba(200, 200, 200, 0.1);
+  box-shadow: inset 1px 1px 1px rgba(0, 0, 0, 0.1);
+}
+
+/* تأثير النجوم العادية - وميض أقوى */
+@keyframes normalStarPulse {
+  0% {
+    opacity: 0.1;
+    transform: scale(0.7);
+    box-shadow: 0 0 0px rgba(255, 255, 255, 0);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.1);
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.7);
+  }
+  100% {
+    opacity: 0.2;
+    transform: scale(0.8);
+    box-shadow: 0 0 2px rgba(255, 255, 255, 0.3);
+  }
+}
+
+/* تأثير النجوم اللامعة - وميض أقوى وأسرع */
+@keyframes brightStarPulse {
+  0% {
+    opacity: 0.3;
+    transform: scale(0.8);
+    box-shadow: 0 0 5px rgba(255, 255, 255, 0.3);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.3);
+    box-shadow: 0 0 20px 5px rgba(255, 255, 255, 0.8), 0 0 30px rgba(255, 255, 255, 0.5);
+  }
+  100% {
+    opacity: 0.4;
+    transform: scale(0.9);
+    box-shadow: 0 0 8px rgba(255, 255, 255, 0.4);
+  }
+}
+
+/* تأثير توهج النجوم */
+.star {
+  position: absolute;
+  border-radius: 50%;
+  z-index: 5;
+  transition: all 0.3s ease-in-out;
+}
+
+.star.normal {
+  animation: normalStarPulse 3s infinite alternate;
+  animation-delay: var(--delay, 0s);
+}
+
+.star.bright {
+  animation: brightStarPulse 4s infinite alternate;
+  animation-delay: var(--delay, 0s);
+}
+@keyframes starGlowPulse {
+    0% {
+        opacity: 0.3;
+        transform: scale(0.9) translate(-50%, -50%);
+    }
+    100% {
+        opacity: 0.7;
+        transform: scale(1.1) translate(-50%, -50%);
+    }
+}
+
+/* سماء ليلية أكثر واقعية مع تدرج لوني حقيقي */
+.dark body {
+    background: linear-gradient(180deg, #0c1445 0%, #132555 50%, #1a3163 100%) !important;
+    background-attachment: fixed !important;
+}
+
+/* قبة سماوية كاملة بتأثير القبة */
+.dark::after {
+    content: "";
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: radial-gradient(ellipse at center, transparent 40%, rgba(0, 0, 20, 0.4) 100%);
+    z-index: -1;
+    pointer-events: none;
+}
+
+/* إضافة تأثير الشفق على الأفق */
+.dark::before {
+    content: "";
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(to top, transparent 85%, rgba(30, 50, 100, 0.2) 100%);
+    opacity: 0.7;
+    z-index: -1;
+    pointer-events: none;
+}
+
+/* Glow heading effect for hero section */
+.glow-heading {
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+}
+
+.dark .glow-heading {
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.2), 0 0 20px rgba(255, 255, 255, 0.1);
+}

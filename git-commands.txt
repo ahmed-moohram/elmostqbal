@@ -1,0 +1,38 @@
+الأوامر بالترتيب - انسخ والصق كل أمر في PowerShell:
+
+1. التهيئة:
+git init
+
+2. إضافة الملفات:
+git add .
+
+3. عمل Commit:
+git commit -m "feat: Educational Platform with Real-time Notifications and Certificates"
+
+4. إضافة GitHub (استبدل USERNAME باسم المستخدم):
+git remote add origin https://github.com/USERNAME/educational-platform.git
+
+5. الرفع:
+git branch -M main
+git push -u origin main
+
+====================================
+في حالة وجود مشاكل:
+====================================
+
+إذا ظهرت رسالة "remote origin already exists":
+git remote remove origin
+git remote add origin https://github.com/USERNAME/educational-platform.git
+
+إذا ظهرت رسالة رفض:
+git pull origin main --allow-unrelated-histories
+git push origin main
+
+====================================
+معلومات Personal Access Token:
+====================================
+1. افتح: https://github.com/settings/tokens
+2. اضغط: Generate new token (classic)
+3. اختر: repo (كل الصلاحيات)
+4. اضغط: Generate token
+5. انسخ التوكن واستخدمه بدلاً من كلمة المرور

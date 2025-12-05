@@ -1,5 +1,6 @@
 @echo off
 chcp 65001 > nul
+<<<<<<< HEAD
 title رفع Frontend على GitHub
 color 0B
 
@@ -48,4 +49,17 @@ echo.
 echo 📌 الخطوة التالية:
 echo    افتح Vercel واستورد almostkbal
 echo ==========================================
+=======
+title رفع المشروع على GitHub
+color 0B
+
+echo ==========================================
+echo         رفع المشروع على GitHub
+echo ==========================================
+echo.
+
+REM تشغيل PowerShell Script
+powershell.exe -ExecutionPolicy Bypass -File upload-to-github.ps1
+
+>>>>>>> baa0ab1d78498e8385735a7f4deae66a0e8de9df
 pause

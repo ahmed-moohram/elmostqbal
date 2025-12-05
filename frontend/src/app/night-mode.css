@@ -1,0 +1,85 @@
+/* تأثيرات الوضع الليلي مع قمر واقعي ونجوم */
+
+/* تغيير لون الخلفية في الوضع الليلي */
+body {
+  background: #ffffff;
+  transition: background 1s ease-in-out;
+}
+
+/* html.dark body {
+  background: #0a0e17 !important;
+  background-image: 
+    linear-gradient(to bottom, rgba(0, 0, 0, 0.9) 0%, rgba(10, 14, 23, 0.95) 100%),
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E") !important;
+  background-blend-mode: overlay;
+  color: #d8d8d8;
+  transition: background 1s ease-in-out;
+} */
+
+/* القمر الثابت - تم تعطيله ليتم التحكم به من NightSky.tsx */
+/*
+.moon {
+  position: fixed;
+  top: 50px;
+  right: 50px;
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: #f5f5dc;
+  box-shadow: 
+    0 0 20px #fff,
+    0 0 40px rgba(255, 255, 255, 0.6),
+    0 0 60px rgba(255, 255, 255, 0.4);
+  z-index: 1;
+  pointer-events: none;
+  transform: none !important;
+  will-change: auto;
+  animation: moon-glow 15s ease-in-out infinite alternate;
+}
+
+@keyframes moon-glow {
+  0% { box-shadow: 0 0 20px #fff, 0 0 40px rgba(255, 255, 255, 0.6), 0 0 60px rgba(255, 255, 255, 0.4); }
+  100% { box-shadow: 0 0 30px #fff, 0 0 60px rgba(255, 255, 255, 0.8), 0 0 90px rgba(255, 255, 255, 0.6); }
+}
+*/
+
+/* حاوية النجوم - تم تعطيلها ليتم التحكم بها من NightSky.tsx */
+/*
+.stars {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -1;
+  pointer-events: none;
+  overflow: hidden;
+}
+*/
+
+/* النجوم الثابتة - تم تعطيلها ليتم التحكم بها من NightSky.tsx */
+/*
+.star {
+  position: absolute;
+  background-color: white;
+  border-radius: 50%;
+  animation: twinkle 4s ease-in-out infinite;
+  transform: none !important;
+  will-change: auto;
+}
+
+@keyframes twinkle {
+  0%, 100% { opacity: 0.3; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.1); }
+}
+*/
+
+/* للهواتف */
+@media (max-width: 768px) {
+  /* .moon {  // Keep this commented if old moon is fully disabled
+    width: 60px;
+    height: 60px;
+    top: 30px;
+    right: 20px;
+  } */
+}
