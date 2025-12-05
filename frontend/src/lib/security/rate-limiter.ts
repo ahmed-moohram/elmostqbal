@@ -71,11 +71,11 @@ class RateLimiter {
   private cleanup(): void {
     const now = Date.now();
     
-    for (const [key, entry] of this.limits.entries()) {
+    this.limits.forEach((entry, key) => {
       if (now > entry.resetTime) {
         this.limits.delete(key);
       }
-    }
+    });
   }
 
   /**
