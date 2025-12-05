@@ -110,7 +110,6 @@ export const createCourse = async (courseData: any) => {
         title: courseData.title,
         description: courseData.description,
         instructor_id: courseData.instructorId,
-        instructor_name: courseData.instructor,
         price: courseData.price,
         discount_price: courseData.discountPrice,
         thumbnail: courseData.thumbnail,
@@ -139,7 +138,6 @@ export const updateCourse = async (courseId: string, updates: any) => {
       .update({
         title: updates.title,
         description: updates.description,
-        instructor_name: updates.instructor,
         price: updates.price,
         discount_price: updates.discountPrice,
         thumbnail: updates.thumbnail,
