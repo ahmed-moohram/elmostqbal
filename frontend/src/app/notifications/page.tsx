@@ -138,8 +138,12 @@ export default function NotificationsPage() {
   };
   
   // تنسيق التاريخ بشكل مقروء
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return '—';
+
     const date = new Date(dateString);
+    if (isNaN(date.getTime())) return '—';
+
     return new Intl.DateTimeFormat('ar-SA', {
       year: 'numeric',
       month: 'short',
@@ -258,7 +262,7 @@ export default function NotificationsPage() {
                             </p>
                             <div className="mt-2 flex items-center gap-4">
                               <span className="text-xs text-gray-500 dark:text-gray-500">
-                                {formatDate(notification.date)}
+                                {formatDate(notification.date || notification.createdAt || '')}
                               </span>
                               
                               {notification.link && (
