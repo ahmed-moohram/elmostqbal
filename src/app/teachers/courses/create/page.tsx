@@ -75,11 +75,11 @@ export default function CreateCoursePage() {
   ];
 
   const levels = [
-    'الابتدائية',
-    'الإعدادية',
-    'الثانوية العامة',
-    'الجامعة',
-    'جميع المستويات'
+    { value: 'beginner', label: 'الابتدائية' },
+    { value: 'intermediate', label: 'الإعدادية' },
+    { value: 'advanced', label: 'الثانوية العامة' },
+    { value: 'advanced', label: 'الجامعة' },
+    { value: 'all-levels', label: 'جميع المستويات' }
   ];
 
   const handleAddRequirement = () => {
@@ -302,8 +302,8 @@ export default function CreateCoursePage() {
                       required
                     >
                       <option value="">اختر المستوى</option>
-                      {levels.map(lvl => (
-                        <option key={lvl} value={lvl}>{lvl}</option>
+                      {levels.map((lvl) => (
+                        <option key={lvl.value} value={lvl.value}>{lvl.label}</option>
                       ))}
                     </select>
                   </div>
@@ -486,7 +486,7 @@ export default function CreateCoursePage() {
                     </div>
                     <div>
                       <span className="text-sm text-gray-500">المستوى:</span>
-                      <p className="font-semibold">{level}</p>
+                      <p className="font-semibold">{levels.find((l) => l.value === level)?.label || level}</p>
                     </div>
                     <div>
                       <span className="text-sm text-gray-500">السعر:</span>
