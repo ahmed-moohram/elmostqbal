@@ -572,7 +572,7 @@ export default function Home() {
             </div>
           </div>
           <div className="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">
-            © {new Date().getFullYear()}  جميع الحقوق محفوظة ل أحمد محرم 
+            {new Date().getFullYear()}  جميع الحقوق محفوظة ©  أحمد محرم 
           </div>
         </div>
       </footer>
