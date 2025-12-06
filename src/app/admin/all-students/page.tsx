@@ -61,66 +61,46 @@ export default function AllStudentsPage() {
   const fetchStudents = async () => {
     try {
       setLoading(true);
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-      const token = localStorage.getItem('token');
-      
+
       let fetchedStudents: Student[] = [];
-      
+
       // محاولة جلب من الـ Backend
       try {
-        const response = await fetch(`${API_URL}/api/students`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
+        const response = await fetch('/api/students');
 
         if (response.ok) {
           const result = await response.json();
           const studentsData = Array.isArray(result) ? result : (result.data || []);
-          
+
           // تحويل البيانات للصيغة المطلوبة من نموذج Student (Mongo)
           fetchedStudents = studentsData.map((student: any) => {
-            const courses = Array.isArray(student.courses) ? student.courses : [];
-            const enrolledCourses = courses.length;
-
-            const totalProgress = enrolledCourses > 0
-              ? Math.round(
-                  courses.reduce(
-                    (sum: number, c: any) => sum + (c.progress || 0),
-                    0
-                  ) / enrolledCourses
-                )
-              : 0;
-
-            const lastCourseAccess = courses
-              .map((c: any) => c.lastAccessed)
-              .filter(Boolean)
-              .sort(
-                (a: string | Date, b: string | Date) =>
-                  new Date(b).getTime() - new Date(a).getTime()
-              )[0];
+            const enrolledCoursesCount = Array.isArray(student.enrolledCourses)
+              ? student.enrolledCourses.length
+              : (typeof student.enrolledCourses === 'number' ? student.enrolledCourses : 0);
 
             return {
               _id: student._id || student.id,
               name: student.name || 'طالب',
               email: student.email || '',
-              phone: student.phone || '',
-              parentPhone: student.parentPhone || '',
-              grade: student.grade || '',
-              enrolledCourses,
-              totalProgress,
-              joinDate: student.createdAt || student.joinDate || new Date().toISOString(),
-              lastActive: lastCourseAccess || student.updatedAt,
+              phone: student.phone || student.studentPhone || student.student_phone || '',
+              parentPhone: student.parentPhone || student.parent_phone || '',
+              grade: student.grade || student.grade_level || '',
+              enrolledCourses: enrolledCoursesCount,
+              totalProgress: 0,
+              joinDate: student.joinDate || student.created_at || student.createdAt || new Date().toISOString(),
+              lastActive: student.lastActive || student.updated_at || student.updatedAt,
               avatar: student.avatar || student.profilePicture
             };
           });
-          
-          console.log(`تم جلب ${fetchedStudents.length} طالب من السيرفر`);
+
+          console.log(`تم جلب ${fetchedStudents.length} طالب من السيرفر الداخلي /api/students`);
+        } else {
+          console.warn('⚠️ فشل جلب الطلاب من /api/students، status:', response.status);
         }
       } catch (error) {
-        console.log('Could not fetch from backend, using local data');
+        console.log('Could not fetch from /api/students', error);
       }
-      
+
       // ⚠️ إذا لم يكن هناك بيانات، عرض رسالة بدلاً من بيانات وهمية
       if (fetchedStudents.length === 0) {
         console.warn('⚠️ لا يوجد طلاب مسجلون في قاعدة البيانات');

@@ -171,12 +171,40 @@ export default function ProtectedVideoPlayer({
   };
 
   if (isEnrolled) {
-    // عرض الفيديو للمشتركين مع تشديد بسيط للحماية حول YouTube
+    const isDriveVideo = !!videoUrl && videoUrl.includes('drive.google.com');
+    // عرض الفيديو للمشتركين مع تشديد بسيط للحماية حول YouTube وروابط Google Drive
     const getEmbeddedUrl = () => {
       const url = videoUrl;
       if (!url) return '';
 
       try {
+        // دعم روابط Google Drive (file / open / uc)
+        if (url.includes('drive.google.com')) {
+          try {
+            const parsed = new URL(url);
+            let fileId = '';
+
+            // شكل: https://drive.google.com/file/d/FILE_ID/...
+            const pathParts = parsed.pathname.split('/').filter(Boolean);
+            const dIndex = pathParts.indexOf('d');
+            if (dIndex !== -1 && pathParts[dIndex + 1]) {
+              fileId = pathParts[dIndex + 1];
+            }
+
+            // شكل: /open?id=FILE_ID أو /uc?export=download&id=FILE_ID
+            if (!fileId) {
+              const idParam = parsed.searchParams.get('id');
+              if (idParam) {
+                fileId = idParam;
+              }
+            }
+
+            if (fileId) {
+              return `https://drive.google.com/file/d/${fileId}/preview`;
+            }
+          } catch (e) {}
+        }
+
         // روابط YouTube العادية
         if (url.includes('youtube.com/watch')) {
           const urlObj = new URL(url);
@@ -202,12 +230,12 @@ export default function ProtectedVideoPlayer({
         }
       } catch (e) {}
 
-      // روابط غير YouTube تُستخدم كما هي
+      // روابط غير YouTube/Drive تُستخدم كما هي
       return url;
     };
 
     return (
-      <div className="w-full aspect-video bg-black rounded-xl overflow-hidden">
+      <div className="w-full aspect-video bg-black rounded-xl overflow-hidden relative">
         <iframe
           src={getEmbeddedUrl()}
           title="Course Video"
@@ -215,6 +243,9 @@ export default function ProtectedVideoPlayer({
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope"
           allowFullScreen={false}
         />
+        {isDriveVideo && (
+          <div className="absolute top-0 right-0 w-16 h-16 bg-black/40 pointer-events-auto z-10" />
+        )}
       </div>
     );
   }

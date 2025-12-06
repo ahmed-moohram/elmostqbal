@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { FaPaperPlane, FaSmile, FaPaperclip, FaVideo, FaPhone, FaTimes } from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
+import { API_BASE_URL } from '@/lib/api';
 
 interface Message {
   id: string;
@@ -43,18 +44,70 @@ export default function CourseChat({
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [showEmoji, setShowEmoji] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
-  // محاكاة رسائل سابقة
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('user');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        setCurrentUserId(parsed.id || userId);
+      } else {
+        setCurrentUserId(userId);
+      }
+    } catch {
+      setCurrentUserId(userId);
+    }
+  }, [userId]);
+
+  const fetchMessagesFromApi = async () => {
+    if (!teacherId) return;
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('token');
+      if (!token) {
+        return;
+      }
+      const response = await fetch(`${API_BASE_URL}/api/messages/conversation/${teacherId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        const apiMessages = data.data || [];
+        const transformed: Message[] = apiMessages.map((m: any) => ({
+          id: m._id,
+          senderId: m.sender?._id || '',
+          senderName: m.sender?.name || 'مستخدم',
+          senderAvatar: m.sender?.avatar || '/default-avatar.png',
+          senderRole: m.sender?._id === teacherId ? 'teacher' : 'student',
+          content: m.content,
+          timestamp: m.createdAt,
+          isRead: m.isRead,
+        }));
+        setMessages(transformed);
+      }
+    } catch (error) {
+      console.error('Error fetching course chat messages:', error);
+      if (!messages.length) {
+        loadMessages();
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (isOpen) {
-      loadMessages();
-      // محاكاة اتصال WebSocket
+      fetchMessagesFromApi();
       simulateRealtimeConnection();
     }
-  }, [isOpen, courseId]);
+  }, [isOpen, courseId, teacherId]);
 
   const loadMessages = () => {
-    // رسائل تجريبية
     const mockMessages: Message[] = [
       {
         id: '1',
@@ -91,26 +144,13 @@ export default function CourseChat({
   };
 
   const simulateRealtimeConnection = () => {
-    // محاكاة مستخدمين متصلين
-    setOnlineUsers(['teacher_1', 'student_1', userId]);
-    
-    // محاكاة رسالة جديدة بعد 5 ثواني
-    setTimeout(() => {
-      if (userRole === 'student') {
-        const newMsg: Message = {
-          id: Date.now().toString(),
-          senderId: teacherId || 'teacher_1',
-          senderName: teacherName || 'أ. محمد أحمد',
-          senderAvatar: '/teacher-avatar.jpg',
-          senderRole: 'teacher',
-          content: 'كيف حالك؟ هل تحتاج مساعدة في أي درس؟',
-          timestamp: new Date().toISOString(),
-          isRead: false
-        };
-        setMessages(prev => [...prev, newMsg]);
-        toast('📩 رسالة جديدة من المدرس', { icon: '💬' });
-      }
-    }, 5000);
+    const me = currentUserId || userId;
+    const users: string[] = [];
+    if (teacherId) users.push(teacherId);
+    if (me) users.push(me);
+    if (users.length) {
+      setOnlineUsers(users);
+    }
   };
 
   const scrollToBottom = () => {
@@ -121,42 +161,57 @@ export default function CourseChat({
     scrollToBottom();
   }, [messages]);
 
-  const handleSendMessage = (e?: React.FormEvent) => {
+  const handleSendMessage = async (e?: React.FormEvent) => {
     e?.preventDefault();
     
-    if (!newMessage.trim()) return;
+    if (!newMessage.trim() || !teacherId) return;
 
-    const message: Message = {
-      id: Date.now().toString(),
-      senderId: userId,
-      senderName: userName,
-      senderAvatar: '/default-avatar.png',
-      senderRole: userRole,
-      content: newMessage,
-      timestamp: new Date().toISOString(),
-      isRead: false
-    };
+    const token = localStorage.getItem('token');
+    if (!token) {
+      toast.error('يجب تسجيل الدخول لإرسال الرسائل');
+      return;
+    }
 
-    setMessages(prev => [...prev, message]);
-    setNewMessage('');
+    setSending(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/messages/send`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          receiverId: teacherId,
+          content: newMessage,
+          messageType: 'text',
+        }),
+      });
 
-    // محاكاة رد تلقائي من المدرس
-    if (userRole === 'student') {
-      setIsTyping(true);
-      setTimeout(() => {
-        setIsTyping(false);
-        const reply: Message = {
-          id: (Date.now() + 1).toString(),
-          senderId: teacherId || 'teacher_1',
-          senderName: teacherName || 'أ. محمد أحمد',
-          senderAvatar: '/teacher-avatar.jpg',
-          senderRole: 'teacher',
-          content: 'شكراً على رسالتك، سأرد عليك قريباً 👍',
-          timestamp: new Date().toISOString(),
-          isRead: false
-        };
-        setMessages(prev => [...prev, reply]);
-      }, 2000);
+      if (response.ok) {
+        const data = await response.json();
+        const m = data.data;
+        if (m) {
+          const msg: Message = {
+            id: m._id,
+            senderId: m.sender?._id || (currentUserId || userId),
+            senderName: m.sender?.name || userName,
+            senderAvatar: m.sender?.avatar || '/default-avatar.png',
+            senderRole: m.sender?._id === teacherId ? 'teacher' : 'student',
+            content: m.content,
+            timestamp: m.createdAt,
+            isRead: m.isRead,
+          };
+          setMessages(prev => [...prev, msg]);
+        }
+        setNewMessage('');
+      } else {
+        toast.error('فشل في إرسال الرسالة');
+      }
+    } catch (error) {
+      console.error('Error sending course chat message:', error);
+      toast.error('حدث خطأ أثناء إرسال الرسالة');
+    } finally {
+      setSending(false);
     }
   };
 
@@ -215,54 +270,63 @@ export default function CourseChat({
 
       {/* Messages Area */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
-        {messages.map((message) => (
-          <div
-            key={message.id}
-            className={`flex ${message.senderId === userId ? 'justify-start' : 'justify-end'}`}
-          >
-            <div className={`max-w-[70%] ${message.senderId === userId ? 'order-2' : 'order-1'}`}>
-              <div className="flex items-start gap-2 mb-1">
-                {message.senderId !== userId && (
-                  <img
-                    src={message.senderAvatar}
-                    alt={message.senderName}
-                    className="w-8 h-8 rounded-full"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src = '/default-avatar.png';
-                    }}
-                  />
-                )}
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-xs font-medium text-gray-600">
-                      {message.senderName}
-                    </span>
-                    {message.senderRole === 'teacher' && (
-                      <span className="text-xs bg-purple-100 text-purple-600 px-2 py-0.5 rounded">
-                        مدرس
+        {loading && !messages.length && (
+          <div className="flex items-center justify-center h-full text-gray-500 text-sm">
+            جاري تحميل الرسائل...
+          </div>
+        )}
+        {messages.map((message) => {
+          const me = currentUserId || userId;
+          const isOwn = message.senderId === me;
+          return (
+            <div
+              key={message.id}
+              className={`flex ${isOwn ? 'justify-start' : 'justify-end'}`}
+            >
+              <div className={`max-w-[70%] ${isOwn ? 'order-2' : 'order-1'}`}>
+                <div className="flex items-start gap-2 mb-1">
+                  {!isOwn && (
+                    <img
+                      src={message.senderAvatar}
+                      alt={message.senderName}
+                      className="w-8 h-8 rounded-full"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = '/default-avatar.png';
+                      }}
+                    />
+                  )}
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-xs font-medium text-gray-600">
+                        {message.senderName}
                       </span>
-                    )}
+                      {message.senderRole === 'teacher' && (
+                        <span className="text-xs bg-purple-100 text-purple-600 px-2 py-0.5 rounded">
+                          مدرس
+                        </span>
+                      )}
+                    </div>
+                    <div
+                      className={`rounded-2xl px-4 py-2 ${
+                        isOwn
+                          ? 'bg-purple-600 text-white'
+                          : 'bg-white border border-gray-200'
+                      }`}
+                    >
+                      <p className="text-sm">{message.content}</p>
+                    </div>
+                    <p className="text-xs text-gray-400 mt-1">
+                      {new Date(message.timestamp).toLocaleTimeString('ar-EG', {
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </p>
                   </div>
-                  <div
-                    className={`rounded-2xl px-4 py-2 ${
-                      message.senderId === userId
-                        ? 'bg-purple-600 text-white'
-                        : 'bg-white border border-gray-200'
-                    }`}
-                  >
-                    <p className="text-sm">{message.content}</p>
-                  </div>
-                  <p className="text-xs text-gray-400 mt-1">
-                    {new Date(message.timestamp).toLocaleTimeString('ar-EG', {
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })}
-                  </p>
                 </div>
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
         
         {/* Typing Indicator */}
         {isTyping && (
@@ -332,7 +396,7 @@ export default function CourseChat({
 
           <button
             type="submit"
-            disabled={!newMessage.trim()}
+            disabled={sending || !newMessage.trim()}
             className="p-2 bg-purple-600 text-white rounded-full hover:bg-purple-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <FaPaperPlane />

@@ -15,6 +15,7 @@ import {
 } from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
 import { createCourse } from '@/services/supabase-service';
+import { uploadCourseImage } from '@/lib/supabase-upload';
 
 export default function CreateCoursePage() {
   const router = useRouter();
@@ -35,6 +36,9 @@ export default function CreateCoursePage() {
   const [targetAudience, setTargetAudience] = useState('');
   const [features, setFeatures] = useState<string[]>(['']);
   const [instructorBio, setInstructorBio] = useState('');
+  const [publishNow, setPublishNow] = useState(true);
+  const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
+  const [thumbnailPreview, setThumbnailPreview] = useState('');
 
   // التحقق من صلاحيات المدرس
   useEffect(() => {
@@ -135,37 +139,69 @@ export default function CreateCoursePage() {
 
     const user = JSON.parse(userJson);
 
+    const priceValue = parseFloat(price);
+    const discountValue = discountPrice ? parseFloat(discountPrice) : null;
+
+    if (isNaN(priceValue) || priceValue <= 0) {
+      toast.error('السعر يجب أن يكون أكبر من صفر');
+      return;
+    }
+
+    if (discountValue !== null) {
+      if (isNaN(discountValue) || discountValue <= 0) {
+        toast.error('السعر بعد الخصم يجب أن يكون أكبر من صفر');
+        return;
+      }
+      if (discountValue >= priceValue) {
+        toast.error('السعر بعد الخصم يجب أن يكون أقل من السعر الأصلي');
+        return;
+      }
+    }
+
     const baseData = {
       title,
       description,
       category,
       level,
-      price: parseFloat(price) || 0,
-      discountPrice: discountPrice ? parseFloat(discountPrice) : null,
+      price: priceValue,
+      discountPrice: discountValue,
     };
-
-    const courseDataForSupabase = {
-      ...baseData,
-      instructorId: user.id,
-      instructor: user.name || 'مدرس',
-      thumbnail: '/placeholder-course.jpg',
-      previewVideo: null,
-      duration: 0,
-      isPublished: false,
-      isFeatured: false,
-    };
-
     try {
       setIsSubmitting(true);
+      let thumbnailUrl = '/placeholder-course.jpg';
+
+      if (thumbnailFile) {
+        const uploadResult = await uploadCourseImage(thumbnailFile);
+
+        if (!uploadResult.success || !uploadResult.url) {
+          toast.error('فشل في رفع صورة الكورس');
+          setIsSubmitting(false);
+          return;
+        }
+
+        thumbnailUrl = uploadResult.url;
+      }
+
+      const courseDataForSupabase = {
+        ...baseData,
+        instructorId: user.id,
+        instructor: user.name || 'مدرس',
+        thumbnail: thumbnailUrl,
+        previewVideo: null,
+        duration: 0,
+        isPublished: publishNow,
+        isFeatured: false,
+      };
+
       const result = await createCourse(courseDataForSupabase);
 
-      if (!result.success) {
+      if (!result.success || !result.data || !result.data.id) {
         toast.error('حدث خطأ أثناء إنشاء الكورس');
         return;
       }
 
       toast.success('تم إنشاء الكورس بنجاح! 🎉');
-      router.replace(`/teachers/${user.id}/dashboard`);
+      router.replace(`/teacher/courses/${result.data.id}/lessons`);
     } catch (error) {
       console.error('Error creating course from teacher page:', error);
       toast.error('حدث خطأ أثناء إنشاء الكورس');
@@ -338,6 +374,41 @@ export default function CreateCoursePage() {
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                     />
                   </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold mb-2">
+                    صورة الكورس (اختياري)
+                  </label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0] || null;
+                      setThumbnailFile(file);
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (event) => {
+                          if (event.target?.result) {
+                            setThumbnailPreview(event.target.result as string);
+                          }
+                        };
+                        reader.readAsDataURL(file);
+                      } else {
+                        setThumbnailPreview('');
+                      }
+                    }}
+                    className="w-full"
+                  />
+                  {thumbnailPreview && (
+                    <div className="mt-3">
+                      <img
+                        src={thumbnailPreview}
+                        alt="معاينة صورة الكورس"
+                        className="w-full max-h-48 object-cover rounded-lg border"
+                      />
+                    </div>
+                  )}
                 </div>
               </motion.div>
             )}
@@ -528,6 +599,19 @@ export default function CreateCoursePage() {
                       </ul>
                     </div>
                   )}
+
+                  <div className="mt-4 flex items-center gap-3">
+                    <input
+                      id="publishNow"
+                      type="checkbox"
+                      checked={publishNow}
+                      onChange={(e) => setPublishNow(e.target.checked)}
+                      className="w-4 h-4"
+                    />
+                    <label htmlFor="publishNow" className="text-sm text-gray-700 cursor-pointer">
+                      نشر الكورس الآن وجعله ظاهرًا في صفحة الدورات العامة
+                    </label>
+                  </div>
                 </div>
               </motion.div>
             )}

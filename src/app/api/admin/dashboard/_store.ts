@@ -206,7 +206,7 @@ export async function getIssues(): Promise<{ issues: Issue[] }> {
   try {
     const { data, error } = await supabase
       .from('admin_notifications')
-      .select('id, title, message, type, priority, created_at')
+      .select('id, title, message, type, priority, created_at, data')
       .order('created_at', { ascending: false })
       .limit(50);
 
@@ -214,12 +214,17 @@ export async function getIssues(): Promise<{ issues: Issue[] }> {
 
     const issues: Issue[] = (data || []).map((row: any) => {
       const id = String(row.id);
+      const rowData = row.data || {};
+      const persistedResolved =
+        rowData && typeof rowData === 'object' && rowData.resolved === true;
+      const isResolved = resolvedIssueIds.has(id) || persistedResolved;
+
       return {
         id,
         title: row.title || 'إشعار',
         description: row.message || '',
         type: mapNotificationTypeToIssueType(row.type),
-        status: resolvedIssueIds.has(id) ? 'resolved' : 'new',
+        status: isResolved ? 'resolved' : 'new',
         date: row.created_at || new Date().toISOString(),
         priority: normalizePriority(row.priority),
       };
@@ -375,8 +380,44 @@ async function activateEnrollmentForPaymentRequest(paymentRequest: any, requestI
 }
 
 export async function resolveIssue(id: string): Promise<boolean> {
-  resolvedIssueIds.add(String(id));
-  return true;
+  const issueId = String(id);
+
+  try {
+    const { data, error } = await supabase
+      .from('admin_notifications')
+      .select('id, data')
+      .eq('id', issueId)
+      .maybeSingle();
+
+    if (error || !data) {
+      console.error('Error fetching issue for resolveIssue:', error);
+      return false;
+    }
+
+    const currentData = (data as any).data || {};
+    const newData = {
+      ...currentData,
+      resolved: true,
+      resolved_at: new Date().toISOString(),
+    };
+
+    const { error: updateError } = await supabase
+      .from('admin_notifications')
+      .update({ data: newData })
+      .eq('id', issueId);
+
+    if (updateError) {
+      console.error('Error updating issue as resolved:', updateError);
+      return false;
+    }
+
+    // نحفظه أيضًا في الذاكرة للجلسة الحالية لتحسين الأداء
+    resolvedIssueIds.add(issueId);
+    return true;
+  } catch (err) {
+    console.error('Unexpected error in resolveIssue:', err);
+    return false;
+  }
 }
 
 export async function updateTransaction(id: string, action: 'approve' | 'decline'): Promise<boolean> {

@@ -23,9 +23,32 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   const form = await request.formData();
+
+  const rawTitle = String(form.get('title') || '').trim();
+  const description = String(form.get('description') || '');
+
+  let baseSlug = String(form.get('slug') || rawTitle)
+    .toLowerCase()
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9\-ء-ي]+/g, '');
+
+  if (!baseSlug) {
+    baseSlug = `course-${Date.now()}`;
+  }
+
+  const slug = `${baseSlug}-${Math.random().toString(36).substring(2, 8)}`;
+
+  const shortDescriptionFromForm = form.get('shortDescription');
+  const shortDescription =
+    typeof shortDescriptionFromForm === 'string' && shortDescriptionFromForm.trim().length > 0
+      ? shortDescriptionFromForm
+      : description.slice(0, 200);
+
   const payload: any = {
-    title: String(form.get('title') || ''),
-    description: String(form.get('description') || ''),
+    title: rawTitle,
+    slug,
+    description,
+    short_description: shortDescription,
     price: Number(form.get('price') || 0),
     discount_price: form.get('discountPrice') != null ? Number(form.get('discountPrice')) : null,
     is_published: String(form.get('isPublished') || 'false') === 'true',
@@ -35,7 +58,9 @@ export async function POST(request: NextRequest) {
     category: String(form.get('category') || ''),
     level: String(form.get('level') || 'مبتدئ'),
   };
+
   const { data, error } = await supabase.from('courses').insert(payload).select('*').single();
+
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json(data, { status: 201 });
 }

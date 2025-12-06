@@ -7,6 +7,7 @@ import Image from 'next/image';
 import { FaUser, FaCalendar, FaBook, FaGraduationCap, FaHistory, FaCertificate, FaCreditCard, FaEdit, FaCamera, FaLock, FaCog, FaArrowLeft } from 'react-icons/fa';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
+import CourseAchievements from '@/components/CourseAchievements';
 import { toast } from 'react-hot-toast';
 
 // نموذج واجهة بيانات المستخدم
@@ -383,46 +384,6 @@ export default function ProfilePage() {
                   </>
                 )}
                 
-                {completedCourses.length > 0 && (
-                  <>
-                    <h3 className="text-xl font-semibold mb-4">الدورات المكتملة</h3>
-                    <div className="space-y-4">
-                      {completedCourses.map(course => (
-                        <Link href={`/courses/${course.id}`} key={course.id} className="block">
-                          <div className="border border-gray-200 rounded-lg hover:shadow-md transition p-4 bg-green-50">
-                            <div className="md:flex items-center">
-                              <div className="relative w-full md:w-32 h-24 md:h-20 mb-4 md:mb-0">
-                                <Image
-                                  src={course.image || '/placeholder-course.png'}
-                                  alt={course.title}
-                                  fill
-                                  className="object-cover rounded-lg"
-                                />
-                              </div>
-                              <div className="md:mr-4 flex-1">
-                                <h4 className="font-bold text-lg">{course.title}</h4>
-                                <p className="text-gray-600 text-sm mb-2">المدرس: {course.instructor}</p>
-                                <div className="w-full bg-gray-200 rounded-full h-2.5 mb-2">
-                                  <div className="bg-green-500 h-2.5 rounded-full" style={{ width: '100%' }}></div>
-                                </div>
-                                <div className="flex justify-between text-sm text-gray-600">
-                                  <span>مكتمل: 100%</span>
-                                  <span>تاريخ الإكمال: {course.completionDate}</span>
-                                </div>
-                              </div>
-                              <div className="md:mr-4 mt-4 md:mt-0">
-                                <button className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition">
-                                  مراجعة الدورة
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        </Link>
-                      ))}
-                    </div>
-                  </>
-                )}
-                
                 {activeCourses.length === 0 && (
                   <div className="text-center py-12">
                     <FaBook className="text-5xl mx-auto text-gray-400 mb-4" />
@@ -433,6 +394,13 @@ export default function ProfilePage() {
                     >
                       استكشف الدورات
                     </Link>
+                  </div>
+                )}
+
+                {authUser?.role === 'student' && (
+                  <div className="mt-10">
+                    <h3 className="text-xl font-semibold mb-4">إنجازاتي في الكورسات</h3>
+                    <CourseAchievements userId={user.id} />
                   </div>
                 )}
               </div>

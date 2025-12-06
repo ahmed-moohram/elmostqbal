@@ -35,6 +35,7 @@ export default function CreateCoursePage() {
   const [targetAudience, setTargetAudience] = useState('');
   const [features, setFeatures] = useState<string[]>(['']);
   const [instructorBio, setInstructorBio] = useState('');
+  const [publishNow, setPublishNow] = useState(true);
 
   // التحقق من صلاحيات المدرس
   useEffect(() => {
@@ -135,13 +136,32 @@ export default function CreateCoursePage() {
 
     const user = JSON.parse(userJson);
 
+    const priceValue = parseFloat(price);
+    const discountValue = discountPrice ? parseFloat(discountPrice) : null;
+
+    if (isNaN(priceValue) || priceValue <= 0) {
+      toast.error('السعر يجب أن يكون أكبر من صفر');
+      return;
+    }
+
+    if (discountValue !== null) {
+      if (isNaN(discountValue) || discountValue <= 0) {
+        toast.error('السعر بعد الخصم يجب أن يكون أكبر من صفر');
+        return;
+      }
+      if (discountValue >= priceValue) {
+        toast.error('السعر بعد الخصم يجب أن يكون أقل من السعر الأصلي');
+        return;
+      }
+    }
+
     const baseData = {
       title,
       description,
       category,
       level,
-      price: parseFloat(price) || 0,
-      discountPrice: discountPrice ? parseFloat(discountPrice) : null,
+      price: priceValue,
+      discountPrice: discountValue,
     };
 
     const courseDataForSupabase = {
@@ -151,7 +171,7 @@ export default function CreateCoursePage() {
       thumbnail: '/placeholder-course.jpg',
       previewVideo: null,
       duration: 0,
-      isPublished: false,
+      isPublished: publishNow,
       isFeatured: false,
     };
 
@@ -528,6 +548,19 @@ export default function CreateCoursePage() {
                       </ul>
                     </div>
                   )}
+
+                  <div className="mt-4 flex items-center gap-3">
+                    <input
+                      id="publishNow"
+                      type="checkbox"
+                      checked={publishNow}
+                      onChange={(e) => setPublishNow(e.target.checked)}
+                      className="w-4 h-4"
+                    />
+                    <label htmlFor="publishNow" className="text-sm text-gray-700 cursor-pointer">
+                      نشر الكورس الآن وجعله ظاهرًا في صفحة الدورات العامة
+                    </label>
+                  </div>
                 </div>
               </motion.div>
             )}

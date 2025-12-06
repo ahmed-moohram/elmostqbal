@@ -133,8 +133,8 @@ export async function GET(request: NextRequest) {
         const { data: userRow } = await supabase
           .from('users')
           .select('id')
-          .eq('phone', studentPhone)
-          .single();
+          .or(`phone.eq.${studentPhone},student_phone.eq.${studentPhone}`)
+          .maybeSingle();
 
         if (userRow) {
           const courseIds = Array.from(
@@ -238,8 +238,10 @@ export async function PATCH(request: NextRequest) {
       const { data: studentData } = await supabase
         .from('users')
         .select('id')
-        .eq('phone', paymentRequest.student_phone)
-        .single();
+        .or(
+          `phone.eq.${paymentRequest.student_phone},student_phone.eq.${paymentRequest.student_phone}`
+        )
+        .maybeSingle();
 
       if (studentData) {
         // التحقق من وجود اشتراك سابق في نظام الدفع الجديد (course_enrollments)

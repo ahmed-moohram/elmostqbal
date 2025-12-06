@@ -8,6 +8,8 @@ import {
   FaUser, FaPhone, FaEnvelope, FaGraduationCap, FaTrophy,
   FaArrowLeft, FaChartLine, FaClock, FaCheckCircle, FaStar
 } from 'react-icons/fa';
+import { supabase } from '@/config/supabase';
+import { achievementsService } from '@/services/achievements.service';
 
 export default function StudentDetailsPage() {
   const params = useParams();
@@ -22,98 +24,102 @@ export default function StudentDetailsPage() {
 
   const fetchStudentDetails = async () => {
     try {
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-      const token = localStorage.getItem('token');
-      
-      const response = await fetch(`${API_URL}/api/users/${studentId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        const studentData = data.user || data;
-        console.log('✅ تم جلب بيانات الطالب من قاعدة البيانات');
-        setStudent(studentData);
-        
-        // جلب إنجازات الطالب
-        const achResponse = await fetch(`${API_URL}/api/users/${studentId}/achievements`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        
-        if (achResponse.ok) {
-          const achData = await achResponse.json();
-          setAchievements(achData.achievements || []);
-        }
-      } else {
-        console.warn('⚠️ لم يتم العثور على الطالب');
+      setLoading(true);
+
+      // جلب بيانات الطالب من جدول users في Supabase
+      const { data: userRow, error: userError } = await supabase
+        .from('users')
+        .select(`
+          id,
+          name,
+          email,
+          phone,
+          student_phone,
+          parent_phone,
+          mother_phone,
+          father_name,
+          school_name,
+          city,
+          grade_level,
+          guardian_job,
+          status,
+          created_at
+        `)
+        .eq('id', studentId)
+        .maybeSingle();
+
+      if (userError || !userRow) {
+        console.warn('⚠️ لم يتم العثور على الطالب في Supabase');
+        setStudent(null);
+        setAchievements([]);
+        return;
       }
+
+      // جلب تقدم الكورسات والإنجازات لكل كورس
+      const courseProgress = await achievementsService.getUserCourseProgress(studentId);
+
+      const courses = (courseProgress || []).map((cp: any) => ({
+        id: cp.course_id,
+        title: cp.course_title,
+        grade: '',
+        progress: cp.progress || 0,
+        lastAccessed: '',
+        timeSpent: 0,
+        completedLessons: cp.completed_lessons || 0,
+        totalLessons: cp.total_lessons || 0,
+      }));
+
+      const totalPoints = (courseProgress || []).reduce(
+        (sum: number, cp: any) => sum + (cp.points_earned || 0),
+        0
+      );
+
+      const mappedStudent = {
+        id: userRow.id,
+        name: userRow.name || 'طالب',
+        grade: userRow.grade_level || '',
+        email: userRow.email || '',
+        phone: userRow.student_phone || (userRow as any).phone || '',
+        parentPhone: userRow.parent_phone || '',
+        motherPhone: (userRow as any).mother_phone || '',
+        fatherName: (userRow as any).father_name || '',
+        schoolName: (userRow as any).school_name || '',
+        city: (userRow as any).city || '',
+        guardianJob: (userRow as any).guardian_job || '',
+        status: (userRow as any).status || 'active',
+        totalPoints,
+        joinDate: userRow.created_at
+          ? new Date(userRow.created_at).toLocaleDateString('ar-EG')
+          : '',
+        isActive: ((userRow as any).status || 'active') === 'active',
+        courses,
+      };
+
+      setStudent(mappedStudent);
+
+      // جلب إنجازات الطالب التفصيلية
+      const userAchievements = await achievementsService.getUserAchievements(studentId);
+
+      const mappedAchievements = (userAchievements || []).map((ua: any) => ({
+        id: ua.id,
+        title: ua.achievement?.title || '',
+        description: ua.achievement?.description || '',
+        courseTitle: ua.course?.title || '',
+        date: ua.earned_at,
+        icon: ua.achievement?.icon || '🏆',
+        points: ua.achievement?.points || 0,
+        earnedAt: ua.earned_at,
+        badge: ua.achievement?.icon || '🏆',
+      }));
+
+      setAchievements(mappedAchievements);
     } catch (error) {
-      console.error('❌ خطأ في جلب بيانات الطالب:', error);
+      console.error('❌ خطأ في جلب بيانات الطالب من Supabase:', error);
+      setStudent(null);
+      setAchievements([]);
     } finally {
       setLoading(false);
     }
-  };
-
-  const mockStudent = {
-    id: 1,
-    name: 'معتصم',
-    grade: 'الصف الأول',
-    email: 'mohammed@example.com',
-    phone: '0123456789',
-    parentPhone: '0123456789',
-    totalPoints: 100,
-    joinDate: '2022-01-01',
-    isActive: true,
-    courses: [
-      {
-        id: 1,
-        title: 'دورة Python',
-        grade: 'A',
-        progress: 50,
-        lastAccessed: '2024-10-04',
-        timeSpent: 3600
-      },
-      {
-        id: 2,
-        title: 'دورة JavaScript',
-        grade: 'B',
-        progress: 30,
-        lastAccessed: '2024-10-04',
-        timeSpent: 1800,
-        badge: '🏆'
-      }
-    ],
-    achievements: [
-      {
-        id: 1,
-        type: 'course_completed',
-        title: 'أول دورة',
-        description: 'أكمل أول دورة',
-        courseTitle: 'دورة Python للمبتدئين',
-        date: '2024-09-15',
-        icon: '🎓'
-      },
-      {
-        id: 2,
-        type: 'streak',
-        title: 'أسبوع متواصل',
-        description: 'تعلم لمدة 7 أيام متواصلة',
-        date: '2024-09-20',
-        icon: '🔥'
-      },
-      {
-        id: 3,
-        type: 'milestone_reached',
-        title: 'وصل لـ 50%',
-        description: 'أتم 50% من دورة Python',
-        courseTitle: 'دورة Python للمبتدئين',
-        date: '2024-09-25',
-        icon: '🏆'
-      }
-    ]
   };
 
   if (loading) {
@@ -226,7 +232,15 @@ export default function StudentDetailsPage() {
                   <div>
                     <p className="text-gray-600 text-sm">متوسط التقدم</p>
                     <p className="text-3xl font-bold text-purple-600">
-                      {Math.round(student.courses.reduce((sum: number, c: any) => sum + c.progress, 0) / student.courses.length)}%
+                      {student.courses.length > 0
+                        ? Math.round(
+                            student.courses.reduce(
+                              (sum: number, c: any) => sum + c.progress,
+                              0
+                            ) / student.courses.length
+                          )
+                        : 0}
+                      %
                     </p>
                   </div>
                   <FaChartLine className="text-5xl text-purple-600 opacity-20" />
@@ -256,11 +270,27 @@ export default function StudentDetailsPage() {
                 </div>
                 <div>
                   <p className="text-gray-600 text-sm">الحالة</p>
-                  <span className={`px-3 py-1 rounded text-sm font-medium ${
-                    student.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                  }`}>
+                  <span
+                    className={`px-3 py-1 rounded text-sm font-medium ${
+                      student.isActive
+                        ? 'bg-green-100 text-green-800'
+                        : 'bg-gray-100 text-gray-800'
+                    }`}
+                  >
                     {student.isActive ? 'نشط' : 'غير نشط'}
                   </span>
+                </div>
+                <div>
+                  <p className="text-gray-600 text-sm">المدرسة</p>
+                  <p className="font-medium">{student.schoolName || 'غير محددة'}</p>
+                </div>
+                <div>
+                  <p className="text-gray-600 text-sm">المدينة</p>
+                  <p className="font-medium">{student.city || 'غير محددة'}</p>
+                </div>
+                <div>
+                  <p className="text-gray-600 text-sm">وظيفة ولي الأمر</p>
+                  <p className="font-medium">{student.guardianJob || 'غير محددة'}</p>
                 </div>
               </div>
             </div>

@@ -284,6 +284,69 @@ export default function TeacherDashboardById() {
     toast.success('جاري فتح نافذة رفع الفيديو...');
   };
 
+  const handleToggleCoursePublish = async (courseId: string, currentStatus: 'published' | 'draft') => {
+    try {
+      const nextPublished = currentStatus !== 'published';
+      const form = new FormData();
+      form.append('isPublished', String(nextPublished));
+
+      const res = await fetch(`/api/courses/${courseId}`, {
+        method: 'PUT',
+        body: form,
+      });
+
+      const json = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        console.error('❌ خطأ في تحديث حالة نشر الكورس عبر API:', json);
+        toast.error('فشل تغيير حالة نشر الكورس');
+        return;
+      }
+
+      setCourses((prev) =>
+        prev.map((c) =>
+          c.id === courseId ? { ...c, status: nextPublished ? 'published' : 'draft' } : c,
+        ),
+      );
+
+      toast.success(nextPublished ? 'تم نشر الكورس بنجاح' : 'تم إلغاء نشر الكورس');
+    } catch (error) {
+      console.error('❌ خطأ غير متوقع أثناء تغيير حالة نشر الكورس:', error);
+      toast.error('حدث خطأ أثناء تغيير حالة نشر الكورس');
+    }
+  };
+
+  const handleDeleteCourse = async (courseId: string) => {
+    if (
+      !window.confirm(
+        'هل أنت متأكد من حذف هذا الكورس؟ سيتم حذف جميع دروسه وتسجيلات الطلاب المرتبطة به.',
+      )
+    ) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/courses/${courseId}`, {
+        method: 'DELETE',
+      });
+
+      const json = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        console.error('❌ خطأ في حذف الكورس عبر API:', json);
+        toast.error('فشل حذف الكورس');
+        return;
+      }
+
+      setCourses((prev) => prev.filter((c) => c.id !== courseId));
+
+      toast.success('تم حذف الكورس بنجاح');
+    } catch (error) {
+      console.error('❌ خطأ غير متوقع أثناء حذف الكورس:', error);
+      toast.error('حدث خطأ أثناء حذف الكورس');
+    }
+  };
+
   const handleOpenChat = (studentId: string, studentName: string) => {
     toast.success(`فتح محادثة مع ${studentName}...`);
     router.push(`/messages?user=${studentId}`);
@@ -496,11 +559,47 @@ export default function TeacherDashboardById() {
                       </span>
                     </div>
                     <div className="flex gap-2">
-                      <button className="flex-1 bg-primary text-white py-2 rounded-lg flex items-center justify-center gap-1 hover:bg-primary-dark transition">
+                      <button
+                        type="button"
+                        onClick={() => router.push(`/courses/${course.id}`)}
+                        className="flex-1 bg-primary text-white py-2 rounded-lg flex items-center justify-center gap-1 hover:bg-primary-dark transition"
+                      >
                         <FaEye /> عرض
                       </button>
-                      <button className="flex-1 bg-gray-100 text-gray-700 py-2 rounded-lg flex items-center justify-center gap-1 hover:bg-gray-200 transition">
+                      <button
+                        type="button"
+                        onClick={() => router.push(`/teacher/courses/${course.id}/edit`)}
+                        className="flex-1 bg-gray-100 text-gray-700 py-2 rounded-lg flex items-center justify-center gap-1 hover:bg-gray-200 transition"
+                      >
                         <FaEdit /> تعديل
+                      </button>
+                    </div>
+                    <div className="mt-3 flex items-center justify-between text-xs">
+                      <button
+                        type="button"
+                        onClick={() => handleToggleCoursePublish(course.id, course.status)}
+                        className={`px-3 py-1 rounded-full border transition flex items-center gap-1 ${
+                          course.status === 'published'
+                            ? 'border-yellow-300 bg-yellow-50 text-yellow-700 hover:bg-yellow-100'
+                            : 'border-green-300 bg-green-50 text-green-700 hover:bg-green-100'
+                        }`}
+                      >
+                        {course.status === 'published' ? (
+                          <>
+                            <FaClock /> إلغاء نشر الكورس
+                          </>
+                        ) : (
+                          <>
+                            <FaCheckCircle /> نشر الكورس
+                          </>
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteCourse(course.id)}
+                        className="text-red-600 hover:text-red-800"
+                      >
+                        حذف الكورس
                       </button>
                     </div>
                   </div>

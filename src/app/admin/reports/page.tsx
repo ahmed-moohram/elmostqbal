@@ -38,10 +38,10 @@ export default function ReportsPage() {
           .gte('created_at', fromIso)
           .lte('created_at', toIso),
         supabase
-          .from('payments')
-          .select('id, amount, status, course_id, payment_date')
-          .gte('payment_date', fromIso)
-          .lte('payment_date', toIso),
+          .from('payment_requests')
+          .select('id, amount_paid, course_price, status, course_id, approved_at, created_at')
+          .gte('created_at', fromIso)
+          .lte('created_at', toIso),
         supabase
           .from('enrollments')
           .select('id, course_id, enrolled_at')
@@ -63,14 +63,16 @@ export default function ReportsPage() {
       const safePayments = (paymentsData || []) as any[];
       const safeEnrollments = (enrollmentsData || []) as any[];
 
-      const successfulPayments = safePayments.filter((p: any) =>
-        ['success', 'completed', 'paid'].includes(String(p.status || '').toLowerCase())
-      );
+      const successfulPayments = safePayments.filter((p: any) => {
+        const status = String(p.status || '').toLowerCase();
+        return ['approved', 'success', 'completed', 'paid'].includes(status);
+      });
 
       const newRegistrations = safeStudents.length;
 
       const revenue = successfulPayments.reduce(
-        (sum: number, p: any) => sum + (Number(p.amount) || 0),
+        (sum: number, p: any) =>
+          sum + (Number(p.amount_paid ?? p.course_price ?? 0) || 0),
         0
       );
 
@@ -123,8 +125,9 @@ export default function ReportsPage() {
       });
 
       successfulPayments.forEach((p: any) => {
-        addDayEntry(p.payment_date, (entry) => {
-          entry.revenue += Number(p.amount) || 0;
+        const paymentDate = p.approved_at || p.created_at;
+        addDayEntry(paymentDate, (entry) => {
+          entry.revenue += Number(p.amount_paid ?? p.course_price ?? 0) || 0;
           if (p.course_id) {
             entry.courses.add(String(p.course_id));
           }
@@ -160,7 +163,7 @@ export default function ReportsPage() {
           revenue: 0,
           sales: 0,
         };
-        current.revenue += Number(p.amount) || 0;
+        current.revenue += Number(p.amount_paid ?? p.course_price ?? 0) || 0;
         current.sales += 1;
         courseRevenueMap.set(courseId, current);
       });

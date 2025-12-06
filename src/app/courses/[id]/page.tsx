@@ -906,50 +906,50 @@ ${randomMsg}`);
             <div 
               className="absolute inset-0 z-30 pointer-events-none"
               style={{ 
-                background: 'repeating-linear-gradient(45deg, transparent, transparent 35px, rgba(255,255,255,.01) 35px, rgba(255,255,255,.01) 70px)' 
+                background: 'repeating-linear-gradient(45deg, transparent, transparent 35px, rgba(255,255,255,.03) 35px, rgba(255,255,255,.03) 70px)' 
               }}
             />
             
             {/* العلامة المائية - أعلى يسار */}
             {(
               <>
-                <div className="absolute top-4 left-4 text-white/30 text-xs font-bold z-40 select-none pointer-events-none animate-pulse">
+                <div className="absolute top-4 left-4 text-white/80 text-sm font-bold z-40 select-none pointer-events-none animate-pulse">
                   <div>{studentInfo?.name || 'مستخدم'}</div>
                   <div>{studentInfo?.phone || userIP}</div>
-                  <div className="text-[10px]">{new Date().toLocaleString('ar-EG')}</div>
+                  <div className="text-[11px]">{new Date().toLocaleString('ar-EG')}</div>
                 </div>
                 
                 {/* العلامة المائية - أعلى يمين */}
-                <div className="absolute top-4 right-4 text-white/30 text-xs font-bold z-40 select-none pointer-events-none">
-                  <div className="text-right text-red-400/50">⚠️ محمي</div>
+                <div className="absolute top-4 right-4 text-white/80 text-sm font-bold z-40 select-none pointer-events-none">
+                  <div className="text-right text-red-400/80">⚠️ محمي</div>
                   <div className="text-right">{studentInfo?.name || 'مستخدم'}</div>
                   <div className="text-right">{studentInfo?.phone || userIP}</div>
                 </div>
                 
                 {/* العلامة المائية - أسفل يسار */}
-                <div className="absolute bottom-4 left-4 text-white/30 text-xs font-bold z-40 select-none pointer-events-none">
-                  <div className="text-yellow-400/50">🔒 محتوى محمي</div>
+                <div className="absolute bottom-4 left-4 text-white/80 text-sm font-bold z-40 select-none pointer-events-none">
+                  <div className="text-yellow-400/80">🔒 محتوى محمي</div>
                   <div>{studentInfo?.name || 'مستخدم'}</div>
                   <div>{studentInfo?.phone || userIP}</div>
                 </div>
                 
                 {/* العلامة المائية - أسفل يمين */}
-                <div className="absolute bottom-4 right-4 text-white/30 text-xs font-bold z-40 select-none pointer-events-none animate-pulse">
+                <div className="absolute bottom-4 right-4 text-white/80 text-sm font-bold z-40 select-none pointer-events-none animate-pulse">
                   <div className="text-right">Course ID: {courseId?.substring(0, 8)}</div>
                   <div className="text-right">{studentInfo?.name || 'مستخدم'}</div>
                   <div className="text-right">{studentInfo?.phone || userIP}</div>
                 </div>
                 
                 {/* العلامة المائية - المنتصف (مائلة) */}
-                <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-white/15 text-3xl font-bold rotate-[-30deg] z-40 select-none pointer-events-none whitespace-nowrap">
+                <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-white/40 text-4xl font-bold rotate-[-30deg] z-40 select-none pointer-events-none whitespace-nowrap drop-shadow-md">
                   {studentInfo?.name || 'محتوى محمي'} • {studentInfo?.phone || userIP}
                 </div>
                 
                 {/* علامات مائية إضافية متحركة */}
-                <div className="absolute top-1/3 left-1/4 text-white/10 text-lg font-bold rotate-[45deg] z-40 select-none pointer-events-none animate-pulse">
+                <div className="absolute top-1/3 left-1/4 text-white/40 text-xl font-bold rotate-[45deg] z-40 select-none pointer-events-none animate-pulse">
                   🔐 PROTECTED
                 </div>
-                <div className="absolute bottom-1/3 right-1/4 text-white/10 text-lg font-bold rotate-[-45deg] z-40 select-none pointer-events-none animate-pulse">
+                <div className="absolute bottom-1/3 right-1/4 text-white/40 text-xl font-bold rotate-[-45deg] z-40 select-none pointer-events-none animate-pulse">
                   © {new Date().getFullYear()}
                 </div>
               </>
@@ -966,14 +966,61 @@ ${randomMsg}`);
               console.log('🔗 رابط الفيديو:', selectedLesson?.videoUrl);
               
               if (selectedLesson?.videoUrl) {
+                const url = selectedLesson.videoUrl;
+
+                // محاولة دعم روابط Google Drive
+                try {
+                  if (url.includes('drive.google.com')) {
+                    const parsed = new URL(url);
+                    let fileId = '';
+
+                    const pathParts = parsed.pathname.split('/').filter(Boolean);
+                    const dIndex = pathParts.indexOf('d');
+                    if (dIndex !== -1 && pathParts[dIndex + 1]) {
+                      fileId = pathParts[dIndex + 1];
+                    }
+
+                    if (!fileId) {
+                      const idParam = parsed.searchParams.get('id');
+                      if (idParam) {
+                        fileId = idParam;
+                      }
+                    }
+
+                    if (fileId) {
+                      const driveUrl = `https://drive.google.com/file/d/${fileId}/preview`;
+                      return (
+                        <>
+                          <iframe
+                            width="100%"
+                            height="100%"
+                            src={driveUrl}
+                            title={selectedLesson.title}
+                            frameBorder="0"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope"
+                            allowFullScreen={false}
+                            className="absolute inset-0 w-full h-full pointer-events-auto"
+                            style={{ zIndex: 1 }}
+                          />
+                          <div 
+                            className="absolute inset-0 z-10" 
+                            style={{ pointerEvents: 'none', background: 'transparent' }}
+                            onContextMenu={(e) => e.preventDefault()}
+                          />
+                        </>
+                      );
+                    }
+                  }
+                } catch (e) {}
+
                 // استخراج معرف فيديو YouTube من الرابط
-                const getYouTubeId = (url: string) => {
+                const getYouTubeId = (innerUrl: string) => {
                   const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
-                  const match = url.match(regex);
+                  const match = innerUrl.match(regex);
                   return match ? match[1] : null;
                 };
                 
-                const videoId = getYouTubeId(selectedLesson.videoUrl);
+                const videoId = getYouTubeId(url);
                 console.log('📺 معرف فيديو YouTube:', videoId);
                 
                 if (videoId) {

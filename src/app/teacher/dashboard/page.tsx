@@ -51,6 +51,8 @@ interface Student {
   progress: number;
   lastActive: string;
   courseName: string;
+  enrolledAtRaw?: string | null;
+  lastActiveAt?: string | null;
 }
 
 interface StudentDetailsState {
@@ -79,6 +81,17 @@ export default function TeacherDashboard() {
   const [activeTab, setActiveTab] = useState('overview');
   const [courses, setCourses] = useState<Course[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
+  const latestActivities = students
+    .slice()
+    .filter((s) => s.lastActiveAt || s.enrolledAtRaw)
+    .sort((a, b) => {
+      const aDate = a.lastActiveAt || a.enrolledAtRaw || '';
+      const bDate = b.lastActiveAt || b.enrolledAtRaw || '';
+      const aTime = aDate ? new Date(aDate).getTime() : 0;
+      const bTime = bDate ? new Date(bDate).getTime() : 0;
+      return bTime - aTime;
+    })
+    .slice(0, 5);
   const [messages, setMessages] = useState<Message[]>([]);
   const [stats, setStats] = useState({
     totalRevenue: 0,
@@ -282,6 +295,8 @@ export default function TeacherDashboard() {
                 ? new Date(enr.last_accessed).toLocaleString('ar-EG')
                 : 'غير معروف',
               courseName: courseTitle,
+              enrolledAtRaw: enr.enrolled_at ?? null,
+              lastActiveAt: enr.last_accessed ?? null,
             };
           });
 
@@ -577,7 +592,7 @@ export default function TeacherDashboard() {
           {/* زر إضافة كورس */}
           {activeTab === 'courses' && (
             <Link
-              href="/teacher/courses/new"
+              href="/teachers/courses/create"
               className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white font-medium rounded-lg hover:from-purple-700 hover:to-blue-700 transition"
             >
               <FaPlus />
@@ -654,35 +669,54 @@ export default function TeacherDashboard() {
             <div className="bg-white rounded-xl shadow-lg p-6">
               <h2 className="text-xl font-bold mb-4">آخر النشاطات</h2>
               <div className="space-y-4">
-                <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
-                  <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-                    <FaCheckCircle className="text-green-600" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-medium">أحمد محمد أكمل درس "المتغيرات في JavaScript"</p>
-                    <p className="text-sm text-gray-500">منذ 15 دقيقة</p>
-                  </div>
-                </div>
+                {latestActivities.length === 0 ? (
+                  <p className="text-sm text-gray-500">
+                    لا توجد نشاطات حديثة حتى الآن. سيظهر هنا آخر تفاعل لطلابك مع الكورسات.
+                  </p>
+                ) : (
+                  latestActivities.map((s) => {
+                    const hasProgress = (s.progress ?? 0) > 0 && s.lastActiveAt;
+                    const dateSource = s.lastActiveAt || s.enrolledAtRaw || '';
+                    const formattedDate = dateSource
+                      ? new Date(dateSource).toLocaleString('ar-EG')
+                      : '';
 
-                <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
-                  <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                    <FaUsers className="text-blue-600" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-medium">3 طلاب جدد انضموا لكورس React.js</p>
-                    <p className="text-sm text-gray-500">منذ ساعة</p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
-                  <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
-                    <FaComments className="text-purple-600" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-medium">لديك 2 رسائل جديدة من الطلاب</p>
-                    <p className="text-sm text-gray-500">منذ ساعتين</p>
-                  </div>
-                </div>
+                    return (
+                      <div
+                        key={`${s.id}-${s.courseId}`}
+                        className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg"
+                      >
+                        <div
+                          className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                            hasProgress ? 'bg-green-100' : 'bg-blue-100'
+                          }`}
+                        >
+                          {hasProgress ? (
+                            <FaCheckCircle className="text-green-600" />
+                          ) : (
+                            <FaUsers className="text-blue-600" />
+                          )}
+                        </div>
+                        <div className="flex-1">
+                          <p className="font-medium">
+                            {hasProgress ? (
+                              <>
+                                {s.name} تقدم إلى نسبة {s.progress}% في كورس {s.courseName}
+                              </>
+                            ) : (
+                              <>
+                                {s.name} انضم إلى كورس {s.courseName}
+                              </>
+                            )}
+                          </p>
+                          {formattedDate && (
+                            <p className="text-sm text-gray-500">{formattedDate}</p>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
               </div>
             </div>
           </div>
@@ -751,9 +785,12 @@ export default function TeacherDashboard() {
                       <FaVideo />
                       الدروس
                     </Link>
-                    <button className="px-3 py-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition">
+                    <Link
+                      href={`/courses/${course.id}`}
+                      className="px-3 py-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition flex items-center justify-center"
+                    >
                       <FaEye />
-                    </button>
+                    </Link>
                   </div>
                 </div>
               </div>

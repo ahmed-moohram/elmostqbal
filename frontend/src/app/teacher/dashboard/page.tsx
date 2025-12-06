@@ -286,6 +286,100 @@ export default function TeacherDashboard() {
           });
 
           setStudents(mappedStudents);
+
+          const activeStudents = mappedStudents.length;
+
+          try {
+            let totalRevenue = 0;
+            let monthlyRevenue = 0;
+
+            if (mappedCourses.length > 0) {
+              const now = new Date();
+              const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+              const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+
+              const { data: paymentsData, error: paymentsError } = await supabase
+                .from('payments')
+                .select('amount, status, payment_date, course_id')
+                .in('course_id', mappedCourses.map((c) => c.id));
+
+              if (paymentsError) {
+                console.error('Error loading payments for teacher:', paymentsError);
+              } else if (paymentsData) {
+                const successfulPayments = (paymentsData as any[]).filter((p) =>
+                  ['success', 'completed', 'paid'].includes(
+                    String(p.status || '').toLowerCase()
+                  )
+                );
+
+                totalRevenue = successfulPayments.reduce(
+                  (sum: number, p: any) => sum + (Number(p.amount) || 0),
+                  0
+                );
+
+                monthlyRevenue = successfulPayments.reduce((sum: number, p: any) => {
+                  if (!p.payment_date) return sum;
+                  const pd = new Date(p.payment_date);
+                  return pd >= monthStart && pd < monthEnd
+                    ? sum + (Number(p.amount) || 0)
+                    : sum;
+                }, 0);
+              }
+            }
+
+            setStats((prev) => ({
+              ...prev,
+              activeStudents,
+              totalRevenue,
+              monthlyRevenue,
+            }));
+          } catch (paymentsError) {
+            console.error(
+              'Unexpected error while loading payments for teacher dashboard:',
+              paymentsError
+            );
+          }
+
+          try {
+            if (typeof window !== 'undefined') {
+              const token = localStorage.getItem('token');
+              if (token) {
+                const res = await fetch('/api/messages/conversations', {
+                  headers: {
+                    Authorization: `Bearer ${token}`,
+                  },
+                });
+
+                if (res.ok) {
+                  const data = await res.json();
+                  const conversations = (data?.data || data?.conversations || []) as any[];
+
+                  const mappedMessages: Message[] = conversations
+                    .slice(0, 5)
+                    .map((conv: any) => ({
+                      id: String(conv._id || conv.id),
+                      studentName: conv.user?.name || 'مستخدم',
+                      studentAvatar: conv.user?.avatar || '/default-avatar.png',
+                      content: conv.lastMessage?.content || '',
+                      time: conv.lastMessage?.createdAt
+                        ? new Date(conv.lastMessage.createdAt).toLocaleString('ar-EG', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            day: '2-digit',
+                            month: 'short',
+                          })
+                        : '',
+                      isRead: (conv.unreadCount ?? 0) === 0,
+                      courseTitle: conv.courseTitle || 'محادثة',
+                    }));
+
+                  setMessages(mappedMessages);
+                }
+              }
+            }
+          } catch (messagesError) {
+            console.error('Error loading teacher messages:', messagesError);
+          }
         } else {
           setStudents([]);
         }
@@ -595,7 +689,7 @@ export default function TeacherDashboard() {
                 <div className="flex items-center justify-between mb-4">
                   <FaDollarSign className="text-3xl text-green-500" />
                   <span className="text-xs text-green-600 bg-green-100 px-2 py-1 rounded">
-                    +12% هذا الشهر
+                    {stats.monthlyRevenue.toLocaleString()} ج.م هذا الشهر
                   </span>
                 </div>
                 <h3 className="text-2xl font-bold">{stats.totalRevenue.toLocaleString()} ج.م</h3>

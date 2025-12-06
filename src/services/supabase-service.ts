@@ -104,11 +104,35 @@ export const getCourseById = async (courseId: string) => {
 
 export const createCourse = async (courseData: any) => {
   try {
+    const title = courseData.title || 'دورة بدون عنوان';
+
+    let baseSlug = (courseData.slug || title)
+      .toString()
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, '-')
+      .replace(/[^a-z0-9\-ء-ي]+/g, '');
+
+    if (!baseSlug) {
+      baseSlug = `course-${Date.now()}`;
+    }
+
+    const slug = `${baseSlug}-${Math.random().toString(36).substring(2, 8)}`;
+
+    const shortDescription =
+      (courseData as any).short_description ??
+      (courseData as any).shortDescription ??
+      (courseData.description || '').slice(0, 200);
+
+    const isPublished = !!courseData.isPublished;
+
     const { data, error } = await supabase
       .from('courses')
       .insert({
         title: courseData.title,
+        slug,
         description: courseData.description,
+        short_description: shortDescription,
         instructor_id: courseData.instructorId,
         price: courseData.price,
         discount_price: courseData.discountPrice,
@@ -117,7 +141,9 @@ export const createCourse = async (courseData: any) => {
         category: courseData.category,
         level: courseData.level,
         duration_hours: courseData.duration,
-        is_published: courseData.isPublished || false,
+        status: isPublished ? 'published' : 'draft',
+        is_active: isPublished ? true : false,
+        is_published: isPublished,
         is_featured: courseData.isFeatured || false
       })
       .select()
@@ -133,25 +159,47 @@ export const createCourse = async (courseData: any) => {
 
 export const updateCourse = async (courseId: string, updates: any) => {
   try {
-    const { data, error } = await supabase
-      .from('courses')
-      .update({
-        title: updates.title,
-        description: updates.description,
-        price: updates.price,
-        discount_price: updates.discountPrice,
-        thumbnail: updates.thumbnail,
-        category: updates.category,
-        level: updates.level,
-        duration_hours: updates.duration,
-        is_published: updates.isPublished,
-        is_featured: updates.isFeatured
-      })
-      .eq('id', courseId)
-      .select()
-      .single();
-    
-    if (error) throw error;
+    const form = new FormData();
+
+    if (updates.title != null) form.append('title', String(updates.title));
+    if (updates.description != null) form.append('description', String(updates.description));
+    if (updates.price != null) form.append('price', String(updates.price));
+    if (updates.discountPrice != null) form.append('discountPrice', String(updates.discountPrice));
+    if (updates.category != null) form.append('category', String(updates.category));
+    if (updates.level != null) form.append('level', String(updates.level));
+
+    // حالة النشر والدفع
+    if (typeof updates.isPublished === 'boolean') {
+      form.append('isPublished', String(updates.isPublished));
+    }
+    if (typeof updates.isPaid === 'boolean') {
+      form.append('isPaid', String(updates.isPaid));
+    }
+    if (typeof updates.isFeatured === 'boolean') {
+      form.append('isFeatured', String(updates.isFeatured));
+    }
+
+    // حقول إضافية تستخدمها بعض الصفحات مثل صورة الكورس والمدة
+    if (updates.thumbnail != null) form.append('thumbnail', String(updates.thumbnail));
+    if (updates.duration != null) form.append('duration', String(updates.duration));
+
+    const res = await fetch(`/api/courses/${courseId}`, {
+      method: 'PUT',
+      body: form,
+    });
+
+    if (!res.ok) {
+      let errBody: any = null;
+      try {
+        errBody = await res.json();
+      } catch {
+        // ignore json parse error
+      }
+      console.error('Error updating course via /api/courses:', res.status, errBody);
+      return { success: false, error: errBody?.error || `Request failed with status ${res.status}` };
+    }
+
+    const data = await res.json();
     return { success: true, data };
   } catch (error) {
     console.error('Error updating course:', error);

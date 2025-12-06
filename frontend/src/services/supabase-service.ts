@@ -104,11 +104,35 @@ export const getCourseById = async (courseId: string) => {
 
 export const createCourse = async (courseData: any) => {
   try {
+    const title = courseData.title || 'دورة بدون عنوان';
+
+    let baseSlug = (courseData.slug || title)
+      .toString()
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, '-')
+      .replace(/[^a-z0-9\-ء-ي]+/g, '');
+
+    if (!baseSlug) {
+      baseSlug = `course-${Date.now()}`;
+    }
+
+    const slug = `${baseSlug}-${Math.random().toString(36).substring(2, 8)}`;
+
+    const shortDescription =
+      (courseData as any).short_description ??
+      (courseData as any).shortDescription ??
+      (courseData.description || '').slice(0, 200);
+
+    const isPublished = !!courseData.isPublished;
+
     const { data, error } = await supabase
       .from('courses')
       .insert({
         title: courseData.title,
+        slug,
         description: courseData.description,
+        short_description: shortDescription,
         instructor_id: courseData.instructorId,
         price: courseData.price,
         discount_price: courseData.discountPrice,
@@ -117,7 +141,9 @@ export const createCourse = async (courseData: any) => {
         category: courseData.category,
         level: courseData.level,
         duration_hours: courseData.duration,
-        is_published: courseData.isPublished || false,
+        status: isPublished ? 'published' : 'draft',
+        is_active: isPublished ? true : false,
+        is_published: isPublished,
         is_featured: courseData.isFeatured || false
       })
       .select()

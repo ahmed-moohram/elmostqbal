@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import AdminLayout from '@/components/AdminLayout';
 import { FaUsers, FaSearch, FaUserGraduate, FaChalkboardTeacher, FaCog } from 'react-icons/fa';
+import supabase from '@/lib/supabase-client';
 
 export default function UsersPage() {
   const [users, setUsers] = useState<any[]>([]);
@@ -16,25 +17,27 @@ export default function UsersPage() {
 
   const fetchUsers = async () => {
     try {
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-      const token = localStorage.getItem('token');
-      
-      const response = await fetch(`${API_URL}/api/users`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        const usersData = data.users || data || [];
-        console.log(`✅ تم جلب ${usersData.length} مستخدم من قاعدة البيانات`);
-        setUsers(usersData);
-      } else {
-        console.warn('⚠️ لا يوجد مستخدمون');
+      const { data, error } = await supabase
+        .from('users')
+        .select('id, name, email, role, status, created_at')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('❌ خطأ في جلب المستخدمين من Supabase:', error);
         setUsers([]);
+        return;
       }
+
+      const mappedUsers = (data || []).map((user: any) => ({
+        ...user,
+        status: user.status || 'active',
+        joinDate: user.created_at
+          ? new Date(user.created_at).toLocaleDateString('ar-EG')
+          : ''
+      }));
+
+      console.log(`✅ تم جلب ${mappedUsers.length} مستخدم من Supabase`);
+      setUsers(mappedUsers);
     } catch (error) {
       console.error('❌ خطأ في جلب المستخدمين:', error);
       setUsers([]);

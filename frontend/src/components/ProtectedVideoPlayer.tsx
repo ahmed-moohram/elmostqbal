@@ -207,7 +207,7 @@ export default function ProtectedVideoPlayer({
     };
 
     return (
-      <div className="w-full aspect-video bg-black rounded-xl overflow-hidden">
+      <div className="w-full aspect-video bg-black rounded-xl overflow-hidden relative">
         <iframe
           src={getEmbeddedUrl()}
           title="Course Video"
@@ -215,6 +215,7 @@ export default function ProtectedVideoPlayer({
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope"
           allowFullScreen={false}
         />
+        <div className="absolute top-0 right-0 w-16 h-16 bg-black/40 pointer-events-auto z-10" />
       </div>
     );
   }
