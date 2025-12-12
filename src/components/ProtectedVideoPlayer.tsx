@@ -13,6 +13,8 @@ interface ProtectedVideoPlayerProps {
   videoUrl: string;
   isEnrolled: boolean;
   onEnroll?: () => void;
+  lessonId?: string;
+  useAccessCode?: boolean;
 }
 
 export default function ProtectedVideoPlayer({
@@ -23,7 +25,9 @@ export default function ProtectedVideoPlayer({
   teacherPhone,
   videoUrl,
   isEnrolled,
-  onEnroll
+  onEnroll,
+  lessonId,
+  useAccessCode = false,
 }: ProtectedVideoPlayerProps) {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [studentName, setStudentName] = useState('');
@@ -32,6 +36,13 @@ export default function ProtectedVideoPlayer({
   const [actualCourseName, setActualCourseName] = useState(courseName);
   const [actualCoursePrice, setActualCoursePrice] = useState(coursePrice);
   const [actualTeacherPhone, setActualTeacherPhone] = useState(teacherPhone);
+  const [unlockedLessons, setUnlockedLessons] = useState<string[]>([]);
+  const [codeInput, setCodeInput] = useState('');
+  const [codeError, setCodeError] = useState<string | null>(null);
+  const [isVerifyingCode, setIsVerifyingCode] = useState(false);
+  const [lessonHasCode, setLessonHasCode] = useState(false);
+  const [lessonIsFreeOrPreview, setLessonIsFreeOrPreview] = useState(false);
+  const [metaLoaded, setMetaLoaded] = useState(false);
   
   // رقم فودافون كاش للمدرس
   const vodafoneCashNumber = actualTeacherPhone || teacherPhone || '01012345678';
@@ -63,6 +74,99 @@ export default function ProtectedVideoPlayer({
       }
     }
   }, [courseName, coursePrice, teacherPhone]);
+
+  useEffect(() => {
+    if (!courseId) return;
+    try {
+      const raw = localStorage.getItem(`lesson_unlocks_${courseId}`);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          setUnlockedLessons(parsed.map((id: any) => String(id)));
+        }
+      }
+    } catch (e) {
+      console.error('Error loading unlocked lessons from localStorage in ProtectedVideoPlayer:', e);
+    }
+  }, [courseId]);
+
+  useEffect(() => {
+    if (!lessonId || !useAccessCode) {
+      setLessonHasCode(false);
+      setLessonIsFreeOrPreview(false);
+      setMetaLoaded(false);
+      return;
+    }
+
+    const fetchMeta = async () => {
+      try {
+        const res = await fetch(`/api/lessons/${lessonId}`);
+        if (!res.ok) {
+          setMetaLoaded(true);
+          return;
+        }
+        const data = await res.json();
+        setLessonHasCode(!!data.hasCode);
+        setLessonIsFreeOrPreview(!!data.isFree || !!data.isPreview);
+        setMetaLoaded(true);
+      } catch (err) {
+        console.error('Error loading lesson meta in ProtectedVideoPlayer:', err);
+        setMetaLoaded(true);
+      }
+    };
+
+    fetchMeta();
+  }, [lessonId, useAccessCode]);
+
+  const handleVerifyCode = async () => {
+    if (!lessonId || !courseId) return;
+
+    if (!codeInput.trim()) {
+      setCodeError('يرجى إدخال الكود');
+      return;
+    }
+
+    setIsVerifyingCode(true);
+    setCodeError(null);
+
+    try {
+      const res = await fetch(`/api/lessons/${lessonId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ code: codeInput.trim(), courseId }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (res.ok && data.success) {
+        setUnlockedLessons((prev) => {
+          if (prev.includes(lessonId)) return prev;
+          const updated = [...prev, lessonId];
+          try {
+            localStorage.setItem(
+              `lesson_unlocks_${courseId}`,
+              JSON.stringify(updated),
+            );
+          } catch (e) {
+            console.error('Error saving unlocked lessons to localStorage in ProtectedVideoPlayer:', e);
+          }
+          return updated;
+        });
+        setCodeInput('');
+        setCodeError(null);
+        toast.success('تم تفعيل الكود وفتح الفيديو');
+      } else {
+        setCodeError(data?.error || 'الكود غير صحيح');
+      }
+    } catch (err) {
+      console.error('Error verifying lesson code in ProtectedVideoPlayer:', err);
+      setCodeError('حدث خطأ أثناء التحقق من الكود');
+    } finally {
+      setIsVerifyingCode(false);
+    }
+  };
 
   const handleCopyNumber = () => {
     navigator.clipboard.writeText(vodafoneCashNumber);
@@ -170,28 +274,24 @@ export default function ProtectedVideoPlayer({
     }
   };
 
-  if (isEnrolled) {
+  const renderVideoPlayer = () => {
     const isDriveVideo = !!videoUrl && videoUrl.includes('drive.google.com');
-    // عرض الفيديو للمشتركين مع تشديد بسيط للحماية حول YouTube وروابط Google Drive
     const getEmbeddedUrl = () => {
       const url = videoUrl;
       if (!url) return '';
 
       try {
-        // دعم روابط Google Drive (file / open / uc)
         if (url.includes('drive.google.com')) {
           try {
             const parsed = new URL(url);
             let fileId = '';
 
-            // شكل: https://drive.google.com/file/d/FILE_ID/...
             const pathParts = parsed.pathname.split('/').filter(Boolean);
             const dIndex = pathParts.indexOf('d');
             if (dIndex !== -1 && pathParts[dIndex + 1]) {
               fileId = pathParts[dIndex + 1];
             }
 
-            // شكل: /open?id=FILE_ID أو /uc?export=download&id=FILE_ID
             if (!fileId) {
               const idParam = parsed.searchParams.get('id');
               if (idParam) {
@@ -205,7 +305,6 @@ export default function ProtectedVideoPlayer({
           } catch (e) {}
         }
 
-        // روابط YouTube العادية
         if (url.includes('youtube.com/watch')) {
           const urlObj = new URL(url);
           const v = urlObj.searchParams.get('v');
@@ -214,7 +313,6 @@ export default function ProtectedVideoPlayer({
           }
         }
 
-        // روابط youtu.be القصيرة
         if (url.includes('youtu.be/')) {
           const id = url.split('youtu.be/')[1]?.split(/[?&]/)[0];
           if (id) {
@@ -222,7 +320,6 @@ export default function ProtectedVideoPlayer({
           }
         }
 
-        // إذا كان الرابط embed بالفعل نضيف له البارامترات
         if (url.includes('youtube.com/embed/')) {
           const hasQuery = url.includes('?');
           const base = hasQuery ? url.split('?')[0] : url;
@@ -230,7 +327,6 @@ export default function ProtectedVideoPlayer({
         }
       } catch (e) {}
 
-      // روابط غير YouTube/Drive تُستخدم كما هي
       return url;
     };
 
@@ -243,11 +339,72 @@ export default function ProtectedVideoPlayer({
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope"
           allowFullScreen={false}
         />
-        {isDriveVideo && (
-          <div className="absolute top-0 right-0 w-16 h-16 bg-black/40 pointer-events-auto z-10" />
-        )}
+        <div className="absolute top-0 left-0 right-0 h-16 bg-black/55 flex items-center justify-end px-4 pointer-events-auto z-10 select-none">
+          <FaLock className="text-white/85 text-xl" />
+        </div>
       </div>
     );
+  };
+
+  const usesCodeFlow = !!lessonId && useAccessCode;
+
+  const isLessonUnlocked = !!lessonId && unlockedLessons.includes(lessonId);
+
+  if (usesCodeFlow) {
+    // دروس مجانية / معاينة: تفتح بدون كود حتى لو المستخدم غير مشترك
+    if (lessonIsFreeOrPreview) {
+      return renderVideoPlayer();
+    }
+
+    // يوجد كود محدد لهذا الدرس: نطلب الكود لغير المشتركين
+    if (lessonHasCode) {
+      if (!isLessonUnlocked) {
+        return (
+          <div className="w-full aspect-video bg-gradient-to-br from-gray-900 to-gray-800 rounded-xl overflow-hidden relative">
+            <div className="absolute inset-0 flex flex-col items-center justify-center text-white p-8">
+              <div className="bg-white/10 backdrop-blur-sm rounded-full p-8 mb-6">
+                <FaLock className="text-6xl" />
+              </div>
+
+              <h2 className="text-2xl font-bold mb-2">هذا الفيديو محمي بكود</h2>
+              <p className="text-gray-300 text-center mb-4">
+                أدخل كود هذا الدرس الذي حصلت عليه من المدرس لفتح الفيديو.
+              </p>
+
+              <div className="w-full max-w-md space-y-3">
+                <input
+                  type="text"
+                  value={codeInput}
+                  onChange={(e) => setCodeInput(e.target.value)}
+                  className="w-full px-4 py-2 rounded-lg border border-gray-600 bg-gray-900/60 text-white focus:outline-none focus:ring-2 focus:ring-green-500"
+                  placeholder="أدخل الكود هنا"
+                />
+                {codeError && (
+                  <p className="text-sm text-red-400 text-center">{codeError}</p>
+                )}
+                <button
+                  type="button"
+                  onClick={handleVerifyCode}
+                  disabled={isVerifyingCode}
+                  className="w-full px-4 py-2 rounded-lg bg-green-500 hover:bg-green-600 text-white font-bold transition disabled:opacity-60"
+                >
+                  {isVerifyingCode ? 'جاري التحقق من الكود...' : 'تفعيل الكود وفتح الفيديو'}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      return renderVideoPlayer();
+    }
+
+    // لا يوجد كود مضبوط لهذا الدرس وليس مجاني/معاينة:
+    // في هذه الحالة لا نفتح الفيديو لغير المشتركين، بل نعود لمسار الاشتراك في الأسفل.
+  }
+
+  if (isEnrolled) {
+    return renderVideoPlayer();
   }
 
   // عرض رسالة القفل وزر الشراء للغير مشتركين

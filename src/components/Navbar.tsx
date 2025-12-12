@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { FaUserCircle, FaBook, FaGraduationCap, FaChevronDown, FaSignOutAlt, FaSignInAlt, FaUserPlus, FaHome, FaCog, FaUser } from 'react-icons/fa';
+import { FaUserCircle, FaBook, FaGraduationCap, FaChevronDown, FaSignOutAlt, FaSignInAlt, FaUserPlus, FaHome, FaCog, FaUser, FaPlus } from 'react-icons/fa';
 import { HiOutlineMenuAlt3 } from 'react-icons/hi';
 import { usePathname, useRouter } from 'next/navigation';
 import ThemeToggle from './ThemeToggle';
@@ -116,6 +116,17 @@ export default function Navbar() {
             {/* Notification Bell */}
             {isAuthenticated && <NotificationBell />}
 
+            {/* Teacher quick create course button (desktop only) */}
+            {isAuthenticated && user?.role === 'teacher' && (
+              <Link
+                href="/teachers/courses/create"
+                className="hidden lg:flex items-center gap-2 px-6 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white font-medium rounded-lg hover:from-purple-700 hover:to-blue-700 transition"
+              >
+                <FaPlus />
+                <span className="hidden xl:inline">إضافة كورس جديد</span>
+              </Link>
+            )}
+
             {/* User Menu */}
             <div className="relative user-menu-container">
               {isAuthenticated ? (
@@ -164,13 +175,23 @@ export default function Navbar() {
                         </div>
                       </div>
                       <Link
-                        href={user?.role === 'student' ? '/student/dashboard' : user?.role === 'admin' ? '/admin' : '/teachers/dashboard'}
+                        href={user?.role === 'student' ? '/student/dashboard' : user?.role === 'admin' ? '/admin' : '/teacher/dashboard'}
                         className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-700 dark:text-gray-200"
                         onClick={() => setUserMenuOpen(false)}
                       >
                         <FaUserCircle />
                         لوحة التحكم
                       </Link>
+                      {user?.role === 'teacher' && (
+                        <Link
+                          href="/teachers/courses/create"
+                          className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-700 dark:text-gray-200"
+                          onClick={() => setUserMenuOpen(false)}
+                        >
+                          <FaGraduationCap />
+                          إنشاء كورس جديد
+                        </Link>
+                      )}
                       <Link
                         href={user?.role === 'student' ? '/student/profile' : user?.role === 'admin' ? '/admin/profile' : '/teachers/profile'}
                         className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-700 dark:text-gray-200"

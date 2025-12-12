@@ -1,0 +1,70 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!supabaseUrl || !supabaseServiceKey) {
+  throw new Error(
+    'Missing Supabase configuration for teacher exam reset-all API. Check NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY',
+  );
+}
+
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json().catch(() => null);
+    const { courseId, examId, teacherId } = body || {};
+
+    if (!courseId || !examId) {
+      return NextResponse.json(
+        { error: 'courseId and examId are required' },
+        { status: 400 },
+      );
+    }
+
+    // التحقق من أن الكورس يخص هذا المدرس (إن وجد teacherId)
+    if (teacherId) {
+      const { data: courseRow, error: courseError } = await supabase
+        .from('courses')
+        .select('id, instructor_id')
+        .eq('id', courseId)
+        .maybeSingle();
+
+      if (courseError) {
+        console.error('Error verifying teacher course in exam reset-all API:', courseError);
+        return NextResponse.json(
+          { error: 'Failed to verify teacher course' },
+          { status: 500 },
+        );
+      }
+
+      if (!courseRow || String(courseRow.instructor_id) !== String(teacherId)) {
+        return NextResponse.json({ error: 'forbidden' }, { status: 403 });
+      }
+    }
+
+    const { error: deleteError } = await supabase
+      .from('quiz_results')
+      .delete()
+      .eq('course_id', courseId)
+      .eq('quiz_id', examId);
+
+    if (deleteError) {
+      console.error('Error resetting exam for all students:', deleteError);
+      return NextResponse.json(
+        { error: 'Failed to reset exam for all students' },
+        { status: 500 },
+      );
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Unexpected error in teacher exam reset-all API:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 },
+    );
+  }
+}

@@ -6,6 +6,9 @@ export interface Exam {
   questions: Question[];
   createdAt: Date;
   updatedAt: Date;
+  // ترتيب الامتحان داخل القسم (للنظام الموحد مع الدروس)
+  sectionId?: string | null;
+  orderIndex?: number;
 }
 
 export interface Question {

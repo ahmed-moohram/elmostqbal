@@ -8,6 +8,8 @@ import { FaUser, FaCalendar, FaBook, FaGraduationCap, FaHistory, FaCertificate, 
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'react-hot-toast';
+import { uploadTeacherAvatar } from '@/lib/supabase-upload';
+import { supabase } from '@/services/supabase-service';
 
 // نموذج واجهة بيانات المستخدم
 interface UserProfile {
@@ -37,13 +39,23 @@ interface EnrolledCourse {
 
 export default function ProfilePage() {
   const router = useRouter();
-  const { user: authUser, isAuthenticated } = useAuth();
+  const { user: authUser, isAuthenticated, updateUser } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState<UserProfile | null>(null);
   const [activeCourses, setActiveCourses] = useState<EnrolledCourse[]>([]);
   const [completedCourses, setCompletedCourses] = useState<EnrolledCourse[]>([]);
   const [activeTab, setActiveTab] = useState('courses');
   const [dashboardPath, setDashboardPath] = useState('/');
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  
+  useEffect(() => {
+    if (authUser || user) {
+      console.log('👤 Profile avatar sources:', {
+        authImage: (authUser as any)?.image,
+        profileImage: user?.profileImage,
+      });
+    }
+  }, [authUser, user]);
   
   useEffect(() => {
     if (!isAuthenticated) {
@@ -55,7 +67,7 @@ export default function ProfilePage() {
     if (authUser) {
       const path = authUser.role === 'student' ? '/student/dashboard' : 
                    authUser.role === 'admin' ? '/admin' : 
-                   '/teachers/dashboard';
+                   '/teacher/dashboard';
       setDashboardPath(path);
     }
     
@@ -114,7 +126,12 @@ export default function ProfilePage() {
             name: userInfo.name,
             email: userInfo.email,
             phone: userInfo.phone,
-            profileImage: userInfo.avatar || '/placeholder-profile.jpg',
+            // نفضّل صورة المستخدم الحالية في الـ AuthContext (نفس صورة الـ Navbar)
+            // ثم الصورة القادمة من الخدمة، ثم placeholder
+            profileImage:
+              (authUser as any)?.image ||
+              userInfo.avatar ||
+              '/placeholder-avatar.png',
             joinDate: new Date(userInfo.createdAt).toLocaleDateString('ar-EG', { month: 'long', year: 'numeric' }),
             activeCourses: activeCoursesList.length,
             completedCourses: completedCoursesList.length,
@@ -141,7 +158,11 @@ export default function ProfilePage() {
             name: authUser.name,
             email: authUser.email || '',
             phone: authUser.phone || '',
-            profileImage: authUser.image || '/placeholder-profile.jpg',
+            profileImage:
+              (authUser as any).avatar_url ||
+              (authUser as any).avatar ||
+              (authUser as any).image ||
+              '/placeholder-avatar.png',
             joinDate: 'غير محدد',
             activeCourses: 0,
             completedCourses: 0,
@@ -164,6 +185,65 @@ export default function ProfilePage() {
   
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
+  };
+
+  const handleChangeAvatar = () => {
+    if (!authUser) return;
+
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = async (event: Event) => {
+      const target = event.target as HTMLInputElement | null;
+      const file = target?.files?.[0];
+      if (!file) return;
+
+      setIsUploadingAvatar(true);
+      try {
+        const result = await uploadTeacherAvatar(file);
+        if (!result.success || !result.url) {
+          toast.error('فشل رفع الصورة، حاول مرة أخرى');
+          return;
+        }
+
+        const url = result.url;
+
+        const { error: userError } = await supabase
+          .from('users')
+          .update({ avatar_url: url })
+          .eq('id', authUser.id);
+
+        if (userError) {
+          console.error('Error updating profile avatar:', userError);
+          toast.error('فشل تحديث الصورة في الحساب');
+          return;
+        }
+
+        // إذا كان المستخدم مدرساً، نحدّث جدول teachers أيضاً بنفس الصورة
+        if (authUser.role === 'teacher') {
+          const { error: teacherError } = await supabase
+            .from('teachers')
+            .update({ avatar_url: url })
+            .eq('user_id', authUser.id);
+
+          if (teacherError) {
+            console.error('Error updating teacher avatar:', teacherError);
+          }
+        }
+
+        setUser((prev) => (prev ? { ...prev, profileImage: url } : prev));
+        // تحديث بيانات المستخدم في الـ AuthContext حتى تظهر الصورة في الـ Navbar وباقي الصفحات
+        updateUser({ image: url });
+        toast.success('تم تحديث صورتك بنجاح');
+      } catch (error) {
+        console.error('Error uploading profile avatar:', error);
+        toast.error('حدث خطأ أثناء رفع الصورة');
+      } finally {
+        setIsUploadingAvatar(false);
+      }
+    };
+
+    input.click();
   };
   
   if (isLoading) {
@@ -205,13 +285,21 @@ export default function ProfilePage() {
               <div className="flex items-center gap-6 flex-1">
                 <div className="relative">
                   <div className="relative w-32 h-32">
-                    <Image
-                      src={user.profileImage || '/placeholder-avatar.png'}
+                    <img
+                      src={
+                        (authUser as any)?.image ||
+                        user.profileImage ||
+                        '/placeholder-avatar.png'
+                      }
                       alt={user.name}
-                      fill
-                      className="object-cover rounded-full border-4 border-primary"
+                      className="w-32 h-32 rounded-full object-cover border-4 border-primary bg-white"
                     />
-                    <button className="absolute bottom-0 right-0 bg-primary text-white p-2 rounded-full hover:bg-primary/90 transition shadow-lg">
+                    <button
+                      type="button"
+                      onClick={handleChangeAvatar}
+                      disabled={isUploadingAvatar}
+                      className="absolute bottom-0 right-0 bg-primary text-white p-2 rounded-full hover:bg-primary/90 transition shadow-lg disabled:opacity-60"
+                    >
                       <FaCamera />
                     </button>
                   </div>

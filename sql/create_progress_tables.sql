@@ -90,7 +90,21 @@ CREATE TABLE IF NOT EXISTS notifications (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- 6. جدول الكتب (للمكتبة)
+-- 6. جدول تقارير أولياء الأمور
+CREATE TABLE IF NOT EXISTS parent_reports (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    teacher_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    student_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    course_id UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+    parent_phone VARCHAR(20),
+    student_name VARCHAR(255) NOT NULL,
+    course_title VARCHAR(255) NOT NULL,
+    report_text TEXT NOT NULL,
+    sent_via VARCHAR(50) DEFAULT 'whatsapp',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 7. جدول الكتب (للمكتبة)
 CREATE TABLE IF NOT EXISTS books (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
     title VARCHAR(255) NOT NULL,
@@ -108,12 +122,13 @@ CREATE TABLE IF NOT EXISTS books (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- 7. إضافة فهارس للأداء
+-- 8. إضافة فهارس للأداء
 CREATE INDEX IF NOT EXISTS idx_lesson_progress_user ON lesson_progress(user_id);
 CREATE INDEX IF NOT EXISTS idx_lesson_progress_course ON lesson_progress(course_id);
 CREATE INDEX IF NOT EXISTS idx_quiz_results_user ON quiz_results(user_id);
 CREATE INDEX IF NOT EXISTS idx_certificates_user ON certificates(user_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_parent_reports_teacher_created ON parent_reports(teacher_id, created_at DESC);
 
 -- 8. إدراج بيانات تجريبية للتقدم
 DO $$
@@ -157,6 +172,10 @@ BEGIN
         INSERT INTO notifications (user_id, title, message, type, icon)
         VALUES (test_user_id, 'مرحباً بك!', 'أهلاً بك في منصتنا التعليمية', 'info', '👋');
         
+        -- إضافة تقرير أولياء الأمور
+        INSERT INTO parent_reports (teacher_id, student_id, course_id, parent_phone, student_name, course_title, report_text, sent_via)
+        VALUES (test_user_id, test_user_id, test_course_id, '0123456789', 'اسم الطالب', 'عنوان الكورس', 'نص التقرير', 'whatsapp');
+        
         RAISE NOTICE '✅ تم إضافة بيانات التقدم التجريبية';
     END IF;
 END $$;
@@ -167,7 +186,8 @@ SELECT
     (SELECT COUNT(*) FROM lesson_progress WHERE is_completed = true) as "الدروس المكتملة",
     (SELECT COUNT(*) FROM quiz_results WHERE passed = true) as "الاختبارات الناجحة",
     (SELECT COUNT(*) FROM certificates) as "الشهادات الصادرة",
-    (SELECT COUNT(*) FROM notifications WHERE is_read = false) as "الإشعارات غير المقروءة";
+    (SELECT COUNT(*) FROM notifications WHERE is_read = false) as "الإشعارات غير المقروءة",
+    (SELECT COUNT(*) FROM parent_reports) as "تقارير أولياء الأمور";
 
 -- رسالة النجاح
 SELECT 

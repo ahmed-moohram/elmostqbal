@@ -21,9 +21,9 @@ export default function Home() {
   const { theme } = useTheme();
   const ctaRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user: authUser } = useAuth();
   const [user, setUser] = useState({ name: '', image: '/placeholder-profile.jpg' });
-  const [featuredCourses, setFeaturedCourses] = useState<any[]>([]);
+  const [featuredTeachers, setFeaturedTeachers] = useState<any[]>([]);
   const [showWelcome, setShowWelcome] = useState(false);
   const [userData, setUserData] = useState<any>(null);
   const [stats, setStats] = useState({ students: 0, courses: 0, teachers: 0 });
@@ -48,22 +48,23 @@ export default function Home() {
 
   // بيانات المستخدم ديناميكية من LocalStorage
   useEffect(() => {
-    // التحقق من وجود مستخدم جديد مسجل
+    // التحقق من وجود مستخدم مسجّل و ما إذا كان هذا دخوله الأول بعد التسجيل
     const storedUser = localStorage.getItem('user');
-    const isNewRegistration = localStorage.getItem('isAuthenticated') === 'true';
+    const justRegistered = localStorage.getItem('justRegistered') === 'true';
     
     if (storedUser) {
       const parsedUser = JSON.parse(storedUser);
       setUserData(parsedUser);
       setUser({ 
         name: parsedUser.name || '', 
-        image: parsedUser.avatar_url || '/placeholder-profile.jpg' 
+        image: parsedUser.image || parsedUser.avatar_url || '/placeholder-profile.jpg' 
       });
       
-      // إذا كان تسجيل جديد، اعرض رسالة ترحيب
-      if (isNewRegistration && !sessionStorage.getItem('welcomeShown')) {
+      // إذا كان المستخدم توه مسجّل جديد، اعرض رسالة الترحيب مرة واحدة فقط
+      if (justRegistered && !sessionStorage.getItem('welcomeShown')) {
         setShowWelcome(true);
         sessionStorage.setItem('welcomeShown', 'true');
+        localStorage.removeItem('justRegistered');
         
         // إخفاء الرسالة بعد 5 ثوانٍ
         setTimeout(() => {
@@ -77,62 +78,76 @@ export default function Home() {
     }
   }, []);
 
-  // جلب الدورات المميزة من Supabase مباشرة
+  // جلب المدرسين المميزين من Supabase
   useEffect(() => {
-    const fetchFeaturedCourses = async () => {
+    const fetchFeaturedTeachers = async () => {
       try {
-        console.log('🔄 جلب الكورسات المميزة من Supabase (مشروع chikf)...');
+        console.log('🔄 جلب المدرسين المميزين من Supabase...');
 
-        // جلب الكورسات المميزة والمنشورة فقط من المشروع الجديد
-        const { data: courses, error } = await supabase
-          .from('courses')
+        const { data: teacherRows, error: teachersError } = await supabase
+          .from('teachers')
           .select('*')
-          .eq('is_published', true)
           .eq('is_featured', true)
-          .limit(3)
-          .order('created_at', { ascending: false });
-        
-        if (error) {
-          console.error('❌ خطأ في جلب الكورسات:', error);
-          setFeaturedCourses([]);
-        } else {
-          console.log(`✅ تم جلب ${courses?.length || 0} كورس من Supabase`);
-          
-          // تحويل البيانات لتناسب الشكل المطلوب
-          const formattedCourses = (courses || []).map(course => ({
-            _id: course.id,
-            id: course.id,
-            title: course.title,
-            description: course.description,
-            price: course.price,
-            thumbnail: course.thumbnail || '/placeholder-course.png',
-            instructor: course.instructor_name || 'المدرس',
-            rating: course.rating ?? 0,
-            studentsCount: (course as any).students_count ?? (course as any).enrollment_count ?? 0,
-            category: course.category || 'عام',
-            level: course.level || 'مبتدئ',
-            isBestseller: (course as any).is_bestseller || false,
-            features: (course as any).features || [],
-            paymentOptions: [
-              {
-                type: 'full',
-                price: course.price || 0,
-                currency: 'EGP',
-                discountPrice: (course as any).discount_price ?? null,
-              },
-            ],
-          }));
-          
-          setFeaturedCourses(formattedCourses);
+          .limit(6);
+
+        if (teachersError) {
+          console.error('❌ خطأ في جلب المدرسين المميزين:', teachersError);
+          setFeaturedTeachers([]);
+          return;
         }
+
+        if (!teacherRows || teacherRows.length === 0) {
+          setFeaturedTeachers([]);
+          return;
+        }
+
+        const userIds = teacherRows.map((t: any) => t.user_id).filter(Boolean);
+
+        const { data: usersRows, error: usersError } = await supabase
+          .from('users')
+          .select('id, name, avatar_url')
+          .in('id', userIds);
+
+        if (usersError) {
+          console.error('❌ خطأ في جلب بيانات مستخدمي المدرسين:', usersError);
+        }
+
+        const usersMap = new Map(
+          (usersRows || []).map((u: any) => [u.id, u])
+        );
+
+        const formatted = teacherRows.map((t: any) => {
+          const user = usersMap.get(t.user_id) || {};
+
+          let avatar = t.avatar_url || user.avatar_url || '/placeholder-avatar.png';
+
+          if (authUser && authUser.id === t.user_id && (authUser as any).image) {
+            avatar = (authUser as any).image;
+          }
+
+          return {
+            id: t.user_id,
+            teacherId: t.id,
+            name: user.name || 'مدرس',
+            avatar,
+            specialization: t.specialization || 'غير محدد',
+            rating: Number(t.rating) || 0,
+            students: t.total_students ?? 0,
+            courses: t.total_courses ?? 0,
+          };
+        });
+
+        console.log('👨‍🏫 Featured teachers data:', formatted);
+
+        setFeaturedTeachers(formatted);
       } catch (error) {
-        console.error('❌ خطأ في جلب الدورات المميزة:', error);
-        setFeaturedCourses([]);
+        console.error('❌ خطأ غير متوقع في جلب المدرسين المميزين:', error);
+        setFeaturedTeachers([]);
       }
     };
 
-    fetchFeaturedCourses();
-  }, []);
+    fetchFeaturedTeachers();
+  }, [authUser]);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -230,7 +245,7 @@ export default function Home() {
       </AnimatePresence>
       
       {/* Hero Section */}
-      <section className="relative flex flex-col items-center justify-center min-h-[calc(100vh-80px)] text-center px-4 sm:px-6 lg:px-8 overflow-hidden">
+      <section className="relative flex flex-col items-center justify-center min-h-[calc(100vh-80px)] text-center px-4 sm:px-6 lg:px-8 overflow-hidden pt-24 sm:pt-32">
         <div 
           className="absolute inset-0 z-0 bg-gradient-to-b from-sky-400 via-sky-300 to-sky-200 dark:from-[#0a1730] dark:via-[#051123] dark:to-[#030c1a]"
         >
@@ -330,137 +345,80 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Featured Courses Section */}
+      {/* Featured Teachers Section */}
       <section className="py-24 bg-white dark:bg-gray-900">
         <div className="container-custom">
           <div className="text-center mb-16">
-            <h2 className="featured-title">أقوى الدورات المميزة</h2>
+            <h2 className="featured-title">المدرسون المتميزون</h2>
             <p className="body-text max-w-2xl mx-auto">
-              اختر من بين أفضل الدورات التعليمية مع نخبة من المدرسين المتميزين
+              تعرّف على نخبة من أفضل المدرسين، واستكشف جميع دوراتهم التعليمية المميزة
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {featuredCourses.length === 0 ? (
+            {featuredTeachers.length === 0 ? (
               <div className="col-span-3 text-center py-12">
-                <p className="text-gray-500 dark:text-gray-400">لا توجد دورات مميزة حالياً</p>
+                <p className="text-gray-500 dark:text-gray-400">لا يوجد مدرسون مميزون حالياً</p>
               </div>
             ) : (
-              featuredCourses.map((course) => (
-                <div key={course._id} className="course-card flex flex-col h-full">
-                  {/* Course Image */}
-                  <div className="relative h-52">
-                    <Image 
-                      src={course.thumbnail || '/placeholder-course.jpg'} 
-                      alt={course.title}
-                      fill
-                      className="object-cover"
-                      onError={(e: any) => {
-                        e.target.src = '/placeholder-course.jpg';
-                      }}
-                    />
-                    {course.isBestseller && (
-                      <div className="absolute top-4 right-4 bg-yellow-500 text-white text-xs font-bold px-3 py-1 rounded-full">
-                        الأكثر مبيعاً
+              featuredTeachers.map((teacher) => (
+                <Link
+                  key={teacher.id}
+                  href={`/teachers/${teacher.id}`}
+                  className="group relative rounded-3xl overflow-hidden bg-gray-900/5 dark:bg-gray-800/40 border border-white/10 shadow-[0_14px_30px_rgba(15,23,42,0.45)] hover:-translate-y-3 hover:scale-[1.05] hover:shadow-[0_30px_70px_rgba(15,23,42,0.75)] transition-all duration-700 ease-out h-96"
+                >
+                  {/* صورة المدرس تغطي الكارت بالكامل */}
+                  <Image
+                    src={teacher.avatar || '/placeholder-avatar.png'}
+                    alt={teacher.name}
+                    fill
+                    sizes="(min-width: 1024px) 25vw, (min-width: 768px) 33vw, 100vw"
+                    className="object-cover transform filter brightness-[1.02] saturate-[1.05] group-hover:scale-110 group-hover:brightness-115 group-hover:saturate-130 transition-transform duration-700 ease-out"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/22 to-transparent group-hover:from-black/55 group-hover:via-black/12 transition-colors duration-700 ease-out" />
+
+                  {/* المحتوى فوق الصورة */}
+                  <div className="absolute inset-0 flex flex-col justify-between p-5 text-white opacity-95 transition-opacity duration-700 ease-out group-hover:opacity-85">
+                    <div className="flex flex-col items-start gap-2">
+                      <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/80 text-xs font-semibold">
+                        <FaChalkboardTeacher className="text-white" />
+                        <span>مدرس مميز</span>
                       </div>
-                    )}
-                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-4 text-white">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium bg-primary/80 px-2 py-0.5 rounded">
-                          {course.category}
-                        </span>
-                        <span className="text-sm font-medium bg-gray-700/50 px-2 py-0.5 rounded">
-                          {course.level}
-                        </span>
+                      <h3 className="text-xl sm:text-2xl font-bold mb-1 line-clamp-1">
+                        {teacher.name}
+                      </h3>
+                      <p className="text-sm text-gray-100/90 line-clamp-1">
+                        {teacher.specialization}
+                      </p>
+                    </div>
+
+                    <div className="flex flex-col gap-3">
+                      <div className="bg-white/10 backdrop-blur-md rounded-2xl p-3 border border-white/15 shadow-lg transition-colors duration-500 ease-out group-hover:bg-white/16 group-hover:border-white/25">
+                        <div className="flex items-center justify-between text-sm text-gray-100">
+                          <div className="flex items-center gap-2">
+                            <FaStar className="text-yellow-400" />
+                            <span className="font-semibold">{teacher.rating.toFixed(1)}</span>
+                            <span className="text-xs text-gray-200">تقييم الطلاب</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <FaUsers className="text-primary-light" />
+                            <span className="font-semibold">{teacher.students || 0}</span>
+                            <span className="text-xs text-gray-200">طالب</span>
+                          </div>
+                        </div>
                       </div>
+
+                      <button
+                        type="button"
+                        className="w-full inline-flex items-center justify-center gap-2 rounded-2xl bg-primary/95 text-white py-2.5 text-sm font-semibold hover:bg-primary-dark transition-transform duration-300 ease-out shadow-lg shadow-primary/40 hover:-translate-y-0.5"
+                      >
+                        عرض كورسات المدرس
+                      </button>
                     </div>
                   </div>
-
-                  {/* Course Content */}
-                  <div className="flex-grow flex flex-col p-5">
-                    <div className="flex justify-between items-start mb-2">
-                      <h3 className="course-title mb-2">{course.title}</h3>
-                    </div>
-                    
-                    <div className="flex items-center gap-2 mb-3">
-                      <span className="course-instructor">{course.instructor?.name || 'مدرس'}</span>
-                      <span className="flex items-center gap-1 text-sm">
-                        <FaStar className="text-yellow-500" />
-                        <span>{course.rating || 0}</span>
-                      </span>
-                    </div>
-
-                    <div className="border-t border-gray-100 dark:border-gray-700 pt-4 mb-4">
-                      <ul className="grid grid-cols-2 gap-y-2 gap-x-4 text-sm">
-                        {course.features?.slice(0, 4).map((feature: string, index: number) => (
-                          <li key={index} className="flex items-center gap-2 course-features">
-                            <FaCheckCircle className="text-primary flex-shrink-0" />
-                            <span>{feature}</span>
-                          </li>
-                        )) || (
-                          <>
-                            <li className="flex items-center gap-2 course-features">
-                              <FaCheckCircle className="text-primary flex-shrink-0" />
-                              <span>دورة شاملة</span>
-                            </li>
-                            <li className="flex items-center gap-2 course-features">
-                              <FaCheckCircle className="text-primary flex-shrink-0" />
-                              <span>شرح مفصل</span>
-                            </li>
-                          </>
-                        )}
-                      </ul>
-                    </div>
-
-                    <div className="mt-auto">
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center gap-1">
-                          <FaUsers className="text-gray-500 dark:text-gray-400" />
-                          <span className="text-sm text-gray-600 dark:text-gray-300">{course.studentsCount || 0} طالب</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <FaCalendarAlt className="text-gray-500 dark:text-gray-400" />
-                          <span className="text-sm text-gray-600 dark:text-gray-300">متاح الآن</span>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center gap-2">
-                          {course.paymentOptions?.[0]?.discountPrice ? (
-                            <>
-                              <span className="text-lg font-bold text-primary">{course.paymentOptions[0].discountPrice} ج.م</span>
-                              <span className="text-sm text-gray-500 line-through">{course.paymentOptions[0].price} ج.م</span>
-                            </>
-                          ) : (
-                            <span className="text-lg font-bold text-primary">{course.paymentOptions?.[0]?.price || 0} ج.م</span>
-                          )}
-                        </div>
-                        {course.paymentOptions?.[0]?.discountPrice && (
-                          <span className="text-sm font-medium text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/30 px-2 py-1 rounded">
-                            خصم {Math.round(((course.paymentOptions[0].price - course.paymentOptions[0].discountPrice) / course.paymentOptions[0].price) * 100)}%
-                          </span>
-                        )}
-                    </div>
-
-                      <div className="grid grid-cols-5 gap-2">
-                        <Link href={`/courses/${course._id}`} className="btn-modern col-span-4 text-center">
-                          الاشتراك الآن
-                        </Link>
-                        <Link href={`/courses/${course._id}/preview`} className="flex items-center justify-center p-3 bg-gray-100 dark:bg-gray-800 text-primary rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
-                          <FaPlay />
-                        </Link>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                </Link>
               ))
             )}
-          </div>
-
-          <div className="text-center mt-10">
-            <Link href="/courses" className="btn-modern inline-block">
-              عرض جميع الدورات
-            </Link>
           </div>
         </div>
       </section>

@@ -33,6 +33,9 @@ interface Lesson {
     options: string[];
     correctAnswer: number;
   }[];
+  accessCode?: string;
+  isFree?: boolean;
+  isPreview?: boolean;
 }
 
 // نموذج بيانات السؤال في الاختبار
@@ -217,6 +220,13 @@ export default function CourseLearnPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [quizScore, setQuizScore] = useState(0);
+  const [unlockedLessons, setUnlockedLessons] = useState<string[]>([]);
+  const [codeInput, setCodeInput] = useState('');
+  const [codeError, setCodeError] = useState<string | null>(null);
+  const [isVerifyingCode, setIsVerifyingCode] = useState(false);
+  const [lessonMeta, setLessonMeta] = useState<
+    Record<string, { hasCode: boolean; isFree: boolean; isPreview: boolean }>
+  >({});
   
   // استخدام hook الخاص بتقدم الدورة
   const {
@@ -229,6 +239,22 @@ export default function CourseLearnPage() {
     updateLessonStatus,
     trackVideoProgress
   } = useCourseProgress(courseId, currentLessonId);
+
+  // تحميل حالة الدروس المفتوحة من localStorage
+  useEffect(() => {
+    if (!courseId) return;
+    try {
+      const raw = localStorage.getItem(`lesson_unlocks_${courseId}`);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          setUnlockedLessons(parsed.map((id: any) => String(id)));
+        }
+      }
+    } catch (e) {
+      console.error('Error loading unlocked lessons from localStorage:', e);
+    }
+  }, [courseId]);
   
   // تحميل بيانات الدورة
   useEffect(() => {
@@ -313,6 +339,32 @@ export default function CourseLearnPage() {
     
     fetchCourseData();
   }, [courseId, currentLessonId]);
+
+  // جلب ميتاداتا الدرس (هل يحتوي على كود؟ مجاني؟ معاينة؟)
+  useEffect(() => {
+    const fetchLessonMeta = async () => {
+      if (!currentLessonId) return;
+      if (lessonMeta[currentLessonId]) return;
+
+      try {
+        const res = await fetch(`/api/lessons/${currentLessonId}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        setLessonMeta((prev) => ({
+          ...prev,
+          [currentLessonId]: {
+            hasCode: !!data.hasCode,
+            isFree: !!data.isFree,
+            isPreview: !!data.isPreview,
+          },
+        }));
+      } catch (err) {
+        console.error('Error loading lesson meta:', err);
+      }
+    };
+
+    fetchLessonMeta();
+  }, [currentLessonId, lessonMeta]);
   
   // بدء جلسة دراسة جديدة عند فتح الصفحة
   useEffect(() => {
@@ -353,6 +405,8 @@ export default function CourseLearnPage() {
       setCurrentLessonId(lessonId);
       setQuizSubmitted(false);
       setUserAnswers({});
+      setCodeInput('');
+      setCodeError(null);
     }
   };
   
@@ -369,6 +423,69 @@ export default function CourseLearnPage() {
       trackVideoProgress(currentTime, duration, progress);
     }
   }, [courseId, currentLessonId, trackVideoProgress]);
+
+  // التحقق من الكود لفتح الدرس الحالي
+  const handleVerifyCode = async () => {
+    if (!currentLessonId || !courseId) return;
+
+    if (!codeInput.trim()) {
+      setCodeError('يرجى إدخال الكود');
+      return;
+    }
+
+    setIsVerifyingCode(true);
+    setCodeError(null);
+
+    try {
+      const res = await fetch(`/api/lessons/${currentLessonId}` , {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ code: codeInput.trim(), courseId }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (res.ok && data.success) {
+        setUnlockedLessons((prev) => {
+          if (prev.includes(currentLessonId)) return prev;
+          const updated = [...prev, currentLessonId];
+          try {
+            localStorage.setItem(
+              `lesson_unlocks_${courseId}`,
+              JSON.stringify(updated),
+            );
+          } catch (e) {
+            console.error('Error saving unlocked lessons to localStorage:', e);
+          }
+          return updated;
+        });
+
+        setCodeInput('');
+        setCodeError(null);
+      } else {
+        setCodeError(data?.error || 'الكود غير صحيح');
+      }
+    } catch (err) {
+      console.error('Error verifying lesson code:', err);
+      setCodeError('حدث خطأ أثناء التحقق من الكود');
+    } finally {
+      setIsVerifyingCode(false);
+    }
+  };
+
+  const meta = currentLessonId ? lessonMeta[currentLessonId] : undefined;
+  const lessonRequiresCode =
+    !!currentLesson &&
+    currentLesson.type === 'video' &&
+    !!meta?.hasCode &&
+    !meta.isFree &&
+    !meta.isPreview;
+
+  const isLessonUnlocked =
+    !!currentLessonId &&
+    (unlockedLessons.includes(currentLessonId) || !lessonRequiresCode);
   
   // تقديم الاختبار
   const submitQuiz = async () => {
@@ -623,13 +740,42 @@ export default function CourseLearnPage() {
               >
                 {/* مشغل الفيديو */}
                 <div className="aspect-video bg-black relative">
-                  <VideoPlayer 
-                    src={currentLesson.videoUrl || ''}
-                    courseId={courseId}
-                    lessonId={currentLessonId}
-                    savedTime={currentPosition}
-                    onProgress={handleVideoProgress}
-                  />
+                  {lessonRequiresCode && !isLessonUnlocked ? (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/60 px-4">
+                      <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 text-center">
+                        <h3 className="text-lg font-bold mb-2">هذا الدرس محمي بكود</h3>
+                        <p className="text-sm text-gray-600 mb-4">
+                          أدخل الكود الذي حصلت عليه بعد الدفع لفتح هذا الفيديو.
+                        </p>
+                        <input
+                          type="text"
+                          value={codeInput}
+                          onChange={(e) => setCodeInput(e.target.value)}
+                          className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary mb-3"
+                          placeholder="أدخل الكود هنا"
+                        />
+                        {codeError && (
+                          <p className="text-sm text-red-600 mb-2">{codeError}</p>
+                        )}
+                        <button
+                          type="button"
+                          onClick={handleVerifyCode}
+                          disabled={isVerifyingCode}
+                          className="w-full bg-primary hover:bg-primary/90 text-white py-2 rounded-lg text-sm font-semibold disabled:opacity-50"
+                        >
+                          {isVerifyingCode ? 'جاري التحقق...' : 'تفعيل الكود وفتح الفيديو'}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <VideoPlayer 
+                      src={currentLesson.videoUrl || ''}
+                      courseId={courseId}
+                      lessonId={currentLessonId}
+                      savedTime={currentPosition}
+                      onProgress={handleVideoProgress}
+                    />
+                  )}
                 </div>
                 
                 <div className="p-6 flex-1">

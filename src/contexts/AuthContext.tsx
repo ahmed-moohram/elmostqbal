@@ -209,6 +209,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         email: user.email,
         phone: user.phone,
         role: user.role as 'student' | 'teacher' | 'admin',
+        // نخزن صورة الحساب في الحقل image حتى يستخدمها الـ Navbar وباقي الواجهة
+        image: user.avatar_url || user.avatar || user.image || undefined,
         isVerified: true
       };
       

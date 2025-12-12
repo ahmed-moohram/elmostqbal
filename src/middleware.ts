@@ -127,8 +127,11 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // Protected teacher routes
-  if (url.pathname.startsWith('/teacher')) {
+  // Protected teacher routes (only paths starting with /teacher, NOT /teachers)
+  const pathSegments = url.pathname.split('/').filter(Boolean);
+  const isTeacherRoute = pathSegments[0] === 'teacher';
+
+  if (isTeacherRoute) {
     const token = request.cookies.get('auth-token');
     const userRole = request.cookies.get('user-role');
 

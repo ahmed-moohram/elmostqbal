@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useRouter, useParams } from 'next/navigation';
 import { toast } from 'react-hot-toast';
 import { FaArrowRight, FaPlus, FaVideo, FaTrash, FaEdit, FaSpinner } from 'react-icons/fa';
@@ -15,6 +16,18 @@ interface Section {
   order_index: number;
 }
 
+type LessonType = 'video' | 'quiz';
+
+interface QuizQuestionForm {
+  id: string;
+  text: string;
+  optionA: string;
+  optionB: string;
+  optionC: string;
+  optionD: string;
+  correctOption: 'A' | 'B' | 'C' | 'D' | '';
+}
+
 interface Lesson {
   id: string;
   title: string;
@@ -25,6 +38,16 @@ interface Lesson {
   is_free: boolean;
   is_preview: boolean;
   section_id: string | null;
+  access_code?: string | null;
+  type?: LessonType;
+  quiz_data?: {
+    questions: {
+      id: string;
+      text: string;
+      options: string[];
+      correctAnswer: string;
+    }[];
+  } | null;
 }
 
 interface LessonFormState {
@@ -35,7 +58,20 @@ interface LessonFormState {
   orderIndex: string;
   isFree: boolean;
   isPreview: boolean;
+  accessCode: string;
+  type: LessonType;
+  quizQuestions: QuizQuestionForm[];
 }
+
+const createEmptyQuizQuestion = (): QuizQuestionForm => ({
+  id: `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+  text: '',
+  optionA: '',
+  optionB: '',
+  optionC: '',
+  optionD: '',
+  correctOption: '',
+});
 
 const initialLessonForm: LessonFormState = {
   title: '',
@@ -45,6 +81,9 @@ const initialLessonForm: LessonFormState = {
   orderIndex: '',
   isFree: false,
   isPreview: false,
+  accessCode: '',
+  type: 'video',
+  quizQuestions: [createEmptyQuizQuestion()],
 };
 
 export default function TeacherCourseLessonsPage() {
@@ -64,6 +103,10 @@ export default function TeacherCourseLessonsPage() {
   const [lessonsBySection, setLessonsBySection] = useState<Record<string, Lesson[]>>({});
   const [unsectionedLessons, setUnsectionedLessons] = useState<Lesson[]>([]);
 
+  const [examsForCourse, setExamsForCourse] = useState<any[]>([]);
+  const [loadingExamsForOrder, setLoadingExamsForOrder] = useState(false);
+  const [savingExamOrder, setSavingExamOrder] = useState(false);
+
   const [selectedSectionId, setSelectedSectionId] = useState<string>('');
 
   const [showNewSectionForm, setShowNewSectionForm] = useState(false);
@@ -73,6 +116,8 @@ export default function TeacherCourseLessonsPage() {
 
   const [lessonForm, setLessonForm] = useState<LessonFormState>(initialLessonForm);
   const [editingLessonId, setEditingLessonId] = useState<string | null>(null);
+  const [draggingLesson, setDraggingLesson] = useState<{ sectionId: string | null; lessonId: string } | null>(null);
+  const [activeEditor, setActiveEditor] = useState<'lesson' | 'exam'>('lesson');
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -140,7 +185,7 @@ export default function TeacherCourseLessonsPage() {
         const { data: lessonsData, error: lessonsError } = await supabase
           .from('lessons')
           .select(
-            'id, section_id, title, description, video_url, duration_minutes, order_index, is_free, is_preview'
+            'id, section_id, title, description, video_url, duration_minutes, order_index, is_free, is_preview, type, quiz_data'
           )
           .eq('course_id', courseId)
           .order('order_index', { ascending: true });
@@ -163,6 +208,9 @@ export default function TeacherCourseLessonsPage() {
             is_free: !!l.is_free,
             is_preview: !!l.is_preview,
             section_id: l.section_id ? String(l.section_id) : null,
+            access_code: l.access_code ?? null,
+            type: (l.type as LessonType) || 'video',
+            quiz_data: l.quiz_data || null,
           };
 
           if (lesson.section_id) {
@@ -200,6 +248,27 @@ export default function TeacherCourseLessonsPage() {
       loadData();
     }
   }, [isLoading, isAuthenticated, user, courseId, router]);
+
+  // جلب الامتحانات لهذا الكورس لكي تظهر في تبويب "ترتيب" ويتم ربطها بالأقسام وترتيبها
+  useEffect(() => {
+    const loadExamsForOrdering = async () => {
+      if (!courseId) return;
+      try {
+        setLoadingExamsForOrder(true);
+        const res = await fetch('/api/exams');
+        const raw = await res.json().catch(() => null);
+        const list = Array.isArray(raw) ? raw : raw?.exams || [];
+        const filtered = list.filter((e: any) => String(e.courseId) === String(courseId));
+        setExamsForCourse(filtered);
+      } catch (error) {
+        console.error('Error loading exams for unified ordering:', error);
+      } finally {
+        setLoadingExamsForOrder(false);
+      }
+    };
+
+    loadExamsForOrdering();
+  }, [courseId]);
 
   const handleCreateSection = async () => {
     if (!courseId) return;
@@ -278,6 +347,34 @@ export default function TeacherCourseLessonsPage() {
   const handleStartEditLesson = (lesson: Lesson) => {
     setEditingLessonId(lesson.id);
     setSelectedSectionId(lesson.section_id || '');
+
+    let quizQuestions: QuizQuestionForm[] = [createEmptyQuizQuestion()];
+    if (lesson.type === 'quiz' && lesson.quiz_data && Array.isArray(lesson.quiz_data.questions)) {
+      quizQuestions = lesson.quiz_data.questions.map((q: any, index: number) => {
+        const options = Array.isArray(q.options) ? q.options : [];
+        let correctOption: QuizQuestionForm['correctOption'] = '';
+        if (options.length) {
+          const idx = options.findIndex((opt: string) => opt === q.correctAnswer);
+          if (idx === 0) correctOption = 'A';
+          else if (idx === 1) correctOption = 'B';
+          else if (idx === 2) correctOption = 'C';
+          else if (idx === 3) correctOption = 'D';
+        }
+        return {
+          id: q.id || `q${index + 1}`,
+          text: q.text || '',
+          optionA: options[0] || '',
+          optionB: options[1] || '',
+          optionC: options[2] || '',
+          optionD: options[3] || '',
+          correctOption,
+        };
+      });
+      if (quizQuestions.length === 0) {
+        quizQuestions = [createEmptyQuizQuestion()];
+      }
+    }
+
     setLessonForm({
       title: lesson.title || '',
       description: lesson.description || '',
@@ -286,6 +383,9 @@ export default function TeacherCourseLessonsPage() {
       orderIndex: lesson.order_index ? String(lesson.order_index) : '',
       isFree: !!lesson.is_free,
       isPreview: !!lesson.is_preview,
+      accessCode: lesson.access_code || '',
+      type: lesson.type || 'video',
+      quizQuestions,
     });
   };
 
@@ -331,26 +431,90 @@ export default function TeacherCourseLessonsPage() {
     }
 
     const duration = Math.max(1, Number(lessonForm.durationMinutes) || 1);
-    const orderIndex = lessonForm.orderIndex
-      ? Number(lessonForm.orderIndex)
-      : (lessonsBySection[selectedSectionId]?.length || 0) + 1;
-
     const targetSectionId = selectedSectionId;
+
+    // ضمان عدم تكرار ترتيب الدرس داخل نفس القسم
+    const existingLessonsInSection = (lessonsBySection[targetSectionId] || []).filter(
+      (l) => !editingLessonId || l.id !== editingLessonId
+    );
+
+    const usedOrderIndices = new Set(
+      existingLessonsInSection
+        .map((l) => Number(l.order_index) || 0)
+        .filter((n) => Number.isFinite(n) && n > 0)
+    );
+
+    let orderIndex: number;
+
+    if (lessonForm.orderIndex) {
+      const requested = Number(lessonForm.orderIndex) || 1;
+      orderIndex = requested > 0 ? requested : 1;
+    } else if (existingLessonsInSection.length > 0) {
+      const maxExisting = Math.max(
+        ...existingLessonsInSection.map((l) => Number(l.order_index) || 0)
+      );
+      orderIndex = (Number.isFinite(maxExisting) ? maxExisting : 0) + 1;
+    } else {
+      orderIndex = 1;
+    }
+
+    while (usedOrderIndices.has(orderIndex)) {
+      orderIndex += 1;
+    }
 
     try {
       setSavingLesson(true);
+      let quizData: any = null;
+
+      if (lessonForm.type === 'quiz') {
+        const preparedQuestions = lessonForm.quizQuestions
+          .map((q, index) => {
+            const options = [q.optionA, q.optionB, q.optionC, q.optionD]
+              .map((o) => o.trim())
+              .filter((o) => o);
+            const text = q.text.trim();
+            let correctAnswer = '';
+            if (q.correctOption === 'A') correctAnswer = q.optionA.trim();
+            if (q.correctOption === 'B') correctAnswer = q.optionB.trim();
+            if (q.correctOption === 'C') correctAnswer = q.optionC.trim();
+            if (q.correctOption === 'D') correctAnswer = q.optionD.trim();
+            if (!text || options.length < 2 || !correctAnswer) {
+              return null;
+            }
+            return {
+              id: q.id || `q${index + 1}`,
+              text,
+              options,
+              correctAnswer,
+            };
+          })
+          .filter((q) => q);
+
+        if (!preparedQuestions.length) {
+          toast.error('يرجى إضافة سؤال واحد صالح على الأقل للاختبار (نص، اختيارات، وإجابة صحيحة).');
+          setSavingLesson(false);
+          return;
+        }
+
+        quizData = { questions: preparedQuestions };
+      }
 
       const payload: any = {
         course_id: courseId,
         section_id: targetSectionId,
         title: lessonForm.title.trim(),
         description: lessonForm.description.trim(),
-        video_url: lessonForm.videoUrl.trim() || null,
+        video_url:
+          lessonForm.type === 'video' ? lessonForm.videoUrl.trim() || null : null,
         duration_minutes: duration,
         order_index: orderIndex,
         is_free: lessonForm.isFree,
         is_preview: lessonForm.isPreview,
         is_published: true,
+        access_code:
+          lessonForm.type === 'video' ? lessonForm.accessCode.trim() || null : null,
+        type: lessonForm.type,
+        quiz_data: lessonForm.type === 'quiz' ? quizData : null,
       };
 
       const method = editingLessonId ? 'PUT' : 'POST';
@@ -368,7 +532,18 @@ export default function TeacherCourseLessonsPage() {
 
       if (!res.ok || !json?.lesson) {
         console.error('Error saving lesson via API:', json);
-        toast.error(editingLessonId ? 'فشل تحديث الدرس' : 'فشل إنشاء الدرس');
+
+        if (res.status === 409 && json?.code === 'DUPLICATE_LESSON_ORDER_INDEX') {
+          toast.error(
+            json.error ||
+              'يوجد بالفعل درس بنفس الترتيب داخل هذا القسم. يرجى اختيار ترتيب مختلف أو ترك الحقل فارغاً ليتم تحديده تلقائياً.',
+          );
+        } else if (json?.error) {
+          toast.error(json.error);
+        } else {
+          toast.error(editingLessonId ? 'فشل تحديث الدرس' : 'فشل إنشاء الدرس');
+        }
+
         return;
       }
 
@@ -385,6 +560,9 @@ export default function TeacherCourseLessonsPage() {
           is_free: !!data.is_free,
           is_preview: !!data.is_preview,
           section_id: data.section_id ? String(data.section_id) : null,
+          access_code: data.access_code ?? payload.access_code ?? null,
+          type: (data.type as LessonType) || lessonForm.type || 'video',
+          quiz_data: data.quiz_data || (lessonForm.type === 'quiz' ? quizData : null),
         };
 
         setLessonsBySection((prev) => {
@@ -427,6 +605,9 @@ export default function TeacherCourseLessonsPage() {
           is_free: !!data.is_free,
           is_preview: !!data.is_preview,
           section_id: data.section_id ? String(data.section_id) : null,
+          access_code: data.access_code ?? payload.access_code ?? null,
+          type: (data.type as LessonType) || lessonForm.type || 'video',
+          quiz_data: data.quiz_data || (lessonForm.type === 'quiz' ? quizData : null),
         };
 
         if (created.section_id) {
@@ -500,6 +681,140 @@ export default function TeacherCourseLessonsPage() {
     }
   };
 
+  const handleLessonDragStart = (sectionId: string | null, lessonId: string) => {
+    setDraggingLesson({ sectionId, lessonId });
+  };
+
+  const handleLessonDragEnd = () => {
+    setDraggingLesson(null);
+  };
+
+  const handleLessonDrop = async (sectionId: string | null, targetLessonId: string) => {
+    if (!courseId || !draggingLesson) return;
+
+    const sourceKey = draggingLesson.sectionId ? String(draggingLesson.sectionId) : '';
+    const targetKey = sectionId ? String(sectionId) : '';
+
+    if (sourceKey !== targetKey) {
+      setDraggingLesson(null);
+      return;
+    }
+
+    const isUnsectioned = !sectionId;
+    const currentList = isUnsectioned
+      ? [...unsectionedLessons]
+      : [...(lessonsBySection[targetKey] || [])];
+
+    const fromIndex = currentList.findIndex((l) => l.id === draggingLesson.lessonId);
+    const toIndex = currentList.findIndex((l) => l.id === targetLessonId);
+
+    if (fromIndex === -1 || toIndex === -1 || fromIndex === toIndex) {
+      setDraggingLesson(null);
+      return;
+    }
+
+    const reordered = [...currentList];
+    const [moved] = reordered.splice(fromIndex, 1);
+    reordered.splice(toIndex, 0, moved);
+
+    const withOrder = reordered.map((lesson, index) => ({
+      ...lesson,
+      order_index: index + 1,
+    }));
+
+    if (isUnsectioned) {
+      setUnsectionedLessons(withOrder);
+    } else {
+      setLessonsBySection((prev) => ({
+        ...prev,
+        [targetKey]: withOrder,
+      }));
+    }
+
+    setDraggingLesson(null);
+
+    try {
+      await Promise.all(
+        withOrder.map((lesson, index) =>
+          fetch(`/api/courses/${courseId}/lessons`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ id: lesson.id, order_index: index + 1 }),
+          }),
+        ),
+      );
+    } catch (error) {
+      console.error('Unexpected error reordering lessons:', error);
+      toast.error('حدث خطأ أثناء حفظ ترتيب الدروس');
+    }
+  };
+
+  // أدوات مساعدة لترتيب الامتحانات مع الأقسام
+  const getSectionTitle = (sectionId: string | null) => {
+    if (!sectionId) return 'بدون قسم';
+    const sec = sections.find((s) => s.id === sectionId);
+    return sec ? sec.title : 'قسم غير معروف';
+  };
+
+  const handleExamFieldChange = (
+    examId: string,
+    field: 'sectionId' | 'orderIndex',
+    value: any,
+  ) => {
+    setExamsForCourse((prev) =>
+      prev.map((exam) => {
+        if (exam.id !== examId) return exam;
+        if (field === 'sectionId') {
+          return {
+            ...exam,
+            sectionId: value || null,
+          };
+        }
+        // orderIndex
+        const numeric = value === '' ? '' : Number(value) || 0;
+        return {
+          ...exam,
+          orderIndex: numeric,
+        };
+      }),
+    );
+  };
+
+  const handleSaveExamOrdering = async () => {
+    if (!courseId || examsForCourse.length === 0) return;
+
+    try {
+      setSavingExamOrder(true);
+
+      await Promise.all(
+        examsForCourse.map((exam) =>
+          fetch(`/api/exams/${exam.id}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              sectionId: exam.sectionId || null,
+              orderIndex:
+                typeof exam.orderIndex === 'number'
+                  ? exam.orderIndex
+                  : Number(exam.orderIndex || 0) || 0,
+            }),
+          }),
+        ),
+      );
+
+      toast.success('تم حفظ ربط وترتيب الامتحانات مع الأقسام');
+    } catch (error) {
+      console.error('Unexpected error saving exams ordering:', error);
+      toast.error('حدث خطأ أثناء حفظ ترتيب الامتحانات');
+    } finally {
+      setSavingExamOrder(false);
+    }
+  };
+
   const totalSections = sections.length;
   const totalLessons =
     Object.values(lessonsBySection).reduce((acc, list) => acc + (list ? list.length : 0), 0) +
@@ -521,7 +836,7 @@ export default function TeacherCourseLessonsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 pt-24">
       <div className="border-b bg-white">
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between gap-4">
           <div>
@@ -536,6 +851,19 @@ export default function TeacherCourseLessonsPage() {
             <h1 className="text-2xl font-bold text-gray-800">إدارة محتوى الكورس</h1>
             <p className="text-gray-600 text-sm mt-1">{courseTitle}</p>
           </div>
+
+          {courseId && (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => router.push(`/teacher/courses/${courseId}/exams`)}
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm rounded-lg bg-purple-600 text-white hover:bg-purple-700 transition"
+              >
+                <FaPlus />
+                إدارة الامتحانات
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -715,7 +1043,12 @@ export default function TeacherCourseLessonsPage() {
                         {lessons.map((lesson) => (
                           <div
                             key={lesson.id}
-                            className="flex items-start justify-between gap-3 border rounded-lg px-3 py-2 text-sm bg-white"
+                            className="flex items-start justify-between gap-3 border rounded-lg px-3 py-2 text-sm bg-white cursor-move"
+                            draggable
+                            onDragStart={() => handleLessonDragStart(section.id, lesson.id)}
+                            onDragEnd={handleLessonDragEnd}
+                            onDragOver={(e) => e.preventDefault()}
+                            onDrop={() => handleLessonDrop(section.id, lesson.id)}
                           >
                             <div className="flex-1">
                               <div className="flex items-center gap-2 mb-1">
@@ -723,6 +1056,11 @@ export default function TeacherCourseLessonsPage() {
                                   {lesson.order_index ? `${lesson.order_index}. ` : ''}
                                   {lesson.title}
                                 </span>
+                                {lesson.type === 'quiz' && (
+                                  <span className="px-2 py-0.5 rounded-full text-xs bg-purple-100 text-purple-700">
+                                    اختبار
+                                  </span>
+                                )}
                                 {lesson.is_free && (
                                   <span className="px-2 py-0.5 rounded-full text-xs bg-green-100 text-green-700">
                                     مجاني
@@ -803,7 +1141,12 @@ export default function TeacherCourseLessonsPage() {
                     {unsectionedLessons.map((lesson) => (
                       <div
                         key={lesson.id}
-                        className="flex items-start justify-between gap-3 border rounded-lg px-3 py-2 text-sm bg-white"
+                        className="flex items-start justify-between gap-3 border rounded-lg px-3 py-2 text-sm bg-white cursor-move"
+                        draggable
+                        onDragStart={() => handleLessonDragStart(null, lesson.id)}
+                        onDragEnd={handleLessonDragEnd}
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={() => handleLessonDrop(null, lesson.id)}
                       >
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-1">
@@ -811,6 +1154,11 @@ export default function TeacherCourseLessonsPage() {
                               {lesson.order_index ? `${lesson.order_index}. ` : ''}
                               {lesson.title}
                             </span>
+                            {lesson.type === 'quiz' && (
+                              <span className="px-2 py-0.5 rounded-full text-xs bg-purple-100 text-purple-700">
+                                اختبار
+                              </span>
+                            )}
                             {lesson.is_free && (
                               <span className="px-2 py-0.5 rounded-full text-xs bg-green-100 text-green-700">
                                 مجاني
@@ -865,12 +1213,44 @@ export default function TeacherCourseLessonsPage() {
             </div>
           </div>
 
-          {/* نموذج إضافة/تعديل الدرس */}
+          {/* نموذج إضافة/تعديل الدرس أو لوحة ترتيب/الامتحانات */}
           <div className="bg-white rounded-xl shadow p-4">
-            <h2 className="font-bold text-lg mb-3">
-              {editingLessonId ? 'تعديل الدرس' : 'إضافة درس جديد'}
-            </h2>
-            <form onSubmit={handleSaveLesson} className="space-y-3 text-sm">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="font-bold text-lg">
+                {activeEditor === 'lesson'
+                  ? editingLessonId
+                    ? 'تعديل الدرس'
+                    : 'إضافة درس جديد'
+                  : 'ترتيب محتوى الكورس والامتحانات'}
+              </h2>
+              <div className="inline-flex rounded-lg border border-gray-200 overflow-hidden text-xs">
+                <button
+                  type="button"
+                  onClick={() => setActiveEditor('lesson')}
+                  className={`px-3 py-1.5 ${
+                    activeEditor === 'lesson'
+                      ? 'bg-purple-600 text-white'
+                      : 'bg-white text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  درس
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveEditor('exam')}
+                  className={`px-3 py-1.5 border-r border-gray-200 ${
+                    activeEditor === 'exam'
+                      ? 'bg-purple-600 text-white'
+                      : 'bg-white text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  ترتيب
+                </button>
+              </div>
+            </div>
+
+            {activeEditor === 'lesson' ? (
+              <form onSubmit={handleSaveLesson} className="space-y-3 text-sm">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-medium mb-1">القسم</label>
@@ -952,6 +1332,20 @@ export default function TeacherCourseLessonsPage() {
               </div>
 
               <div>
+                <label className="block font-medium mb-1">كود هذا الدرس (اختياري)</label>
+                <input
+                  type="text"
+                  value={lessonForm.accessCode}
+                  onChange={(e) => setLessonForm({ ...lessonForm, accessCode: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  placeholder="مثال: MATH-LESSON-1"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  إذا تركت هذا الحقل فارغًا سيكون الدرس متاحًا بدون كود (للطلبة المشتركين في الكورس).
+                </p>
+              </div>
+
+              <div>
                 <label className="block font-medium mb-1">رابط الفيديو (Google Drive أو غيره)</label>
                 <input
                   type="url"
@@ -1003,7 +1397,86 @@ export default function TeacherCourseLessonsPage() {
                   </button>
                 </div>
               </div>
-            </form>
+              </form>
+            ) : (
+              <div className="space-y-4 text-sm">
+                <div className="mt-4 pt-4 border-t border-gray-100 space-y-3">
+                  <h3 className="font-semibold text-sm">امتحانات هذا الكورس وترتيبها مع الأقسام</h3>
+
+                  {loadingExamsForOrder ? (
+                    <div className="flex items-center justify-center py-6 text-gray-500 text-xs">
+                      <FaSpinner className="animate-spin ml-2" />
+                      <span>جاري تحميل الامتحانات...</span>
+                    </div>
+                  ) : examsForCourse.length === 0 ? (
+                    <p className="text-xs text-gray-500">
+                      لا توجد امتحانات بعد لهذا الكورس. يمكنك إضافة الامتحانات من زر "فتح صفحة إدارة
+                      الامتحانات" بالأعلى.
+                    </p>
+                  ) : (
+                    <>
+                      <div className="space-y-2 max-h-72 overflow-y-auto">
+                        {examsForCourse.map((exam) => (
+                          <div
+                            key={exam.id}
+                            className="flex flex-col md:flex-row md:items-center gap-3 border rounded-lg px-3 py-2 bg-gray-50"
+                          >
+                            <div className="flex-1 text-right">
+                              <div className="font-medium text-sm">{exam.title}</div>
+                              <div className="text-[11px] text-gray-500 mt-0.5">
+                                القسم الحالي: {getSectionTitle(exam.sectionId || null)}
+                                {' '}
+                                • ترتيب داخل القسم:{' '}
+                                {exam.orderIndex && Number(exam.orderIndex) > 0
+                                  ? Number(exam.orderIndex)
+                                  : 'لم يُحدد بعد'}
+                              </div>
+                            </div>
+                            <div className="flex flex-col sm:flex-row gap-2 items-stretch">
+                              <select
+                                value={exam.sectionId || ''}
+                                onChange={(e) =>
+                                  handleExamFieldChange(exam.id, 'sectionId', e.target.value || null)
+                                }
+                                className="px-2 py-1.5 border rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
+                              >
+                                <option value="">بدون قسم</option>
+                                {sections.map((section) => (
+                                  <option key={section.id} value={section.id}>
+                                    {section.title}
+                                  </option>
+                                ))}
+                              </select>
+                              <input
+                                type="number"
+                                min={1}
+                                value={exam.orderIndex ?? ''}
+                                onChange={(e) =>
+                                  handleExamFieldChange(exam.id, 'orderIndex', e.target.value)
+                                }
+                                className="w-24 px-2 py-1.5 border rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                placeholder="ترتيب"
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="flex justify-end pt-2">
+                        <button
+                          type="button"
+                          onClick={handleSaveExamOrdering}
+                          disabled={savingExamOrder}
+                          className="px-4 py-1.5 rounded-lg bg-purple-600 text-white text-xs hover:bg-purple-700 disabled:opacity-50"
+                        >
+                          {savingExamOrder ? 'جاري حفظ الترتيب...' : 'حفظ ربط وترتيب الامتحانات'}
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

@@ -43,75 +43,58 @@ export default function CourseChat({
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [showEmoji, setShowEmoji] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-  // محاكاة رسائل سابقة
   useEffect(() => {
-    if (isOpen) {
-      loadMessages();
-      // محاكاة اتصال WebSocket
-      simulateRealtimeConnection();
+    if (isOpen && courseId) {
+      const fetchMessages = async () => {
+        try {
+          setIsLoading(true);
+          const params = new URLSearchParams();
+          params.set('courseId', courseId);
+          if (teacherId) {
+            params.set('teacherId', teacherId);
+          }
+
+          const res = await fetch(`/api/course-messages?${params.toString()}`);
+          if (!res.ok) {
+            return;
+          }
+
+          const data = await res.json();
+          const mapped: Message[] = (data || []).map((m: any) => ({
+            id: String(m.id),
+            senderId: m.sender_id,
+            senderName:
+              m.sender_name ||
+              (m.sender_role === 'teacher'
+                ? teacherName || 'المدرس'
+                : userName || 'طالب'),
+            senderAvatar:
+              m.sender_role === 'teacher'
+                ? '/teacher-avatar.jpg'
+                : '/placeholder-avatar.png',
+            senderRole: m.sender_role,
+            content: m.content,
+            timestamp: m.created_at || new Date().toISOString(),
+            isRead: true,
+          }));
+
+          setMessages(mapped);
+          const baseOnline: string[] = [];
+          if (teacherId) baseOnline.push(teacherId);
+          if (userId) baseOnline.push(userId);
+          setOnlineUsers(baseOnline);
+        } catch (error) {
+          console.error('Error loading course messages:', error);
+        } finally {
+          setIsLoading(false);
+        }
+      };
+
+      fetchMessages();
     }
-  }, [isOpen, courseId]);
-
-  const loadMessages = () => {
-    // رسائل تجريبية
-    const mockMessages: Message[] = [
-      {
-        id: '1',
-        senderId: teacherId || 'teacher_1',
-        senderName: teacherName || 'أ. محمد أحمد',
-        senderAvatar: '/teacher-avatar.jpg',
-        senderRole: 'teacher',
-        content: 'أهلاً وسهلاً بكم في الكورس! 🎉',
-        timestamp: new Date(Date.now() - 3600000).toISOString(),
-        isRead: true
-      },
-      {
-        id: '2',
-        senderId: 'student_1',
-        senderName: 'أحمد علي',
-        senderAvatar: '/student1.jpg',
-        senderRole: 'student',
-        content: 'شكراً أستاذ، الكورس رائع جداً',
-        timestamp: new Date(Date.now() - 3000000).toISOString(),
-        isRead: true
-      },
-      {
-        id: '3',
-        senderId: teacherId || 'teacher_1',
-        senderName: teacherName || 'أ. محمد أحمد',
-        senderAvatar: '/teacher-avatar.jpg',
-        senderRole: 'teacher',
-        content: 'العفو، إذا كان لديكم أي أسئلة لا تترددوا في السؤال',
-        timestamp: new Date(Date.now() - 2400000).toISOString(),
-        isRead: true
-      }
-    ];
-    setMessages(mockMessages);
-  };
-
-  const simulateRealtimeConnection = () => {
-    // محاكاة مستخدمين متصلين
-    setOnlineUsers(['teacher_1', 'student_1', userId]);
-    
-    // محاكاة رسالة جديدة بعد 5 ثواني
-    setTimeout(() => {
-      if (userRole === 'student') {
-        const newMsg: Message = {
-          id: Date.now().toString(),
-          senderId: teacherId || 'teacher_1',
-          senderName: teacherName || 'أ. محمد أحمد',
-          senderAvatar: '/teacher-avatar.jpg',
-          senderRole: 'teacher',
-          content: 'كيف حالك؟ هل تحتاج مساعدة في أي درس؟',
-          timestamp: new Date().toISOString(),
-          isRead: false
-        };
-        setMessages(prev => [...prev, newMsg]);
-        toast('📩 رسالة جديدة من المدرس', { icon: '💬' });
-      }
-    }, 5000);
-  };
+  }, [isOpen, courseId, teacherId, userId, userName, teacherName]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -121,42 +104,55 @@ export default function CourseChat({
     scrollToBottom();
   }, [messages]);
 
-  const handleSendMessage = (e?: React.FormEvent) => {
+  const handleSendMessage = async (e?: React.FormEvent) => {
     e?.preventDefault();
     
     if (!newMessage.trim()) return;
 
-    const message: Message = {
+    const content = newMessage.trim();
+
+    const optimistic: Message = {
       id: Date.now().toString(),
       senderId: userId,
       senderName: userName,
-      senderAvatar: '/default-avatar.png',
+      senderAvatar: '/placeholder-avatar.png',
       senderRole: userRole,
-      content: newMessage,
+      content,
       timestamp: new Date().toISOString(),
-      isRead: false
+      isRead: false,
     };
 
-    setMessages(prev => [...prev, message]);
+    setMessages(prev => [...prev, optimistic]);
     setNewMessage('');
 
-    // محاكاة رد تلقائي من المدرس
-    if (userRole === 'student') {
-      setIsTyping(true);
-      setTimeout(() => {
-        setIsTyping(false);
-        const reply: Message = {
-          id: (Date.now() + 1).toString(),
-          senderId: teacherId || 'teacher_1',
-          senderName: teacherName || 'أ. محمد أحمد',
-          senderAvatar: '/teacher-avatar.jpg',
-          senderRole: 'teacher',
-          content: 'شكراً على رسالتك، سأرد عليك قريباً 👍',
-          timestamp: new Date().toISOString(),
-          isRead: false
-        };
-        setMessages(prev => [...prev, reply]);
-      }, 2000);
+    try {
+      const res = await fetch('/api/course-messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          courseId,
+          teacherId,
+          senderId: userId,
+          senderName: userName,
+          senderRole: userRole,
+          content,
+        }),
+      });
+
+      if (!res.ok) {
+        try {
+          const errorBody = await res.json();
+          console.error('Error response from /api/course-messages:', res.status, errorBody);
+        } catch (jsonErr) {
+          console.error('Failed to parse error response from /api/course-messages:', jsonErr);
+        }
+        toast.error('فشل إرسال الرسالة، حاول مرة أخرى');
+      }
+    } catch (error) {
+      console.error('Error sending course message:', error);
+      toast.error('حدث خطأ أثناء إرسال الرسالة');
     }
   };
 
@@ -181,7 +177,7 @@ export default function CourseChat({
                 alt="Chat"
                 className="w-10 h-10 rounded-full border-2 border-white"
                 onError={(e) => {
-                  (e.target as HTMLImageElement).src = '/default-avatar.png';
+                  (e.target as HTMLImageElement).src = '/placeholder-avatar.png';
                 }}
               />
               <div className="absolute bottom-0 left-0 w-3 h-3 bg-green-400 rounded-full border-2 border-white"></div>
@@ -228,7 +224,7 @@ export default function CourseChat({
                     alt={message.senderName}
                     className="w-8 h-8 rounded-full"
                     onError={(e) => {
-                      (e.target as HTMLImageElement).src = '/default-avatar.png';
+                      (e.target as HTMLImageElement).src = '/placeholder-avatar.png';
                     }}
                   />
                 )}
@@ -272,7 +268,7 @@ export default function CourseChat({
               alt="Typing"
               className="w-8 h-8 rounded-full"
               onError={(e) => {
-                (e.target as HTMLImageElement).src = '/default-avatar.png';
+                (e.target as HTMLImageElement).src = '/placeholder-avatar.png';
               }}
             />
             <div className="bg-white border border-gray-200 rounded-2xl px-4 py-2">

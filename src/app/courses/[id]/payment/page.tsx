@@ -69,49 +69,12 @@ export default function PaymentPage() {
             thumbnail: (courseData as any).thumbnail || '/placeholder-course.jpg',
           });
         } else {
-          console.warn('لم يتم العثور على الكورس في Supabase، سيتم استخدام القيم الافتراضية/القديمة:', error);
-
-          // بيانات الكورسات الواقعية (للأرقام فقط) - تُستخدم الآن فقط كـ fallback
-          const mockCourses: Record<number, CourseDetails> = {
-            1: {
-              id: 1,
-              title: "الرياضيات للثانوية العامة 2024",
-              price: 1200,
-              discountPrice: 999,
-              thumbnail: "/placeholder-course.jpg",
-            },
-            2: {
-              id: 2,
-              title: "الفيزياء المتقدمة للجامعات",
-              price: 1500,
-              discountPrice: 1299,
-              thumbnail: "/placeholder-course.jpg",
-            },
-            3: {
-              id: 3,
-              title: "الكيمياء الشاملة للثانوية",
-              price: 1100,
-              discountPrice: 950,
-              thumbnail: "/placeholder-course.jpg",
-            },
-          };
-
-          await new Promise(resolve => setTimeout(resolve, 300));
-
-          const numericCourseId = Number(courseId);
-          const fallbackCourse = mockCourses[numericCourseId];
-          if (fallbackCourse) {
-            setCourse(fallbackCourse);
-          } else {
-            // إذا لم يتم العثور على الكورس
-            setCourse({
-              id: courseId || 'unknown',
-              title: "كورس تعليمي",
-              price: 999,
-              discountPrice: 799,
-              thumbnail: "/placeholder-course.jpg",
-            });
-          }
+          console.warn('لم يتم العثور على الكورس في Supabase لمسار الدفع:', error);
+          setCourse(null);
+          setError('لم يتم العثور على هذا الكورس في النظام');
+          setTimeout(() => {
+            router.replace('/courses');
+          }, 2000);
         }
 
         setIsLoading(false);
@@ -301,6 +264,7 @@ export default function PaymentPage() {
             studentName: finalStudentName,
             studentPhone: finalStudentPhone,
             studentEmail: finalStudentEmail,
+            studentId: user.id || (user as any)._id,
             courseId: courseId,
             courseName: course.title,
             coursePrice: course.discountPrice || course.price,

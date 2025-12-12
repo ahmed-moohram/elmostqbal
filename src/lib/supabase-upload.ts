@@ -31,6 +31,32 @@ export const uploadCourseImage = async (file: File): Promise<{ success: boolean;
   }
 };
 
+export const uploadTeacherAvatar = async (file: File): Promise<{ success: boolean; url?: string; error?: any }> => {
+  try {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
+    const filePath = `teachers/${fileName}`;
+
+    const { data, error } = await supabase.storage
+      .from('images')
+      .upload(filePath, file);
+
+    if (error) {
+      console.error('❌ خطأ في رفع صورة المدرس:', error);
+      throw error;
+    }
+
+    const { data: publicUrl } = supabase.storage
+      .from('images')
+      .getPublicUrl(filePath);
+
+    return { success: true, url: publicUrl.publicUrl };
+  } catch (error) {
+    console.error('❌ فشل رفع صورة المدرس:', error);
+    return { success: false, error };
+  }
+};
+
 // دالة رفع فيديوهات الدروس إلى Supabase Storage
 export const uploadLessonVideo = async (file: File): Promise<{ success: boolean; url?: string; error?: any }> => {
   try {

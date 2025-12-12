@@ -48,49 +48,10 @@ export default function CourseReviews({
   const loadReviews = async () => {
     setIsLoading(true);
     try {
-      // محاكاة جلب المراجعات من API
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      const mockReviews: Review[] = [
-        {
-          id: '1',
-          userId: '1',
-          userName: 'أحمد محمد',
-          rating: 5,
-          comment: 'كورس ممتاز جداً! شرح واضح ومبسط. استفدت كثيراً من المحتوى المقدم.',
-          createdAt: new Date(Date.now() - 86400000),
-          likes: 12,
-          isLiked: false,
-        },
-        {
-          id: '2',
-          userId: '2',
-          userName: 'فاطمة علي',
-          rating: 4,
-          comment: 'محتوى جيد وشامل، لكن أتمنى لو كان هناك المزيد من الأمثلة العملية.',
-          createdAt: new Date(Date.now() - 172800000),
-          likes: 8,
-          isLiked: true,
-        },
-        {
-          id: '3',
-          userId: '3',
-          userName: 'محمود حسن',
-          rating: 5,
-          comment: 'أفضل كورس أخذته في هذا المجال. المدرس محترف والشرح ممتاز.',
-          createdAt: new Date(Date.now() - 259200000),
-          likes: 15,
-          isLiked: false,
-        },
-      ];
-
-      // التحقق من مراجعة المستخدم
-      const userReviewData = mockReviews.find(r => r.userId === user?.id);
-      if (userReviewData) {
-        setUserReview(userReviewData);
-      }
-
-      setReviews(mockReviews);
+      // في الوضع الحالي لا توجد مراجعات حقيقية مخزنة في قاعدة البيانات
+      // لذلك لا نعرض أي بيانات وهمية، ونترك القائمة فارغة حتى يتم ربط Backend فعلي لاحقاً
+      setReviews([]);
+      setUserReview(null);
     } catch (error) {
       console.error('Error loading reviews:', error);
       toast.error('فشل تحميل المراجعات');
@@ -111,27 +72,8 @@ export default function CourseReviews({
     }
 
     try {
-      // محاكاة إرسال المراجعة
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      const newReview: Review = {
-        id: Date.now().toString(),
-        userId: user!.id,
-        userName: user!.name,
-        rating,
-        comment,
-        createdAt: new Date(),
-        likes: 0,
-        isLiked: false,
-        isOwner: true,
-      };
-
-      setReviews([newReview, ...reviews]);
-      setUserReview(newReview);
-      setComment('');
-      setRating(5);
-      setShowReviewForm(false);
-      toast.success('تم إضافة مراجعتك بنجاح');
+      // حتى يتم ربط نظام المراجعات بقاعدة البيانات الحقيقية، لن نقوم بإنشاء مراجعات محلية وهمية
+      toast.error('نظام المراجعات سيُفعَّل قريباً بعد ربطه بقاعدة البيانات');
     } catch (error) {
       console.error('Error submitting review:', error);
       toast.error('فشل إضافة المراجعة');

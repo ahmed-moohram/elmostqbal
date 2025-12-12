@@ -5,6 +5,10 @@ import { toast } from 'react-hot-toast';
 
 export default function VideoProtection() {
   useEffect(() => {
+    if (process.env.NODE_ENV !== 'production') {
+      return;
+    }
+
     // 1. منع أدوات المطور بطرق متعددة
     const devtools = { open: false, orientation: undefined };
     

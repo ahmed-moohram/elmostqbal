@@ -61,6 +61,16 @@ interface Activity {
   timestamp: string;
 }
 
+interface CourseMessageSummary {
+  id: string;
+  courseId: string;
+  courseTitle: string;
+  senderName: string;
+  senderRole: 'student' | 'teacher';
+  content: string;
+  createdAt: string;
+}
+
 export default function TeacherDashboardById() {
   const router = useRouter();
   const params = useParams();
@@ -74,6 +84,7 @@ export default function TeacherDashboardById() {
   const [students, setStudents] = useState<Student[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
   const [activities, setActivities] = useState<Activity[]>([]);
+  const [courseMessages, setCourseMessages] = useState<CourseMessageSummary[]>([]);
   const [uploading, setUploading] = useState(false);
   const [selectedCourseId, setSelectedCourseId] = useState<string>('');
   const [uploadFile, setUploadFile] = useState<File | null>(null);
@@ -83,211 +94,9 @@ export default function TeacherDashboardById() {
   const [isFreeLesson, setIsFreeLesson] = useState(false);
 
   useEffect(() => {
-    const fetchData = async () => {
-      const userJson = typeof window !== 'undefined' ? localStorage.getItem('user') : null;
-      if (!userJson) {
-        toast.error('يرجى تسجيل الدخول أولاً');
-        router.replace('/login');
-        return;
-      }
-
-      const user = JSON.parse(userJson);
-
-      if (user.role !== 'teacher') {
-        toast.error('ليس لديك صلاحية الوصول لهذه الصفحة');
-        router.replace('/');
-        return;
-      }
-
-      if (!teacherId || user.id !== teacherId) {
-        toast.error('لا يمكنك الوصول إلى لوحة مدرس آخر');
-        router.replace('/');
-        return;
-      }
-
-      setTeacher(user);
-
-      try {
-        setDataLoading(true);
-
-        // 1) جلب كورسات هذا المدرس
-        const { data: coursesData, error: coursesError } = await supabase
-          .from('courses')
-          .select('id, title, is_published')
-          .eq('instructor_id', user.id);
-
-        if (coursesError) {
-          console.error('❌ خطأ في جلب كورسات المدرس:', coursesError);
-          toast.error('حدث خطأ في جلب كورساتك');
-        }
-
-        const safeCourses = (coursesData || []) as any[];
-        const courseIds = safeCourses.map((c) => c.id).filter(Boolean);
-        const courseTitleMap = new Map<string, string>(
-          safeCourses
-            .filter((c) => c.id)
-            .map((c) => [String(c.id), c.title || ''])
-        );
-
-        // 2) جلب عدد الدروس لكل كورس + تفاصيل الدروس
-        let lessonCounts = new Map<string, number>();
-        let lessonsMap: Record<string, Lesson[]> = {};
-        if (courseIds.length > 0) {
-          const { data: lessonsData, error: lessonsError } = await supabase
-            .from('lessons')
-            .select('id, course_id, title, duration_minutes, order_index, is_free, video_url')
-            .in('course_id', courseIds);
-
-          if (lessonsError) {
-            console.error('⚠️ خطأ في جلب عدد الدروس لكل كورس:', lessonsError);
-          }
-
-          if (lessonsData) {
-            lessonCounts = new Map<string, number>();
-            lessonsMap = {};
-
-            (lessonsData as any[]).forEach((lesson) => {
-              const cid = lesson.course_id as string | null;
-              if (!cid) return;
-
-              lessonCounts.set(cid, (lessonCounts.get(cid) || 0) + 1);
-
-              const l: Lesson = {
-                id: String(lesson.id),
-                title: lesson.title || 'درس بدون عنوان',
-                durationMinutes: Number(lesson.duration_minutes) || 0,
-                orderIndex: Number(lesson.order_index) || 0,
-                isFree: !!lesson.is_free,
-                videoUrl: lesson.video_url || null,
-              };
-
-              if (!lessonsMap[cid]) {
-                lessonsMap[cid] = [];
-              }
-              lessonsMap[cid].push(l);
-            });
-
-            Object.keys(lessonsMap).forEach((cid) => {
-              lessonsMap[cid].sort((a, b) => a.orderIndex - b.orderIndex);
-            });
-          }
-        }
-
-        // 3) جلب التسجيلات (الطلاب) في كورسات هذا المدرس
-        let enrollments: any[] = [];
-        if (courseIds.length > 0) {
-          const { data: enrollmentsData, error: enrollmentsError } = await supabase
-            .from('enrollments')
-            .select('id, user_id, course_id, progress, enrolled_at, last_accessed')
-            .in('course_id', courseIds)
-            .eq('is_active', true);
-
-          if (enrollmentsError) {
-            console.error('⚠️ خطأ في جلب تسجيلات الطلاب لكورسات المدرس:', enrollmentsError);
-          }
-
-          enrollments = (enrollmentsData || []) as any[];
-        }
-
-        // 4) جلب بيانات الطلاب من جدول users
-        const studentIds = Array.from(
-          new Set(enrollments.map((e) => e.user_id).filter(Boolean))
-        );
-
-        let studentsMap = new Map<string, Student>();
-        let recentActivities: Activity[] = [];
-        if (studentIds.length > 0) {
-          const { data: usersData, error: usersError } = await supabase
-            .from('users')
-            .select('id, name, email')
-            .in('id', studentIds);
-
-          if (usersError) {
-            console.error('⚠️ خطأ في جلب بيانات الطلاب:', usersError);
-          }
-
-          const users = (usersData || []) as any[];
-
-          studentsMap = new Map(
-            users.map((u) => {
-              const userEnrolls = enrollments.filter((e) => e.user_id === u.id);
-              const enrolledCourseIds = userEnrolls.map((e) => e.course_id);
-              const avgProgress =
-                userEnrolls.length > 0
-                  ? userEnrolls.reduce(
-                      (sum: number, e: any) => sum + (Number(e.progress) || 0),
-                      0
-                    ) / userEnrolls.length
-                  : 0;
-
-              const student: Student = {
-                id: u.id,
-                name: u.name || 'طالب',
-                email: u.email || '',
-                enrolledCourses: enrolledCourseIds.map((cid: any) => String(cid)),
-                progress: Math.round(avgProgress || 0),
-              };
-
-              return [u.id, student];
-            })
-          );
-        }
-
-        if (enrollments.length > 0 && studentsMap.size > 0) {
-          recentActivities = enrollments
-            .map((enrollment: any) => {
-              const student = studentsMap.get(enrollment.user_id as string);
-              const courseTitle = courseTitleMap.get(String(enrollment.course_id));
-              const ts = (enrollment.enrolled_at || enrollment.last_accessed) as string | null;
-
-              if (!student || !courseTitle || !ts) return null;
-
-              return {
-                id: String(enrollment.id),
-                type: 'enrollment' as const,
-                studentName: student.name,
-                courseTitle,
-                timestamp: ts,
-              };
-            })
-            .filter(Boolean) as Activity[];
-
-          recentActivities.sort(
-            (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-          );
-        }
-
-        // 5) تحويل الكورسات إلى الشكل المناسب للوحة المدرس
-        const transformedCourses: Course[] = safeCourses.map((c) => {
-          const cid = c.id as string;
-          const studentsCount = enrollments.filter((e) => e.course_id === cid).length;
-          const lessonsCountValue = lessonCounts.get(cid) || 0;
-
-          return {
-            id: cid,
-            title: c.title || 'بدون عنوان',
-            studentsCount,
-            lessonsCount: lessonsCountValue,
-            status: c.is_published ? 'published' : 'draft',
-          };
-        });
-
-        setCourses(transformedCourses);
-        setStudents(Array.from(studentsMap.values()));
-        setActivities(recentActivities.slice(0, 5));
-        setLessonsByCourse(lessonsMap);
-        setSelectedCourseId((prev) => prev || (transformedCourses[0]?.id ?? ''));
-      } catch (error) {
-        console.error('❌ خطأ غير متوقع في جلب بيانات لوحة المدرس:', error);
-        toast.error('حدث خطأ في تحميل بيانات لوحة التحكم');
-      } finally {
-        setDataLoading(false);
-        setIsLoading(false);
-      }
-    };
-
-    fetchData();
-  }, [router, teacherId]);
+    // إعادة توجيه أي طلب على /teachers/[id]/dashboard إلى لوحة المدرس الرسمية
+    router.replace('/teacher/dashboard');
+  }, [router]);
 
   const handleUploadVideo = () => {
     setActiveTab('upload');

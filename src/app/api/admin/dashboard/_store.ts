@@ -298,18 +298,28 @@ export async function getCharts(period: string) {
 }
 
 async function activateEnrollmentForPaymentRequest(paymentRequest: any, requestId: string) {
-  const { data: studentData } = await supabase
-    .from('users')
-    .select('id')
-    .eq('phone', paymentRequest.student_phone)
-    .single();
+  // نحاول أولاً استخدام student_id المخزَّن مع الطلب إن وُجد
+  let studentId: string | null = paymentRequest?.student_id as string | null | undefined;
 
-  if (!studentData) return;
+  // إذا لم يكن هناك student_id (طلبات قديمة)، نستخدم رقم الهاتف للبحث عن الطالب
+  if (!studentId) {
+    const studentPhone = paymentRequest?.student_phone as string | null | undefined;
+    if (!studentPhone) return;
+
+    const { data: studentData } = await supabase
+      .from('users')
+      .select('id')
+      .or(`phone.eq.${studentPhone},student_phone.eq.${studentPhone}`)
+      .maybeSingle();
+
+    if (!studentData) return;
+    studentId = studentData.id;
+  }
 
   const { data: existingEnrollment } = await supabase
     .from('course_enrollments')
     .select('id')
-    .eq('student_id', studentData.id)
+    .eq('student_id', studentId)
     .eq('course_id', paymentRequest.course_id)
     .maybeSingle();
 
@@ -317,7 +327,7 @@ async function activateEnrollmentForPaymentRequest(paymentRequest: any, requestI
     await supabase
       .from('course_enrollments')
       .insert({
-        student_id: studentData.id,
+        student_id: studentId,
         course_id: paymentRequest.course_id,
         payment_request_id: requestId,
         is_active: true,
@@ -338,7 +348,7 @@ async function activateEnrollmentForPaymentRequest(paymentRequest: any, requestI
     const { data: existingLegacyEnrollment } = await supabase
       .from('enrollments')
       .select('id')
-      .eq('user_id', studentData.id)
+      .eq('user_id', studentId)
       .eq('course_id', paymentRequest.course_id)
       .maybeSingle();
 
@@ -346,7 +356,7 @@ async function activateEnrollmentForPaymentRequest(paymentRequest: any, requestI
       await supabase
         .from('enrollments')
         .insert({
-          user_id: studentData.id,
+          user_id: studentId,
           course_id: paymentRequest.course_id,
           progress: 0,
           is_active: true,
@@ -368,7 +378,7 @@ async function activateEnrollmentForPaymentRequest(paymentRequest: any, requestI
     await supabase
       .from('notifications')
       .insert({
-        user_id: studentData.id,
+        user_id: studentId,
         title: 'تم قبول طلب الاشتراك',
         message: `تم قبول طلب اشتراكك في كورس ${paymentRequest.course_name}`,
         type: 'payment',

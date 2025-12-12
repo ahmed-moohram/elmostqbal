@@ -35,7 +35,7 @@ export default function StudentDashboard() {
     totalCourses: 0,
     completedCourses: 0,
     totalWatchTime: 0,
-    currentStreak: 5,
+    currentStreak: 0,
     totalPoints: 0,
   });
   const [weeklyProgress, setWeeklyProgress] = useState(0);
@@ -126,7 +126,8 @@ export default function StudentDashboard() {
         setEnrolledCourses(courses);
 
         // حساب الإحصائيات العامة
-        const totalCompleted = courses.filter((c) => c.progress >= 90).length;
+        // نعتبر الكورس مكتمل فقط عندما تصل نسبة التقدم إلى 100%
+        const totalCompleted = courses.filter((c) => (c.progress || 0) >= 100).length;
         const totalTime = Object.values(coursesProgress).reduce(
           (sum, course: any) => sum + (course.totalWatchTime || 0),
           0
@@ -140,7 +141,7 @@ export default function StudentDashboard() {
           totalCourses: courses.length,
           completedCourses: totalCompleted,
           totalWatchTime: Math.floor(totalTime / 3600),
-          currentStreak: 5,
+          currentStreak: 0,
           totalPoints: totalQuizPoints,
         });
 
@@ -234,6 +235,9 @@ export default function StudentDashboard() {
             />
           </div>
           <p className="text-sm mt-2 text-white/90">{weeklyProgress}% من هدفك الأسبوعي</p>
+          <p className="text-xs mt-1 text-white/85">
+            أنهيت {stats.completedCourses} من {stats.totalCourses} كورس، المتبقي {Math.max(stats.totalCourses - stats.completedCourses, 0)} كورس
+          </p>
         </motion.div>
 
         {/* الكورسات المسجل فيها */}

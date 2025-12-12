@@ -106,11 +106,18 @@ export default function LoginPage() {
         return;
       }
 
-      const dashboardPath = user.role === 'student'
-        ? '/student/dashboard'
-        : user.role === 'admin'
-        ? '/admin'
-        : '/teacher/dashboard';
+      // إذا كان المستخدم توه مسجل جديد، نوجهه أولاً للصفحة الرئيسية لعرض رسالة الترحيب
+      let dashboardPath: string;
+      if (typeof window !== 'undefined' && localStorage.getItem('justRegistered') === 'true') {
+        dashboardPath = '/';
+      } else {
+        dashboardPath = user.role === 'student'
+          ? '/student/dashboard'
+          : user.role === 'admin'
+          ? '/admin'
+          : '/teacher/dashboard';
+      }
+
       router.replace(dashboardPath);
     }
   }, [isAuthenticated, user, router, searchParams]);

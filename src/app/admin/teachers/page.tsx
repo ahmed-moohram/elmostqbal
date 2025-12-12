@@ -8,6 +8,7 @@ import { FaPlus, FaEdit, FaTrash, FaSearch, FaFilter, FaSortAmountDown, FaSortAm
 import AdminLayout from '../../../components/AdminLayout';
 import supabase from '@/lib/supabase-client';
 import { hashPassword, validatePasswordStrength } from '@/lib/security/password-utils';
+import { uploadTeacherAvatar } from '@/lib/supabase-upload';
 
 // تم إزالة البيانات الوهمية - سيتم جلب البيانات من Backend
 const ignoredMockTeachers = [
@@ -120,6 +121,96 @@ export default function TeachersManagement() {
     }
   };
 
+  const handleToggleFeatured = async (id: string, current: boolean) => {
+    try {
+      const currentTeacher = teachers.find((t: any) => t.id === id);
+
+      // استخدام upsert مع onConflict=user_id لتفادي مشكلة التكرار
+      const { error } = await supabase
+        .from('teachers')
+        .upsert(
+          {
+            user_id: id,
+            is_featured: !current,
+            specialization: currentTeacher?.specialty || 'مدرس',
+            bio: '',
+            experience_years: 0,
+          },
+          { onConflict: 'user_id' }
+        );
+
+      if (error) {
+        console.error('❌ خطأ في إنشاء/تحديث سجل المدرس في جدول teachers:', error);
+        alert('فشل تحديث حالة التمييز للمدرس. تأكد من بنية جدول teachers وسياسات RLS.');
+        return;
+      }
+
+      setTeachers(prev =>
+        prev.map((teacher: any) =>
+          teacher.id === id ? { ...teacher, isFeatured: !current } : teacher
+        )
+      );
+    } catch (error) {
+      console.error('❌ خطأ غير متوقع أثناء تحديث حالة التمييز للمدرس:', error);
+      alert('حدث خطأ أثناء تحديث حالة التمييز للمدرس');
+    }
+  };
+
+  const handleUploadAvatar = async (id: string, file: File) => {
+    try {
+      const result = await uploadTeacherAvatar(file);
+      if (!result.success || !result.url) {
+        alert('فشل رفع صورة المدرس، حاول مرة أخرى');
+        return;
+      }
+
+      const url = result.url;
+
+      const { error: userError } = await supabase
+        .from('users')
+        .update({ avatar_url: url })
+        .eq('id', id);
+
+      if (userError) {
+        console.error('⚠️ خطأ في تحديث صورة المدرس في جدول users:', userError);
+      }
+
+      const { error: teacherError } = await supabase
+        .from('teachers')
+        .update({ avatar_url: url })
+        .eq('user_id', id);
+
+      if (teacherError) {
+        console.error('⚠️ خطأ في تحديث صورة المدرس في جدول teachers:', teacherError);
+      }
+
+      setTeachers(prev =>
+        prev.map((teacher: any) =>
+          teacher.id === id ? { ...teacher, image: url } : teacher
+        )
+      );
+
+      alert('تم تحديث صورة المدرس بنجاح');
+    } catch (error) {
+      console.error('❌ خطأ غير متوقع أثناء رفع صورة المدرس:', error);
+      alert('حدث خطأ أثناء رفع صورة المدرس');
+    }
+  };
+
+  const handleUploadAvatarClick = (id: string) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = (event: Event) => {
+      const target = event.target as HTMLInputElement | null;
+      const file = target?.files?.[0];
+      if (file) {
+        handleUploadAvatar(id, file);
+      }
+    };
+    input.click();
+  };
+
   // Load teachers from Supabase
   useEffect(() => {
     const loadTeachers = async () => {
@@ -162,7 +253,8 @@ export default function TeachersManagement() {
               coursesCount: meta.total_courses ?? 0,
               status: meta.status || 'approved',
               isActive: u.status !== 'suspended',
-              image: (u as any).avatar_url || meta.avatar_url || '/default-teacher.png',
+              image: (u as any).avatar_url || meta.avatar_url || '/placeholder-avatar.png',
+              isFeatured: !!meta.is_featured,
             };
           });
 
@@ -379,6 +471,7 @@ export default function TeachersManagement() {
                     )}
                   </button>
                 </th>
+                <th className="px-4 py-3 text-center text-sm font-medium text-gray-500 dark:text-gray-300">مميز في الرئيسية</th>
                 <th className="px-4 py-3 text-right text-sm font-medium text-gray-500 dark:text-gray-300">حالة الطلب</th>
                 <th className="px-4 py-3 text-center text-sm font-medium text-gray-500 dark:text-gray-300">إجراءات</th>
               </tr>
@@ -411,6 +504,18 @@ export default function TeachersManagement() {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">{teacher.studentsCount}</td>
+                  <td className="px-4 py-3 text-center">
+                    <button
+                      onClick={() => handleToggleFeatured(teacher.id, !!teacher.isFeatured)}
+                      className={`px-3 py-1 text-xs rounded-full border transition-colors ${
+                        teacher.isFeatured
+                          ? 'bg-purple-100 text-purple-700 border-purple-200'
+                          : 'bg-gray-50 text-gray-500 border-gray-200'
+                      }`}
+                    >
+                      {teacher.isFeatured ? 'مميز' : 'عادي'}
+                    </button>
+                  </td>
                   <td className="px-4 py-3">
                     <span
                       className={`px-2 py-1 text-xs rounded-full ${
@@ -457,6 +562,13 @@ export default function TeachersManagement() {
                         className="text-red-600 hover:text-red-800 dark:text-red-500 dark:hover:text-red-400"
                       >
                         <FaTrash />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleUploadAvatarClick(teacher.id)}
+                        className="text-xs border border-blue-300 rounded px-2 py-1 text-blue-600 hover:bg-blue-50"
+                      >
+                        رفع صورة
                       </button>
                       <Link 
                         href={`/admin/teachers/${teacher.id}`}

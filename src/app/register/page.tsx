@@ -373,43 +373,18 @@ const RegisterPage = () => {
       
       console.log('✅ تم التسجيل بنجاح');
       
-      // حفظ بيانات المستخدم الكاملة
-      const userData = {
-        id: newUser.id,
-        name: newUser.name,
-        email: newUser.email,
-        phone: newUser.phone,
-        role: newUser.role,
-        // بيانات إضافية من النموذج
-        fatherName: fatherName,
-        studentPhone: studentPhone,
-        parentPhone: parentPhone,
-        motherPhone: motherPhone,
-        schoolName: schoolName,
-        city: city,
-        gradeLevel: gradeLevel,
-        guardianJob: guardianJob,
-        registrationDate: new Date().toISOString()
-      };
-      
-      // حفظ البيانات في localStorage
-      localStorage.setItem('user', JSON.stringify(userData));
+      // حفظ بعض بيانات الطالب فقط (للرجوع لها لاحقاً إن لزم)
       localStorage.setItem('studentInfo', JSON.stringify({
         name: fullName,
         phone: studentPhone,
         email: email || `${studentPhone}@student.com`
       }));
-      localStorage.setItem('token', 'supabase-token-' + Date.now());
-      localStorage.setItem('isAuthenticated', 'true');
-      localStorage.setItem('userRole', 'student');
-      
-      // إظهار رسالة ترحيب
-      console.log('✅ تم التسجيل بنجاح! مرحباً', fullName);
-      
-      // التوجيه إلى الصفحة الرئيسية
-      setTimeout(() => {
-        router.push('/');
-      }, 500);
+
+      // علامة أن هذا المستخدم مسجَّل جديداً، ليتم إظهار رسالة الترحيب بعد أول تسجيل دخول
+      localStorage.setItem('justRegistered', 'true');
+
+      // تحويل الطالب مباشرة إلى صفحة تسجيل الدخول ليقوم بتسجيل الدخول أولاً
+      router.push('/login');
       
     } catch (err: any) {
       console.error('🔴 خطأ في التسجيل:', err);

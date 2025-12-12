@@ -120,7 +120,47 @@ export default function Dashboard() {
         const result = await getDashboardData(user.id);
         
         if (result.success && result.data) {
-          setActiveCourses(result.data.activeCourses || []);
+          const rawActive = Array.isArray(result.data.activeCourses)
+            ? result.data.activeCourses
+            : [];
+
+          const mappedActive: Course[] = rawActive
+            .filter((e: any) => e && e.course)
+            .map((e: any) => {
+              const course = e.course || {};
+
+              const totalLessons = typeof course.total_lessons === 'number'
+                ? course.total_lessons
+                : typeof course.lessons_count === 'number'
+                  ? course.lessons_count
+                  : 0;
+
+              const progress = typeof e.progress === 'number'
+                ? e.progress
+                : 0;
+
+              const completedLessons = totalLessons > 0
+                ? Math.round((progress / 100) * totalLessons)
+                : 0;
+
+              const last = e.last_accessed || e.updated_at || e.enrolled_at;
+
+              return {
+                id: String(course.id),
+                title: course.title || 'كورس بدون اسم',
+                thumbnail: course.thumbnail || '/placeholder-course.jpg',
+                instructor: course.instructor_name || 'مدرس',
+                progress,
+                lastAccessed: last
+                  ? new Date(last).toLocaleDateString('ar-EG')
+                  : 'لم يبدأ بعد',
+                nextLesson: '',
+                totalLessons,
+                completedLessons,
+              } as Course;
+            });
+
+          setActiveCourses(mappedActive);
           setCertificates(result.data.certificates || []);
           setOverallProgress(result.data.overallProgress || 0);
 
@@ -218,7 +258,7 @@ export default function Dashboard() {
       <Sidebar 
         user={{ 
           name: user?.name || 'طالب العلم', 
-          image: '/default-avatar.png' 
+          image: '/placeholder-avatar.png' 
         }}
         onLogout={() => {
           localStorage.removeItem('user');

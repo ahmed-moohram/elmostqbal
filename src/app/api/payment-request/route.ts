@@ -14,7 +14,7 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    
+
     const {
       studentName,
       studentPhone,
@@ -43,7 +43,8 @@ export async function POST(request: NextRequest) {
         student_name: studentName,
         student_phone: studentPhone,
         student_email: studentEmail,
-        student_id: null,
+        // student_id يُترك فارغًا هنا لأن الجدول يشير إلى auth.users(id)
+        // وسوف نعتمد على رقم الهاتف لربط الطلب بالطالب عند الموافقة
         course_id: courseId,
         course_name: courseName,
         course_price: coursePrice,
@@ -234,21 +235,30 @@ export async function PATCH(request: NextRequest) {
 
     // إذا تمت الموافقة، قم بتفعيل الاشتراك
     if (status === 'approved') {
-      // البحث عن معرف الطالب
-      const { data: studentData } = await supabase
-        .from('users')
-        .select('id')
-        .or(
-          `phone.eq.${paymentRequest.student_phone},student_phone.eq.${paymentRequest.student_phone}`
-        )
-        .maybeSingle();
+      // نحاول أولاً استخدام student_id المخزَّن مع الطلب إن وُجد
+      let studentIdForEnrollment: string | null = paymentRequest.student_id;
 
-      if (studentData) {
+      // في حالة عدم وجود student_id (طلبات قديمة)، نبحث بالهاتف
+      if (!studentIdForEnrollment && paymentRequest.student_phone) {
+        const { data: studentData } = await supabase
+          .from('users')
+          .select('id')
+          .or(
+            `phone.eq.${paymentRequest.student_phone},student_phone.eq.${paymentRequest.student_phone}`
+          )
+          .maybeSingle();
+
+        if (studentData) {
+          studentIdForEnrollment = studentData.id;
+        }
+      }
+
+      if (studentIdForEnrollment) {
         // التحقق من وجود اشتراك سابق في نظام الدفع الجديد (course_enrollments)
         const { data: existingEnrollment } = await supabase
           .from('course_enrollments')
           .select('id')
-          .eq('student_id', studentData.id)
+          .eq('student_id', studentIdForEnrollment)
           .eq('course_id', paymentRequest.course_id)
           .single();
 
@@ -257,7 +267,7 @@ export async function PATCH(request: NextRequest) {
           await supabase
             .from('course_enrollments')
             .insert({
-              student_id: studentData.id,
+              student_id: studentIdForEnrollment,
               course_id: paymentRequest.course_id,
               payment_request_id: requestId,
               is_active: true,
@@ -280,7 +290,7 @@ export async function PATCH(request: NextRequest) {
           const { data: existingLegacyEnrollment } = await supabase
             .from('enrollments')
             .select('id')
-            .eq('user_id', studentData.id)
+            .eq('user_id', studentIdForEnrollment)
             .eq('course_id', paymentRequest.course_id)
             .single();
 
@@ -288,7 +298,7 @@ export async function PATCH(request: NextRequest) {
             await supabase
               .from('enrollments')
               .insert({
-                user_id: studentData.id,
+                user_id: studentIdForEnrollment,
                 course_id: paymentRequest.course_id,
                 progress: 0,
                 is_active: true,
@@ -311,7 +321,7 @@ export async function PATCH(request: NextRequest) {
           await supabase
             .from('notifications')
             .insert({
-              user_id: studentData.id,
+              user_id: studentIdForEnrollment,
               title: 'تم قبول طلب الاشتراك',
               message: `تم قبول طلب اشتراكك في كورس ${paymentRequest.course_name}`,
               type: 'payment',

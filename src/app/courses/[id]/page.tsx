@@ -4,12 +4,13 @@ import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Image from 'next/image';
 import ProtectedVideoPlayer from '@/components/ProtectedVideoPlayer';
-import { FaPlay, FaLock, FaStar, FaCheck, FaUsers, FaClock, FaBookOpen, FaChartLine, FaTrophy, FaAward, FaComments, FaUserGraduate } from 'react-icons/fa';
+import { FaPlay, FaLock, FaStar, FaCheck, FaUsers, FaClock, FaBookOpen, FaChartLine, FaTrophy, FaAward, FaComments, FaUserGraduate, FaQuestionCircle } from 'react-icons/fa';
 import { ImSpinner9 } from 'react-icons/im';
 import { toast } from 'react-hot-toast';
 import VideoProtection from '@/components/VideoProtection';
 import CourseChat from '@/components/CourseChat';
 import { achievementsService } from '@/services/achievements.service';
+import RatingDisplay from '@/components/Ratings/RatingDisplay';
 
 interface CourseProgress {
   completedLessons: string[];
@@ -30,7 +31,7 @@ function CoursePage() {
   const [activeLesson, setActiveLesson] = useState<string | null>(null);
   const [isEnrolling, setIsEnrolling] = useState(false);
   const [progress, setProgress] = useState<CourseProgress | null>(null);
-  const [studentInfo, setStudentInfo] = useState<{name: string; phone: string} | null>(null);
+  const [studentInfo, setStudentInfo] = useState<{id: string; name: string; phone: string} | null>(null);
   const [isEnrolled, setIsEnrolled] = useState(false);
   const [userIP, setUserIP] = useState<string>('');
   const [videoProgress, setVideoProgress] = useState<{[key: string]: number}>({});
@@ -43,11 +44,26 @@ function CoursePage() {
   useEffect(() => {
     const userJson = localStorage.getItem('user');
     if (userJson) {
-      const user = JSON.parse(userJson);
-      setStudentInfo({
-        name: user.name || 'طالب',
-        phone: user.phone || '0100000000'
-      });
+      try {
+        const user = JSON.parse(userJson);
+        const info = {
+          id: String(user.id || ''),
+          name: user.name || 'طالب',
+          phone: user.studentPhone || user.phone || '0100000000',
+        };
+        setStudentInfo(info);
+        try {
+          localStorage.setItem('studentInfo', JSON.stringify({
+            id: info.id,
+            name: info.name,
+            phone: info.phone,
+          }));
+        } catch (storageErr) {
+          console.error('Error saving studentInfo to localStorage:', storageErr);
+        }
+      } catch (e) {
+        console.error('Error parsing user data for studentInfo:', e);
+      }
     }
   }, []);
 
@@ -98,9 +114,42 @@ function CoursePage() {
             );
 
             if (approvedRequest) {
+              // أول مرة يتم فيها تفعيل الاشتراك لهذا الكورس على هذا الجهاز
               if (!cachedEnrollment) {
                 toast.success('🎉 مرحباً! تم تفعيل اشتراكك في الكورس');
+
+                // التأكد من وجود صف في جدول enrollments لهذا الطالب وهذا الكورس
+                try {
+                  const userJson = localStorage.getItem('user');
+                  if (userJson) {
+                    const user = JSON.parse(userJson);
+                    const userId = user.id;
+
+                    if (userId && courseId) {
+                      const { default: supabase } = await import('@/lib/supabase-client');
+                      const { error: enrollSyncError } = await supabase
+                        .from('enrollments')
+                        .upsert(
+                          {
+                            user_id: userId,
+                            course_id: courseId,
+                            progress: 0,
+                            is_active: true,
+                            enrolled_at: new Date().toISOString(),
+                          },
+                          { onConflict: 'user_id,course_id' }
+                        );
+
+                      if (enrollSyncError) {
+                        console.error('❌ خطأ في مزامنة الاشتراك مع جدول enrollments:', enrollSyncError);
+                      }
+                    }
+                  }
+                } catch (syncError) {
+                  console.error('❌ خطأ غير متوقع أثناء مزامنة الاشتراك مع جدول enrollments:', syncError);
+                }
               }
+
               isCurrentlyEnrolled = true;
               localStorage.setItem(`enrollment_${courseId}`, 'true');
             } else {
@@ -195,7 +244,37 @@ function CoursePage() {
       }
       
       console.log('✅ تم جلب بيانات الكورس:', courseData);
-      
+
+      // محاولة جلب اسم المدرس الحقيقي إن لم يكن instructor_name موجوداً
+      let instructorName: string | null = courseData.instructor_name || null;
+      let instructorAvatar: string | null = courseData.instructor_avatar || null;
+      let instructorPhone: string | null = courseData.instructor_phone || courseData.vodafone_cash || null;
+
+      if (!instructorName && courseData.instructor_id) {
+        try {
+          const { data: instructorUser, error: instructorError } = await supabase
+            .from('users')
+            .select('name, avatar_url, phone')
+            .eq('id', courseData.instructor_id)
+            .maybeSingle();
+
+          if (!instructorError && instructorUser) {
+            instructorName = instructorUser.name || instructorName;
+            instructorAvatar = instructorUser.avatar_url || instructorAvatar;
+            instructorPhone = instructorPhone || instructorUser.phone || null;
+          } else if (instructorError) {
+            console.warn('⚠️ تعذر جلب بيانات المدرس من جدول users:', instructorError);
+          }
+        } catch (instErr) {
+          console.warn('⚠️ خطأ غير متوقع أثناء جلب بيانات المدرس:', instErr);
+        }
+      }
+
+      // قيم افتراضية آمنة في حال غياب أي بيانات
+      if (!instructorName) instructorName = 'المدرس';
+      if (!instructorAvatar) instructorAvatar = '/default-instructor.svg';
+      if (!instructorPhone) instructorPhone = '01012345678';
+
       // جلب الأقسام والدروس عبر section_id فقط
       const { data: sections, error: sectionsError } = await supabase
         .from('sections')
@@ -205,6 +284,28 @@ function CoursePage() {
       if (sectionsError) {
         console.warn('⚠️ خطأ في جلب الأقسام:', sectionsError);
       }
+
+      // جلب الامتحانات لهذا الكورس عبر واجهة /api/exams حتى نستخدم نفس المنطق والصلاحيات
+      let exams: any[] = [];
+      try {
+        const examsRes = await fetch(`/api/exams?courseId=${courseId}`);
+        if (examsRes.ok) {
+          const examsJson = await examsRes.json();
+          // واجهة /api/exams ترجع حالياً مصفوفة مباشرة، لكن ندعم أيضاً شكل { exams: [] } احتياطياً
+          exams = Array.isArray(examsJson)
+            ? examsJson
+            : Array.isArray(examsJson?.exams)
+            ? examsJson.exams
+            : [];
+        } else {
+          console.warn('⚠️ فشل جلب الامتحانات عبر /api/exams:', examsRes.status);
+        }
+      } catch (ex) {
+        console.warn('⚠️ خطأ غير متوقع أثناء جلب الامتحانات عبر /api/exams:', ex);
+      }
+
+      // إخفاء الامتحانات المعطلة فقط، والباقي يظهر للطلاب
+      exams = exams.filter((exam: any) => exam.isActive !== false);
 
       let sectionsWithLessons: any[] = [];
       if (sections && sections.length > 0) {
@@ -216,6 +317,7 @@ function CoursePage() {
           const bd = b.created_at ? Date.parse(b.created_at) : 0;
           return ad - bd;
         });
+
         for (const section of sections) {
           const { data: sectionLessons, error: sectionLessonsError } = await supabase
             .from('lessons')
@@ -225,14 +327,50 @@ function CoursePage() {
             console.warn('⚠️ خطأ في جلب دروس القسم:', { sectionId: section.id, error: sectionLessonsError });
             continue;
           }
+
+          // ترتيب دروس القسم حسب order_index (القديم والجديد)
           const orderedSectionLessons = (sectionLessons || []).sort((a: any, b: any) => {
             const ao = a.order_index ?? a.order ?? 0;
             const bo = b.order_index ?? b.order ?? 0;
             return ao - bo;
           });
+
+          // الامتحانات التابعة لهذا القسم
+          const sectionExams = exams.filter(
+            (exam: any) => exam.sectionId && exam.sectionId === String(section.id),
+          );
+
+          // دمج الدروس والامتحانات في قائمة واحدة موحّدة بحسب orderIndex
+          const unifiedItems = [
+            ...orderedSectionLessons.map((lesson: any) => ({
+              type: 'lesson' as const,
+              id: String(lesson.id),
+              title: lesson.title,
+              description: lesson.description,
+              duration: lesson.duration_minutes || lesson.duration || 0,
+              videoUrl: lesson.video_url || '',
+              isFree: !!lesson.is_free,
+              isPreview: !!lesson.is_preview || !!lesson.is_free,
+              orderIndex: lesson.order_index ?? lesson.order ?? 0,
+            })),
+            ...sectionExams.map((exam: any) => ({
+              type: 'exam' as const,
+              id: exam.id,
+              title: exam.title,
+              duration: exam.duration,
+              orderIndex: exam.orderIndex ?? 0,
+            })),
+          ].sort((a, b) => {
+            if (a.orderIndex !== b.orderIndex) return a.orderIndex - b.orderIndex;
+            // عند تساوي الترتيب نفضّل ظهور الدرس أولاً ثم الامتحان
+            if (a.type === b.type) return 0;
+            return a.type === 'lesson' ? -1 : 1;
+          });
+
           sectionsWithLessons.push({
             id: String(section.id),
             title: section.title || 'قسم',
+            // نبقي مصفوفة الدروس كما هي لاستخدامها في حساب التقدم وتشغيل الفيديو
             lessons: orderedSectionLessons.map((lesson: any) => ({
               id: lesson.id,
               title: lesson.title,
@@ -242,6 +380,31 @@ function CoursePage() {
               isFree: !!lesson.is_free,
               isPreview: !!lesson.is_preview || !!lesson.is_free,
             })),
+            // العناصر الموحّدة (دروس + امتحانات) لعرضها في واجهة الطالب
+            items: unifiedItems,
+          });
+        }
+
+        // إضافة قسم خاص لأي امتحانات لا ترتبط بأي قسم (section_id فارغ أو لا يطابق الأقسام الحالية)
+        const sectionIdsSet = new Set(sections.map((s: any) => String(s.id)));
+        const orphanExams = exams.filter(
+          (exam: any) => !exam.sectionId || !sectionIdsSet.has(String(exam.sectionId)),
+        );
+
+        if (orphanExams.length > 0) {
+          sectionsWithLessons.push({
+            id: 'general-exams',
+            title: 'امتحانات عامة للكورس',
+            lessons: [],
+            items: orphanExams
+              .map((exam: any, index: number) => ({
+                type: 'exam' as const,
+                id: exam.id,
+                title: exam.title,
+                duration: exam.duration,
+                orderIndex: exam.orderIndex || index + 1,
+              }))
+              .sort((a, b) => a.orderIndex - b.orderIndex),
           });
         }
       }
@@ -255,8 +418,8 @@ function CoursePage() {
         price: courseData.price,
         thumbnail: courseData.thumbnail || '/placeholder-course.png',
         instructor: {
-          name: courseData.instructor_name || 'المدرس',
-          image: '/default-instructor.svg'
+          name: instructorName,
+          image: instructorAvatar || '/default-instructor.svg'
         },
         // التقييم والعدد يعتمدان فقط على قيم الجدول، وإذا لم توجد = 0
         rating: courseData.rating ?? 0,
@@ -281,18 +444,19 @@ function CoursePage() {
         id: courseData.id,
         title: courseData.title,
         price: courseData.price,
-        instructor_name: courseData.instructor_name || formattedCourse.instructor?.name,
-        instructor_phone: courseData.instructor_phone || courseData.vodafone_cash || '01012345678'
+        instructor_name: instructorName,
+        instructor_phone: instructorPhone
       };
       localStorage.setItem('currentCourse', JSON.stringify(currentCourseData));
       console.log('💾 تم حفظ بيانات الكورس:', currentCourseData);
       
       // تعيين معلومات المدرس
+      // نستخدم instructor_id (هو معرّف المستخدم المدرس) حتى يتطابق مع teacherId المستخدم في لوحة المدرس
       setTeacherInfo({
-        id: courseData.teacher_id || '1',
-        name: courseData.instructor_name || formattedCourse.instructor?.name || 'أ. محمد أحمد',
-        avatar: courseData.instructor_avatar || formattedCourse.instructor?.image || '/teacher-avatar.jpg',
-        phone: courseData.instructor_phone || courseData.vodafone_cash || '01012345678' // رقم فودافون كاش
+        id: courseData.instructor_id || courseData.teacher_id || '1',
+        name: instructorName || 'أ. محمد أحمد',
+        avatar: instructorAvatar || '/teacher-avatar.jpg',
+        phone: instructorPhone || '01012345678' // رقم فودافون كاش
       });
       
       // حساب التقدم من localStorage
@@ -429,6 +593,26 @@ ${randomMsg}`);
               }
             } catch (achError) {
               console.error('❌ خطأ في تفعيل نظام الإنجازات:', achError);
+            }
+
+            // تحديث نسبة التقدم في جدول enrollments حتى تظهر في لوحة تحكم الطالب والإنجازات
+            try {
+              const { error: enrollmentError } = await supabase
+                .from('enrollments')
+                .update({
+                  progress: percentComplete,
+                  last_accessed: new Date().toISOString(),
+                  completed_at: percentComplete === 100 ? new Date().toISOString() : null,
+                  is_active: true,
+                })
+                .eq('user_id', userId)
+                .eq('course_id', courseId);
+
+              if (enrollmentError) {
+                console.error('❌ خطأ في تحديث تقدم الكورس في enrollments:', enrollmentError);
+              }
+            } catch (enrollErr) {
+              console.error('❌ خطأ غير متوقع أثناء تحديث جدول enrollments:', enrollErr);
             }
           }
         }
@@ -721,7 +905,7 @@ ${randomMsg}`);
       {/* قسم معلومات المدرس */}
       <div className="bg-white rounded-xl p-6 mb-8 shadow-lg border border-gray-100">
         <h3 className="text-2xl font-bold mb-4 flex items-center gap-2">
-          <FaAward className="text-primary" /> المدرس
+          <FaAward className="text-primary" /> {course.instructor.name}
         </h3>
         <div className="flex items-center gap-4 mb-4">
           <div className="w-20 h-20 rounded-full bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center text-white text-3xl font-bold">
@@ -732,6 +916,16 @@ ${randomMsg}`);
             <p className="text-gray-600">{course.instructor.bio}</p>
           </div>
         </div>
+      </div>
+
+      {/* قسم التقييمات الحقيقية للكورس */}
+      <div className="mb-8">
+        <RatingDisplay
+          targetType="course"
+          targetId={courseId}
+          averageRating={course.rating || 0}
+          totalRatings={course.ratingCount || 0}
+        />
       </div>
 
       {/* قسم المتطلبات والميزات */}
@@ -764,85 +958,137 @@ ${randomMsg}`);
         </div>
       </div>
 
-      {/* قسم الدروس */}
+      {/* قسم الدروس والامتحانات بنظام موحد */}
       <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100 mb-8">
         <h3 className="text-2xl font-bold mb-6 flex items-center gap-2">
           <FaBookOpen className="text-primary" /> محتوى الدورة
         </h3>
         <div className="space-y-4">
           {course?.sections && Array.isArray(course.sections) && course.sections.length > 0 ? (
-            course.sections.map((section, sIndex) => (
-            <div key={section.id} className="border-2 border-gray-200 rounded-xl overflow-hidden hover:border-primary transition">
-              <div className="bg-gradient-to-r from-gray-50 to-white p-4 border-b border-gray-200">
-                <h4 className="font-bold text-lg flex items-center gap-2">
-                  <span className="bg-primary text-white w-8 h-8 rounded-full flex items-center justify-center text-sm">
-                    {sIndex + 1}
-                  </span>
-                  {section.title}
-                  <span className="text-sm text-gray-500 mr-auto">({section.lessons?.length || 0} دروس)</span>
-                </h4>
-              </div>
-              <div className="p-2">
-                {section.lessons?.map((lesson, lIndex) => (
-                  <div
-                    key={lesson.id}
-                    className={`p-4 rounded-lg cursor-pointer transition ${
-                      activeLesson === String(lesson.id) 
-                        ? 'bg-primary text-white shadow-md' 
-                        : 'hover:bg-gray-50'
-                    } mb-2`}
-                    onClick={() => {
-                      setActiveLesson(String(lesson.id));
-                      setIsVideoPlaying(false);
-                      if (!progress?.completedLessons.includes(String(lesson.id))) {
-                        toast(`🎬 بدء الدرس: ${lesson.title}`, { 
-                          icon: '📺',
-                          duration: 3000 
-                        });
-                      }
-                    }}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3 flex-1">
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                          activeLesson === String(lesson.id) ? 'bg-white/20' : 'bg-gray-100'
-                        }`}>
-                          {lesson.isPreview ? (
-                            <FaPlay className={activeLesson === String(lesson.id) ? 'text-white' : 'text-primary'} />
-                          ) : progress?.completedLessons.includes(String(lesson.id)) ? (
-                            <FaCheck className="text-green-500" />
-                          ) : (
-                            <FaLock className={activeLesson === String(lesson.id) ? 'text-white/70' : 'text-gray-400'} />
-                          )}
-                        </div>
-                        <div className="flex-1">
-                          <h5 className={`font-semibold ${activeLesson === String(lesson.id) ? 'text-white' : 'text-gray-800'}`}>
-                            {lIndex + 1}. {lesson.title}
-                          </h5>
-                          <div className="flex items-center gap-3 mt-1">
-                            <span className={`text-sm flex items-center gap-1 ${
-                              activeLesson === String(lesson.id) ? 'text-white/80' : 'text-gray-600'
-                            }`}>
-                              <FaClock className="text-xs" /> {lesson.duration} دقيقة
-                            </span>
-                            {lesson.isPreview && (
-                              <span className="bg-green-500 text-white text-xs px-2 py-0.5 rounded-full">معاينة مجانية</span>
+            course.sections.map((section: any, sIndex: number) => (
+              <div
+                key={section.id}
+                className="border-2 border-gray-200 rounded-xl overflow-hidden hover:border-primary transition"
+              >
+                <div className="bg-gradient-to-r from-gray-50 to-white p-4 border-b border-gray-200">
+                  <h4 className="font-bold text-lg flex items-center gap-2">
+                    <span className="bg-primary text-white w-8 h-8 rounded-full flex items-center justify-center text-sm">
+                      {sIndex + 1}
+                    </span>
+                    {section.title}
+                    <span className="text-sm text-gray-500 mr-auto">
+                      ({section.items?.filter((i: any) => i.type === 'lesson').length || 0} دروس)
+                    </span>
+                  </h4>
+                </div>
+
+                <div className="p-2">
+                  {section.items?.map((item: any, index: number) => {
+                    if (item.type === 'lesson') {
+                      const isActive = activeLesson === String(item.id);
+                      const isCompleted = progress?.completedLessons.includes(String(item.id));
+
+                      return (
+                        <div
+                          key={`lesson-${item.id}`}
+                          className={`p-4 rounded-lg cursor-pointer transition ${
+                            isActive ? 'bg-primary text-white shadow-md' : 'hover:bg-gray-50'
+                          } mb-2`}
+                          onClick={() => {
+                            setActiveLesson(String(item.id));
+                            setIsVideoPlaying(false);
+                            if (!isCompleted) {
+                              toast(`🎬 بدء الدرس: ${item.title}`, {
+                                icon: '📺',
+                                duration: 3000,
+                              });
+                            }
+                          }}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3 flex-1">
+                              <div
+                                className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                                  isActive ? 'bg-white/20' : 'bg-gray-100'
+                                }`}
+                              >
+                                {item.isPreview ? (
+                                  <FaPlay className={isActive ? 'text-white' : 'text-primary'} />
+                                ) : isCompleted ? (
+                                  <FaCheck className="text-green-500" />
+                                ) : (
+                                  <FaLock className={isActive ? 'text-white/70' : 'text-gray-400'} />
+                                )}
+                              </div>
+                              <div className="flex-1">
+                                <h5 className={`font-semibold ${isActive ? 'text-white' : 'text-gray-800'}`}>
+                                  {index + 1}. {item.title}
+                                </h5>
+                                <div className="flex items-center gap-3 mt-1">
+                                  <span
+                                    className={`text-sm flex items-center gap-1 ${
+                                      isActive ? 'text-white/80' : 'text-gray-600'
+                                    }`}
+                                  >
+                                    <FaClock className="text-xs" /> {item.duration} دقيقة
+                                  </span>
+                                  {item.isPreview && (
+                                    <span className="bg-green-500 text-white text-xs px-2 py-0.5 rounded-full">
+                                      معاينة مجانية
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                            {isActive && (
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-medium">جاري التشغيل</span>
+                                <div className="w-3 h-3 rounded-full border-2 border-white animate-spin border-t-transparent" />
+                              </div>
                             )}
                           </div>
                         </div>
-                      </div>
-                      {activeLesson === String(lesson.id) && (
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium">جاري التشغيل</span>
-                          <div className="w-3 h-3 rounded-full border-2 border-white animate-spin border-t-transparent" />
+                      );
+                    }
+
+                    if (item.type === 'exam') {
+                      return (
+                        <div
+                          key={`exam-${item.id}`}
+                          className="p-4 rounded-lg cursor-pointer transition bg-purple-50 hover:bg-purple-100 mb-2 border border-purple-200 flex items-center justify-between"
+                          onClick={() => {
+                            router.push(`/courses/${courseId}/exams`);
+                            toast(`📝 فتح امتحان: ${item.title}`, {
+                              icon: '📝',
+                              duration: 2500,
+                            });
+                          }}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-purple-600 flex items-center justify-center">
+                              <FaQuestionCircle className="text-white" />
+                            </div>
+                            <div>
+                              <h5 className="font-semibold text-purple-900">امتحان: {item.title}</h5>
+                              {item.duration > 0 && (
+                                <p className="text-xs text-purple-700 mt-1 flex items-center gap-1">
+                                  <FaClock className="text-[10px]" /> مدة الامتحان: {item.duration} دقيقة
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          <span className="text-xs font-semibold text-purple-800 bg-purple-100 px-3 py-1 rounded-full">
+                            اضغط لفتح صفحة الامتحان
+                          </span>
                         </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
+                      );
+                    }
+
+                    return null;
+                  })}
+                </div>
               </div>
-            </div>
-          ))
+            ))
           ) : (
             <p className="text-gray-500 text-center py-8">لا توجد أقسام متاحة</p>
           )}
@@ -870,6 +1116,13 @@ ${randomMsg}`);
                 coursePrice={course?.price || 0}
                 teacherName={teacherInfo?.name || 'المدرس'}
                 teacherPhone={teacherInfo?.phone}
+                lessonId={(() => {
+                  const selectedLesson = course?.sections
+                    ?.flatMap((section: any) => section.lessons || [])
+                    ?.find((lesson: any) => String(lesson.id) === activeLesson);
+                  return selectedLesson ? String(selectedLesson.id) : '';
+                })()}
+                useAccessCode={true}
                 videoUrl={(() => {
                   const selectedLesson = course?.sections
                     ?.flatMap((section: any) => section.lessons || [])
@@ -1067,7 +1320,12 @@ ${randomMsg}`);
                 );
               }
             })()}
+
+            {/* شريط قفل في أعلى الفيديو لمنع الضغط على أزرار المشاركة ونسخ الرابط */}
+            <div className="absolute top-0 left-0 right-0 h-16 bg-black/55 flex items-center justify-end px-4 pointer-events-auto z-50 select-none">
+              <FaLock className="text-white/85 text-xl" />
             </div>
+          </div>
           )}
           {/* معلومات التقدم والتحكم */}
           {isEnrolled && (
@@ -1138,18 +1396,6 @@ ${randomMsg}`);
                   >
                     {isVideoPlaying ? '⏸️ إيقاف مؤقت' : '▶️ تشغيل'}
                   </button>
-                  
-                  <button 
-                    onClick={() => handleLessonComplete(activeLesson)}
-                    disabled={progress?.completedLessons.includes(activeLesson)}
-                    className={`px-8 py-3 rounded-xl flex items-center gap-2 font-bold shadow-lg transition ${
-                      progress?.completedLessons.includes(activeLesson)
-                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                        : 'bg-gradient-to-r from-green-500 to-green-600 text-white hover:from-green-600 hover:to-green-700'
-                    }`}
-                  >
-                    <FaCheck /> {progress?.completedLessons.includes(activeLesson) ? 'مكتمل' : 'إكمال الدرس يدوياً'}
-                  </button>
                 </div>
                 
                 <div className="text-gray-600">
@@ -1162,7 +1408,7 @@ ${randomMsg}`);
         </div>
       )}
       
-      {/* زر الشات العائم */}
+      {/* زر الشات العائم - يظهر فقط للمشتركين */}
       {isEnrolled && !showChat && (
         <button
           onClick={() => setShowChat(true)}
@@ -1173,12 +1419,12 @@ ${randomMsg}`);
         </button>
       )}
       
-      {/* مكون الشات */}
-      {isEnrolled && (
+      {/* مكون الشات - يظهر فقط للمشتركين */}
+      {isEnrolled && studentInfo?.id && (
         <CourseChat
           courseId={courseId}
-          userId={studentInfo?.phone || 'student_' + Date.now()}
-          userName={studentInfo?.name || 'طالب'}
+          userId={studentInfo.id}
+          userName={studentInfo.name}
           userRole="student"
           teacherId={teacherInfo?.id}
           teacherName={teacherInfo?.name}
@@ -1187,8 +1433,8 @@ ${randomMsg}`);
         />
       )}
       
-      {/* معلومات المدرس */}
-      {course && (
+      {/* معلومات المدرس (بدون زر شات إضافي) */}
+      {false && course && (
         <div className="fixed bottom-8 right-8 bg-white rounded-lg shadow-lg p-4 max-w-xs z-30">
           <div className="flex items-center gap-3">
             <img
@@ -1196,20 +1442,13 @@ ${randomMsg}`);
               alt={teacherInfo?.name}
               className="w-12 h-12 rounded-full object-cover border-2 border-purple-200"
               onError={(e) => {
-                (e.target as HTMLImageElement).src = '/default-avatar.png';
+                (e.target as HTMLImageElement).src = '/placeholder-avatar.png';
               }}
             />
             <div className="flex-1">
               <h4 className="font-bold text-sm">{teacherInfo?.name}</h4>
               <p className="text-xs text-gray-500">مدرس الكورس</p>
             </div>
-            <button
-              onClick={() => setShowChat(true)}
-              className="px-3 py-1 bg-purple-100 text-purple-600 rounded-lg hover:bg-purple-200 transition text-sm font-medium"
-            >
-              <FaUserGraduate className="inline ml-1" />
-              تواصل
-            </button>
           </div>
         </div>
       )}
