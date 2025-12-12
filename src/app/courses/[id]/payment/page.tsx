@@ -71,7 +71,6 @@ export default function PaymentPage() {
         } else {
           console.warn('لم يتم العثور على الكورس في Supabase لمسار الدفع:', error);
           setCourse(null);
-          setError('لم يتم العثور على هذا الكورس في النظام');
           setTimeout(() => {
             router.replace('/courses');
           }, 2000);
