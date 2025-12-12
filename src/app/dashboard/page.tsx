@@ -2,7 +2,6 @@
 
 import { useEffect, useState, ReactNode } from "react";
 import { FaChalkboardTeacher, FaBookOpen, FaUserGraduate, FaBook } from "react-icons/fa";
-import Sidebar from "../../components/Sidebar";
 import { motion, AnimatePresence } from 'framer-motion';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -255,18 +254,6 @@ export default function Dashboard() {
 
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-gray-900 overflow-hidden">
-      <Sidebar 
-        user={{ 
-          name: user?.name || 'طالب العلم', 
-          image: '/placeholder-avatar.png' 
-        }}
-        onLogout={() => {
-          localStorage.removeItem('user');
-          localStorage.removeItem('token');
-          router.push('/login');
-        }}
-      />
-      
       <main className="flex-1 overflow-y-auto overflow-x-hidden pb-20">
         <div className="container mx-auto px-4 py-6">
           

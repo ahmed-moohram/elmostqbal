@@ -490,8 +490,13 @@ export default function Home() {
                   >
                     <FaFacebook className="text-xl text-white" />
                   </motion.div>
-                  <a href="#" className="text-gray-400 hover:text-blue-400 transition-colors text-sm">
-                    صفحتنا على الفيسبوك
+                  <a
+                    href="https://www.facebook.com/groups/1256199588821814/user/61561020877459?locale=ar_AR"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-gray-400 hover:text-blue-400 transition-colors text-sm"
+                  >
+                    صفحتنا / جروبنا على الفيسبوك
                   </a>
                 </motion.div>
                 
@@ -506,8 +511,13 @@ export default function Home() {
                   >
                     <FaWhatsapp className="text-xl text-white" />
                   </motion.div>
-                  <a href="https://wa.me/+201000000000" className="text-gray-400 hover:text-green-400 transition-colors text-sm">
-                    +20 100 000 0000
+                  <a
+                    href="https://wa.me/201070333143"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-gray-400 hover:text-green-400 transition-colors text-sm"
+                  >
+                    01070333143
                   </a>
                 </motion.div>
                 
