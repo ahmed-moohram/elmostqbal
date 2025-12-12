@@ -99,7 +99,7 @@ export async function POST(request: NextRequest) {
       .from('exams')
       .insert(insertPayload)
       .select(
-        'id, course_id, title, description, duration, total_marks, passing_marks, questions, start_date, end_date, is_active',
+        'id, course_id, section_id, order_index, title, description, duration, total_marks, passing_marks, questions, start_date, end_date, is_active',
       )
       .maybeSingle();
 
@@ -114,23 +114,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const createdRow: any = data;
+
     const created = {
-      id: String(data.id),
-      title: data.title || '',
-      courseId: String(data.course_id),
-      sectionId: data.section_id ? String(data.section_id) : null,
+      id: String(createdRow.id),
+      title: createdRow.title || '',
+      courseId: String(createdRow.course_id),
+      sectionId: createdRow.section_id ? String(createdRow.section_id) : null,
       orderIndex:
-        typeof data.order_index === 'number'
-          ? data.order_index
-          : Number(data.order_index || 0) || 0,
-      description: data.description || '',
-      duration: Number(data.duration || 0),
-      totalMarks: Number(data.total_marks || 0),
-      passingMarks: Number(data.passing_marks || 0),
-      questions: data.questions || [],
-      startDate: data.start_date || null,
-      endDate: data.end_date || null,
-      isActive: data.is_active ?? true,
+        typeof createdRow.order_index === 'number'
+          ? createdRow.order_index
+          : Number(createdRow.order_index || 0) || 0,
+      description: createdRow.description || '',
+      duration: Number(createdRow.duration || 0),
+      totalMarks: Number(createdRow.total_marks || 0),
+      passingMarks: Number(createdRow.passing_marks || 0),
+      questions: createdRow.questions || [],
+      startDate: createdRow.start_date || null,
+      endDate: createdRow.end_date || null,
+      isActive: createdRow.is_active ?? true,
     };
 
     return NextResponse.json({ exam: created }, { status: 201 });
