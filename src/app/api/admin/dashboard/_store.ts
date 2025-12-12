@@ -299,7 +299,7 @@ export async function getCharts(period: string) {
 
 async function activateEnrollmentForPaymentRequest(paymentRequest: any, requestId: string) {
   // نحاول أولاً استخدام student_id المخزَّن مع الطلب إن وُجد
-  let studentId: string | null = paymentRequest?.student_id as string | null | undefined;
+  let studentId: string | null = (paymentRequest?.student_id ?? null) as string | null;
 
   // إذا لم يكن هناك student_id (طلبات قديمة)، نستخدم رقم الهاتف للبحث عن الطالب
   if (!studentId) {
