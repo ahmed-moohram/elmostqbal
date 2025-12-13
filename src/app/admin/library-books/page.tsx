@@ -281,27 +281,23 @@ export default function AdminLibraryBooksPage() {
     if (!confirm("هل أنت متأكد من حذف هذا الكتاب؟")) return;
 
     try {
-      const pathParts = book.file_url.split("/").slice(-3).join("/");
-      const { error: storageError } = await supabase.storage
-        .from("pdf-library")
-        .remove([pathParts]);
+      const response = await fetch("/api/admin/library-books/delete", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ bookId: book.id }),
+      });
 
-      if (storageError) {
-        console.error("Storage error:", storageError);
-      }
+      const result = await response.json();
 
-      const { error: dbError } = await supabase
-        .from("library_books")
-        .delete()
-        .eq("id", book.id);
-
-      if (dbError) {
-        console.error("Database error:", dbError);
-        toast.error("فشل حذف الكتاب");
+      if (!response.ok || !result.success) {
+        console.error("Error deleting book via API:", result.error || result);
+        toast.error(result.error || "فشل حذف الكتاب");
         return;
       }
 
-      toast.success("تم حذف الكتاب بنجاح");
+      toast.success(result.message || "تم حذف الكتاب بنجاح");
       await fetchBooks();
     } catch (err) {
       console.error("Error deleting admin book:", err);

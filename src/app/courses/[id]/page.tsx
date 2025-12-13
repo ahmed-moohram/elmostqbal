@@ -40,6 +40,40 @@ function CoursePage() {
   const [showChat, setShowChat] = useState(false);
   const [teacherInfo, setTeacherInfo] = useState<{id: string; name: string; avatar: string; phone?: string} | null>(null);
 
+  // تحذير عند فتح أداة المطوّر (الكونسول) في صفحة الكورس
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    let handled = false;
+
+    const checkDevtools = () => {
+      const widthDiff = window.outerWidth - window.innerWidth;
+      const heightDiff = window.outerHeight - window.innerHeight;
+      const threshold = 160; // فرق كافٍ لاعتبار أن أدوات المطوّر مفتوحة
+
+      const isOpen = widthDiff > threshold || heightDiff > threshold;
+
+      if (isOpen && !handled) {
+        handled = true;
+        try {
+          toast.error('يمنع فتح أداة المطوّر (الكونسول) أثناء مشاهدة الكورس. سيتم إعادة تحميل الصفحة.');
+        } catch (e) {
+          console.warn('Devtools warning toast failed:', e);
+        }
+
+        setTimeout(() => {
+          window.location.reload();
+        }, 1500);
+      }
+    };
+
+    const intervalId = window.setInterval(checkDevtools, 1500);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, []);
+
   // استخراج معلومات الطالب
   useEffect(() => {
     const userJson = localStorage.getItem('user');

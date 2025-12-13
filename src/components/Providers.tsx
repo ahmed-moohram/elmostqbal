@@ -5,6 +5,7 @@ import { AuthProvider } from '@/contexts/AuthContext'
 import { ProgressProvider } from '@/contexts/ProgressContext'
 import { NotificationProvider } from '@/contexts/NotificationContext'
 import { Toaster } from 'react-hot-toast'
+import DevtoolsGuard from './DevtoolsGuard'
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
@@ -12,6 +13,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
       <AuthProvider>
         <NotificationProvider>
           <ProgressProvider>
+            <DevtoolsGuard />
             {children}
             <Toaster 
               position="top-center"

@@ -121,16 +121,20 @@ export default function LibraryBookDetailsPage({ params }: PageProps) {
         }
 
         const userId = user?.id || (user as any)?._id;
+        const phone = user?.studentPhone || user?.phone || '';
         if (!userId) {
           setHasAccess(false);
           return;
         }
 
-        const res = await fetch(
-          `/api/library/owned?bookId=${encodeURIComponent(book.id)}&userId=${encodeURIComponent(
-            userId
-          )}`
-        );
+        const params = new URLSearchParams();
+        params.set('bookId', book.id);
+        params.set('userId', userId);
+        if (phone) {
+          params.set('studentPhone', phone);
+        }
+
+        const res = await fetch(`/api/library/owned?${params.toString()}`);
 
         if (!res.ok) {
           setHasAccess(false);
