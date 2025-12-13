@@ -29,6 +29,17 @@ interface TeacherCourse {
   isPublished: boolean;
 }
 
+interface TeacherBook {
+  id: string;
+  title: string;
+  author?: string | null;
+  description?: string | null;
+  category?: string | null;
+  fileUrl: string;
+  viewCount: number;
+  downloadCount: number;
+}
+
 export default function PublicTeacherPage() {
   const params = useParams();
   const router = useRouter();
@@ -38,6 +49,7 @@ export default function PublicTeacherPage() {
   const [error, setError] = useState<string | null>(null);
   const [teacher, setTeacher] = useState<TeacherProfile | null>(null);
   const [courses, setCourses] = useState<TeacherCourse[]>([]);
+  const [books, setBooks] = useState<TeacherBook[]>([]);
 
   useEffect(() => {
     const loadTeacher = async () => {
@@ -120,6 +132,31 @@ export default function PublicTeacherPage() {
         } else {
           setCourses([]);
         }
+
+        // جلب كتب المدرس المنشورة في المكتبة
+        const { data: booksRows, error: booksError } = await supabase
+          .from('library_books')
+          .select('*')
+          .eq('uploaded_by', teacherUserId)
+          .eq('is_public', true)
+          .order('created_at', { ascending: false });
+
+        if (booksError) {
+          console.error('❌ خطأ في جلب كتب المدرس:', booksError);
+        }
+
+        const mappedBooks: TeacherBook[] = (booksRows || []).map((b: any) => ({
+          id: b.id,
+          title: b.title,
+          author: b.author,
+          description: b.description,
+          category: b.category,
+          fileUrl: b.file_url || '',
+          viewCount: Number(b.view_count) || 0,
+          downloadCount: Number(b.download_count) || 0,
+        }));
+
+        setBooks(mappedBooks);
       } catch (err) {
         console.error('❌ خطأ غير متوقع في صفحة المدرس العامة:', err);
         setError('حدث خطأ غير متوقع');
@@ -254,6 +291,72 @@ export default function PublicTeacherPage() {
                     </div>
                   </div>
                 </Link>
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* كتب المدرس في المكتبة */}
+        <section className="mt-12">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">
+              كتب {teacher.name}
+            </h2>
+          </div>
+
+          {books.length === 0 ? (
+            <p className="text-gray-500 dark:text-gray-400 text-center py-8">
+              لا توجد كتب منشورة لهذا المدرس حالياً.
+            </p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {books.map((book) => (
+                <div
+                  key={book.id}
+                  className="bg-white dark:bg-slate-900 rounded-2xl shadow-md hover:shadow-xl transition-shadow overflow-hidden flex flex-col h-full p-5"
+                >
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                      <FaBookOpen className="text-primary" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-lg font-semibold text-slate-900 dark:text-white line-clamp-2">
+                        {book.title}
+                      </h3>
+                      {book.author && (
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                          تأليف: {book.author}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {book.description && (
+                    <p className="text-sm text-slate-600 dark:text-slate-300 mb-3 line-clamp-3">
+                      {book.description}
+                    </p>
+                  )}
+
+                  <div className="mt-auto flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+                    <span>
+                      تمت المشاهدة {book.viewCount} مرة
+                    </span>
+                    <span>
+                      تم التحميل {book.downloadCount} مرة
+                    </span>
+                  </div>
+
+                  {book.fileUrl && (
+                    <a
+                      href={book.fileUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-4 inline-flex items-center justify-center px-4 py-2 rounded-full bg-primary text-white text-sm font-medium hover:bg-primary/90 transition-colors"
+                    >
+                      عرض الكتاب
+                    </a>
+                  )}
+                </div>
               ))}
             </div>
           )}

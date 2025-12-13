@@ -4,7 +4,18 @@ import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { FaSearch, FaFilter, FaBook, FaStar, FaEye, FaDownload, FaBookOpen, FaGraduationCap, FaBookReader } from 'react-icons/fa';
+import { 
+  FaSearch, 
+  FaFilter, 
+  FaBook, 
+  FaStar, 
+  FaEye, 
+  FaDownload, 
+  FaBookOpen, 
+  FaGraduationCap, 
+  FaBookReader,
+  FaWhatsapp,
+} from 'react-icons/fa';
 import GlowingText from '../../components/GlowingText';
 import { toast } from 'react-hot-toast';
 import { useTheme } from 'next-themes';
@@ -24,6 +35,8 @@ interface Book {
   isNewRelease: boolean;
   description: string;
   year: number;
+  price?: number | null;
+  isPaid?: boolean;
 }
 
 const categories = [
@@ -49,6 +62,7 @@ const LibraryPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { theme } = useTheme();
+  const vodafoneNumber = '01070333143';
   
   // جلب البيانات من Supabase (الكتب الحقيقية المرفوعة)
   useEffect(() => {
@@ -88,6 +102,8 @@ const LibraryPage = () => {
           isNewRelease: book.is_new_release || false,
           description: book.description || '',
           year: book.year || new Date().getFullYear(),
+          price: typeof book.price === 'number' ? book.price : book.price ? Number(book.price) : null,
+          isPaid: typeof book.is_paid === 'boolean' ? book.is_paid : false,
         }));
 
         setBooks(transformedBooks);
@@ -142,6 +158,71 @@ const LibraryPage = () => {
   const itemVariants = {
     hidden: { y: 20, opacity: 0 },
     show: { y: 0, opacity: 1, transition: { duration: 0.4 } }
+  };
+
+  const handleBuyBook = async (book: Book) => {
+    try {
+      if (typeof window === 'undefined') return;
+
+      const userJson = localStorage.getItem('user');
+      if (!userJson) {
+        toast.error('يرجى تسجيل الدخول أولاً لشراء الكتب');
+        window.location.href = '/login?redirect=/library';
+        return;
+      }
+
+      let user: any = {};
+      try {
+        user = JSON.parse(userJson);
+      } catch (e) {
+        console.error('Error parsing user data:', e);
+      }
+
+      const studentName = user?.name || 'طالب';
+      const studentPhone = user?.studentPhone || user?.phone || '';
+      if (!studentPhone) {
+        toast.error('لا يوجد رقم هاتف مسجل في حسابك');
+      }
+
+      const bookPrice = typeof book.price === 'number' ? book.price : 0;
+
+      const message = `
+*طلب شراء كتاب*
+
+📚 اسم الكتاب: ${book.title}
+💰 السعر: ${bookPrice} جنيه
+👤 اسم الطالب: ${studentName}
+📱 رقم الهاتف: ${studentPhone}
+
+سأرسل إيصال الدفع الآن لتأكيد شراء الكتاب ✅
+`;
+
+      const waUrl = `https://wa.me/2${vodafoneNumber}?text=${encodeURIComponent(message)}`;
+      window.open(waUrl, '_blank');
+
+      try {
+        await fetch('/api/library/book-purchase', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            bookId: book.id,
+            studentId: user?.id || (user as any)?._id,
+            studentName,
+            studentPhone,
+            price: bookPrice,
+          }),
+        });
+      } catch (requestError) {
+        console.error('Error creating book purchase request:', requestError);
+      }
+
+      toast.success('تم إرسال طلب شراء الكتاب، سيتم مراجعته من الأدمن قريباً');
+    } catch (err) {
+      console.error('Error in handleBuyBook:', err);
+      toast.error('حدث خطأ أثناء إنشاء طلب شراء الكتاب');
+    }
   };
   
   return (
@@ -343,6 +424,11 @@ const LibraryPage = () => {
                     <div className="p-4">
                       <h3 className="text-lg font-bold mb-1 line-clamp-1">{book.title}</h3>
                       <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">{book.author}</p>
+                      {typeof book.price === 'number' && book.price > 0 && (
+                        <p className="text-sm font-semibold text-primary mb-2">
+                          سعر الكتاب: {book.price} ج.م
+                        </p>
+                      )}
                       
                       <div className="flex justify-between items-center mb-3">
                         <div className="flex items-center">
@@ -367,6 +453,16 @@ const LibraryPage = () => {
                           عرض الكتاب
                         </div>
                       </Link>
+
+                      {typeof book.price === 'number' && book.price > 0 && (
+                        <button
+                          onClick={() => handleBuyBook(book)}
+                          className="w-full mt-2 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md transition-colors text-center font-medium flex items-center justify-center gap-2"
+                        >
+                          <FaWhatsapp />
+                          شراء الكتاب
+                        </button>
+                      )}
                     </div>
                   </motion.div>
                 ))}

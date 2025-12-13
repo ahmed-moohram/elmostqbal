@@ -1,6 +1,7 @@
-'use client';
+"use client";
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useDropzone } from 'react-dropzone';
 import { FaFilePdf, FaUpload, FaTrash, FaEye, FaDownload, FaBook } from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
@@ -32,6 +33,13 @@ interface PDFBook {
 }
 
 export default function LibraryUpload() {
+  const router = useRouter();
+
+  // إعادة توجيه أي زيارة لهذه الصفحة إلى لوحة المدرس
+  useEffect(() => {
+    router.replace('/teacher/dashboard');
+  }, [router]);
+
   const [uploading, setUploading] = useState(false);
   const [books, setBooks] = useState<PDFBook[]>([]);
   const [formData, setFormData] = useState({

@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { toast } from 'react-hot-toast';
@@ -11,9 +11,12 @@ import {
   FaUsers, FaBookOpen, FaChartLine, FaDollarSign, 
   FaVideo, FaComments, FaBell, FaPlus, FaEdit, 
   FaTrash, FaEye, FaCog, FaSignOutAlt, FaGraduationCap,
-  FaStar, FaClock, FaCheckCircle, FaEnvelope, FaWhatsapp
+  FaStar, FaClock, FaCheckCircle, FaEnvelope, FaWhatsapp,
+  FaFilePdf, FaUpload, FaDownload, FaBook
 } from 'react-icons/fa';
 import { uploadTeacherAvatar } from '@/lib/supabase-upload';
+import { useDropzone } from 'react-dropzone';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface TeacherData {
   id: string;
@@ -90,13 +93,29 @@ interface Message {
   courseTitle: string;
   courseId: string;
 }
+
+interface TeacherLibraryBook {
+  id: string;
+  title: string;
+  author: string;
+  description: string;
+  category: string;
+  file_url: string;
+  file_size: number;
+  download_count: number;
+  view_count: number;
+  created_at: string;
+  cover_image?: string | null;
+  price?: number | null;
+  is_paid?: boolean | null;
+}
 export default function TeacherDashboard() {
   const router = useRouter();
   const { user, isAuthenticated, isLoading, logout } = useAuth();
 
   const [teacher, setTeacher] = useState<TeacherData | null>(null);
   const [activeTab, setActiveTab] = useState<
-    'overview' | 'courses' | 'students' | 'messages' | 'earnings' | 'settings'
+    'overview' | 'courses' | 'library' | 'students' | 'messages' | 'earnings' | 'settings'
   >('overview');
   const [courses, setCourses] = useState<Course[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
@@ -127,6 +146,29 @@ export default function TeacherDashboard() {
   const [showChat, setShowChat] = useState(false);
   const [chatCourseId, setChatCourseId] = useState<string | null>(null);
 
+  // كتب المكتبة الخاصة بالمدرس
+  const [libraryBooks, setLibraryBooks] = useState<TeacherLibraryBook[]>([]);
+  const [bookFormData, setBookFormData] = useState({
+    title: '',
+    author: '',
+    description: '',
+    category: 'general',
+    course_id: '',
+    is_public: true,
+    price: '',
+    is_paid: false,
+  });
+  const [selectedBookFile, setSelectedBookFile] = useState<File | null>(null);
+  const [bookUploading, setBookUploading] = useState(false);
+  const [selectedCoverFile, setSelectedCoverFile] = useState<File | null>(null);
+  const [bookSourceType, setBookSourceType] = useState<'upload' | 'external'>('upload');
+  const [bookExternalUrl, setBookExternalUrl] = useState('');
+  const [bookUploadProgress, setBookUploadProgress] = useState(0);
+
+  const totalBookSizeMB = selectedBookFile ? selectedBookFile.size / (1024 * 1024) : 0;
+  const uploadedBookSizeMB = totalBookSizeMB * (bookUploadProgress / 100);
+  const remainingBookSizeMB = Math.max(totalBookSizeMB - uploadedBookSizeMB, 0);
+
   const latestActivities = students
     .slice()
     .filter((s) => s.lastActiveAt || s.enrolledAtRaw)
@@ -138,6 +180,48 @@ export default function TeacherDashboard() {
       return bTime - aTime;
     })
     .slice(0, 5);
+
+  // إعداد رفع ملفات PDF للكتب (Dropzone)
+  const onBookDrop = useCallback((acceptedFiles: File[]) => {
+    const file = acceptedFiles[0];
+
+    const allowedTypes = [
+      'application/pdf',
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    ];
+
+    if (file && allowedTypes.includes(file.type)) {
+      if (file.size > 50 * 1024 * 1024) {
+        toast.error('حجم الملف كبير جداً (الحد الأقصى 50MB)');
+        return;
+      }
+
+      setSelectedBookFile(file);
+
+      const fileName = file.name.replace(/\.(pdf|pptx)$/i, '');
+      setBookFormData((prev) => ({
+        ...prev,
+        title: fileName,
+      }));
+
+      toast.success('تم اختيار الملف بنجاح');
+    } else {
+      toast.error('يجب اختيار ملف PDF أو PPTX فقط');
+    }
+  }, []);
+
+  const {
+    getRootProps: getBookRootProps,
+    getInputProps: getBookInputProps,
+    isDragActive: isBookDragActive,
+  } = useDropzone({
+    onDrop: onBookDrop,
+    accept: {
+      'application/pdf': ['.pdf'],
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation': ['.pptx'],
+    },
+    maxFiles: 1,
+  });
 
   const buildParentReportText = () => {
     if (!selectedStudent) return '';
@@ -166,6 +250,306 @@ export default function TeacherDashboard() {
       studentDetails.quizResults.length > 0 ? studentDetails.averageQuizScore : 0;
 
     return `السلام عليكم ورحمة الله وبركاته\n\nولي أمر الطالب/ة ${selectedStudent.name}\n\nنود إبلاغكم بتقرير مختصر عن أداء ابنكم/ابنتكم في كورس "${selectedStudent.courseName}" على المنصة.\n\n- نسبة إنجاز الكورس الحالية: ${selectedStudent.progress}%\n- عدد الدروس المكتملة: ${completedLessons} من ${totalLessons} درس\n- الدروس المتبقية: ${remainingLessons} درس\n- عدد محاولات الاختبارات: ${totalQuizAttempts}\n- عدد مرات النجاح في الامتحان: ${passedQuizzes}\n- عدد مرات الرسوب في الامتحان: ${failedQuizzes}\n- متوسط درجة الاختبارات: ${avgScore}%\n- حالة الحضور هذا الأسبوع: ${weeklyStatus}\n\nنشكركم على متابعتكم، وأي تقصير يتم التنبيه عليه أولاً للطالب ثم التنسيق معكم عند الحاجة.`;
+  };
+
+  // جلب كتب المدرس من جدول library_books
+  const fetchTeacherBooks = async () => {
+    try {
+      if (!user?.id) return;
+
+      const { data, error } = await supabase
+        .from('library_books')
+        .select('*')
+        .eq('uploaded_by', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching teacher books:', error);
+        return;
+      }
+
+      setLibraryBooks((data || []) as any);
+    } catch (error) {
+      console.error('Error fetching teacher books:', error);
+    }
+  };
+
+  // إرسال إشعار عند رفع كتاب جديد
+  const sendBookUploadNotification = async (userId: string, book: any) => {
+    try {
+      await supabase.from('notifications').insert({
+        user_id: userId,
+        title: 'تم رفع كتاب جديد',
+        message: `تم رفع كتاب "${book.title}" بنجاح إلى المكتبة`,
+        type: 'success',
+        link: `/library/${book.id}`,
+        metadata: {
+          book_id: book.id,
+          book_title: book.title,
+        },
+      });
+    } catch (error) {
+      console.error('Error sending book upload notification:', error);
+    }
+  };
+
+  // رفع كتاب PDF إلى مكتبة المدرس
+  const uploadBookPDF = async () => {
+    if (!bookFormData.title || !bookFormData.author) {
+      toast.error('يرجى ملء جميع الحقول المطلوبة');
+      return;
+    }
+
+    if (bookSourceType === 'upload' && !selectedBookFile) {
+      toast.error('يرجى اختيار ملف للكتاب');
+      return;
+    }
+
+    if (bookSourceType === 'external' && !bookExternalUrl.trim()) {
+      toast.error('يرجى إدخال رابط الكتاب (جوجل درايف أو رابط مباشر)');
+      return;
+    }
+
+    if (!user?.id) {
+      toast.error('يجب تسجيل الدخول أولاً');
+      return;
+    }
+
+    const numericPrice = bookFormData.price ? Number(bookFormData.price) : null;
+    if (bookFormData.is_paid && (!numericPrice || numericPrice <= 0)) {
+      toast.error('أدخل سعرًا صالحًا للكتاب المدفوع');
+      return;
+    }
+
+    setBookUploading(true);
+
+    let progressInterval: any = null;
+    if (bookSourceType === 'upload' && selectedBookFile) {
+      setBookUploadProgress(0);
+      let currentProgress = 0;
+      progressInterval = setInterval(() => {
+        currentProgress = Math.min(currentProgress + 5, 95);
+        setBookUploadProgress(currentProgress);
+      }, 300);
+    }
+
+    try {
+      let fileUrl = '';
+      let fileSize = 0;
+      let filePath: string | null = null;
+
+      if (bookSourceType === 'upload') {
+        if (!selectedBookFile) {
+          toast.error('يرجى اختيار ملف للكتاب');
+          return;
+        }
+
+        const fileName = `${Date.now()}-${selectedBookFile.name}`;
+        filePath = `library/${user.id}/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('pdf-library')
+          .upload(filePath, selectedBookFile, {
+            contentType: selectedBookFile.type || 'application/octet-stream',
+            upsert: false,
+          });
+
+        if (uploadError) {
+          console.error('Upload error:', uploadError);
+          toast.error('فشل رفع الملف');
+          return;
+        }
+
+        const {
+          data: { publicUrl },
+        } = supabase.storage.from('pdf-library').getPublicUrl(filePath);
+
+        fileUrl = publicUrl;
+        fileSize = selectedBookFile.size;
+      } else {
+        fileUrl = bookExternalUrl.trim();
+        fileSize = 0;
+      }
+
+      let coverPublicUrl: string | null = null;
+      let coverFilePath: string | null = null;
+
+      if (selectedCoverFile) {
+        try {
+          const coverFileName = `${Date.now()}-cover-${selectedCoverFile.name}`;
+          coverFilePath = `library/${user.id}/covers/${coverFileName}`;
+
+          const { error: coverUploadError } = await supabase.storage
+            .from('pdf-library')
+            .upload(coverFilePath, selectedCoverFile, {
+              contentType: selectedCoverFile.type || 'image/jpeg',
+              upsert: false,
+            });
+
+          if (coverUploadError) {
+            console.error('Cover upload error:', coverUploadError);
+            toast.error('فشل رفع صورة الغلاف، سيتم استخدام صورة افتراضية');
+          } else {
+            const { data: coverData } = supabase.storage
+              .from('pdf-library')
+              .getPublicUrl(coverFilePath);
+            coverPublicUrl = coverData.publicUrl;
+          }
+        } catch (coverErr) {
+          console.error('Unexpected error uploading cover image:', coverErr);
+        }
+      }
+
+      const { data: book, error: dbError } = await supabase
+        .from('library_books')
+        .insert({
+          title: bookFormData.title,
+          author: bookFormData.author,
+          description: bookFormData.description,
+          category: bookFormData.category,
+          file_url: fileUrl,
+          file_size: fileSize,
+          file_path: filePath,
+          uploaded_by: user.id,
+          teacher_id: user.id,
+          course_id: bookFormData.course_id || null,
+          is_public: bookFormData.is_public,
+          download_count: 0,
+          view_count: 0,
+          cover_image: coverPublicUrl,
+          price: numericPrice,
+          is_paid: numericPrice != null && numericPrice > 0 ? true : bookFormData.is_paid,
+          metadata: {
+            original_name:
+              bookSourceType === 'upload' && selectedBookFile
+                ? selectedBookFile.name
+                : null,
+            upload_date: new Date().toISOString(),
+            source: bookSourceType,
+            external_url: bookSourceType === 'external' ? bookExternalUrl.trim() : undefined,
+          },
+        })
+        .select()
+        .single();
+
+      if (dbError) {
+        console.error('Database error:', dbError);
+        if (filePath) {
+          await supabase.storage.from('pdf-library').remove([filePath]);
+        }
+        if (coverFilePath) {
+          try {
+            await supabase.storage.from('pdf-library').remove([coverFilePath]);
+          } catch (removeCoverErr) {
+            console.error('Error removing cover image after DB error:', removeCoverErr);
+          }
+        }
+        toast.error('فشل حفظ معلومات الكتاب');
+        return;
+      }
+
+      if (progressInterval) {
+        setBookUploadProgress(100);
+      }
+
+      toast.success('تم رفع الكتاب بنجاح!');
+
+      setSelectedBookFile(null);
+      setSelectedCoverFile(null);
+      setBookSourceType('upload');
+      setBookExternalUrl('');
+      setBookFormData({
+        title: '',
+        author: '',
+        description: '',
+        category: 'general',
+        course_id: '',
+        is_public: true,
+        price: '',
+        is_paid: false,
+      });
+
+      await fetchTeacherBooks();
+      await sendBookUploadNotification(user.id, book);
+    } catch (error) {
+      console.error('Error uploading teacher book:', error);
+      toast.error('حدث خطأ في رفع الكتاب');
+    } finally {
+      if (progressInterval) {
+        clearInterval(progressInterval);
+      }
+      setBookUploading(false);
+      setBookUploadProgress(0);
+    }
+  };
+
+  const viewBookPDF = async (book: TeacherLibraryBook) => {
+    try {
+      await supabase
+        .from('library_books')
+        .update({ view_count: book.view_count + 1 })
+        .eq('id', book.id);
+    } catch (error) {
+      console.error('Error updating view count for book:', error);
+    }
+
+    window.open(book.file_url, '_blank');
+  };
+
+  const downloadBookPDF = async (book: TeacherLibraryBook) => {
+    try {
+      await supabase
+        .from('library_books')
+        .update({ download_count: book.download_count + 1 })
+        .eq('id', book.id);
+    } catch (error) {
+      console.error('Error updating download count for book:', error);
+    }
+
+    // لو الرابط من Supabase نستخدم خاصية التحميل، لو خارجي نفتح في تبويب جديد
+    if (book.file_url.includes('supabase.co')) {
+      const link = document.createElement('a');
+      link.href = book.file_url;
+      link.download = book.title;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toast.success('جاري تحميل الكتاب...');
+    } else {
+      window.open(book.file_url, '_blank');
+    }
+  };
+
+  const deleteBook = async (book: TeacherLibraryBook) => {
+    if (!confirm('هل أنت متأكد من حذف هذا الكتاب؟')) return;
+
+    try {
+      const pathParts = book.file_url.split('/').slice(-3).join('/');
+      const { error: storageError } = await supabase.storage
+        .from('pdf-library')
+        .remove([pathParts]);
+
+      if (storageError) {
+        console.error('Storage error:', storageError);
+      }
+
+      const { error: dbError } = await supabase
+        .from('library_books')
+        .delete()
+        .eq('id', book.id);
+
+      if (dbError) {
+        console.error('Database error:', dbError);
+        toast.error('فشل حذف الكتاب');
+        return;
+      }
+
+      toast.success('تم حذف الكتاب بنجاح');
+      await fetchTeacherBooks();
+    } catch (error) {
+      console.error('Error deleting book:', error);
+      toast.error('حدث خطأ في حذف الكتاب');
+    }
   };
 
   const handleChangeAvatar = () => {
@@ -592,7 +976,6 @@ export default function TeacherDashboard() {
             const params = new URLSearchParams();
             params.set('teacherId', user.id);
             params.set('days', '7');
-
             const res = await fetch(
               `/api/teacher/parent-reports?${params.toString()}`
             );
@@ -807,6 +1190,18 @@ export default function TeacherDashboard() {
             </button>
 
             <button
+              onClick={() => setActiveTab('library')}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition ${
+                activeTab === 'library'
+                  ? 'bg-purple-100 text-purple-700 font-medium'
+                  : 'hover:bg-gray-100'
+              }`}
+            >
+              <FaBook />
+              المكتبة (الكتب)
+            </button>
+
+            <button
               onClick={() => setActiveTab('students')}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition ${
                 activeTab === 'students'
@@ -878,6 +1273,7 @@ export default function TeacherDashboard() {
             <h1 className="text-3xl font-bold text-gray-800">
               {activeTab === 'overview' && 'نظرة عامة'}
               {activeTab === 'courses' && 'إدارة الكورسات'}
+              {activeTab === 'library' && 'إدارة الكتب'}
               {activeTab === 'students' && 'الطلاب المشتركين'}
               {activeTab === 'messages' && 'الرسائل والمحادثات'}
               {activeTab === 'earnings' && 'الأرباح والمدفوعات'}
@@ -1024,6 +1420,352 @@ export default function TeacherDashboard() {
                       </div>
                     );
                   })
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* إدارة كتب المكتبة للمدرس */}
+        {activeTab === 'library' && (
+          <div className="grid lg:grid-cols-2 gap-6">
+            {/* قسم رفع كتاب */}
+            <div className="bg-white rounded-xl shadow-lg p-6">
+              <h2 className="text-xl font-bold mb-4">رفع كتاب جديد</h2>
+
+              {/* اختيار مصدر الكتاب */}
+              <div className="flex items-center gap-3 mb-4">
+                <button
+                  type="button"
+                  onClick={() => setBookSourceType('upload')}
+                  className={`px-3 py-1.5 text-sm rounded-full border transition ${
+                    bookSourceType === 'upload'
+                      ? 'bg-purple-600 text-white border-purple-600'
+                      : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  ملف مرفوع (PDF / PPTX)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBookSourceType('external');
+                  }}
+                  className={`px-3 py-1.5 text-sm rounded-full border transition ${
+                    bookSourceType === 'external'
+                      ? 'bg-purple-600 text-white border-purple-600'
+                      : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  رابط خارجي (جوجل درايف)
+                </button>
+              </div>
+
+              {bookSourceType === 'upload' && (
+                <div
+                  {...getBookRootProps()}
+                  className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
+                    isBookDragActive
+                      ? 'border-purple-500 bg-purple-50'
+                      : 'border-gray-300 hover:border-purple-400'
+                  }`}
+                >
+                  <input {...getBookInputProps()} />
+                  <FaUpload className="text-4xl text-gray-400 mx-auto mb-4" />
+                  {selectedBookFile ? (
+                    <div>
+                      <FaFilePdf className="text-5xl text-red-500 mx-auto mb-2" />
+                      <p className="font-semibold">{selectedBookFile.name}</p>
+                      <p className="text-sm text-gray-600">
+                        {(selectedBookFile.size / 1024 / 1024).toFixed(2)} MB
+                      </p>
+                    </div>
+                  ) : (
+                    <div>
+                      <p className="font-semibold mb-2">
+                        {isBookDragActive
+                          ? 'أفلت الملف هنا'
+                          : 'اسحب وأفلت ملف كتاب (PDF أو PPTX) هنا'}
+                      </p>
+                      <p className="text-sm text-gray-600">أو انقر لاختيار ملف</p>
+                      <p className="text-xs text-gray-500 mt-2">الحد الأقصى: 50MB</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {(bookSourceType === 'external' || selectedBookFile) && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mt-6 space-y-4"
+                >
+                  <div>
+                    <label className="block text-sm font-medium mb-2">
+                      عنوان الكتاب *
+                    </label>
+                    <input
+                      type="text"
+                      value={bookFormData.title}
+                      onChange={(e) =>
+                        setBookFormData({ ...bookFormData, title: e.target.value })
+                      }
+                      className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500"
+                      placeholder="مثال: كتاب الرياضيات للصف الثالث"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-2">المؤلف *</label>
+                    <input
+                      type="text"
+                      value={bookFormData.author}
+                      onChange={(e) =>
+                        setBookFormData({ ...bookFormData, author: e.target.value })
+                      }
+                      className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500"
+                      placeholder="اسم المؤلف"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-2">الوصف</label>
+                    <textarea
+                      value={bookFormData.description}
+                      onChange={(e) =>
+                        setBookFormData({ ...bookFormData, description: e.target.value })
+                      }
+                      className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500"
+                      rows={3}
+                      placeholder="وصف مختصر للكتاب"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-2">التصنيف</label>
+                    <select
+                      value={bookFormData.category}
+                      onChange={(e) =>
+                        setBookFormData({ ...bookFormData, category: e.target.value })
+                      }
+                      className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500"
+                    >
+                      <option value="general">عام</option>
+                      <option value="arabic">لغة عربية</option>
+                      <option value="english">لغة إنجليزية</option>
+                      <option value="french">لغة فرنسية</option>
+                      <option value="german">لغة ألمانية</option>
+                      <option value="italian">لغة إيطالية</option>
+                      <option value="spanish">لغة إسبانية</option>
+                      <option value="mathematics">رياضيات</option>
+                      <option value="physics">فيزياء</option>
+                      <option value="chemistry">كيمياء</option>
+                      <option value="biology">أحياء</option>
+                      <option value="science">علوم</option>
+                      <option value="history">تاريخ</option>
+                      <option value="geography">جغرافيا</option>
+                      <option value="religion">تربية دينية</option>
+                      <option value="social">دراسات اجتماعية</option>
+                      <option value="computer">حاسب آلي</option>
+                      <option value="programming">برمجة</option>
+                      <option value="other">مواد أخرى</option>
+                    </select>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium mb-2 flex items-center gap-1">
+                        <FaDollarSign />
+                        سعر الكتاب (ج.م)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.5"
+                        value={bookFormData.price}
+                        onChange={(e) =>
+                          setBookFormData({ ...bookFormData, price: e.target.value })
+                        }
+                        className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500"
+                        placeholder="0 (مجاني)"
+                      />
+                    </div>
+
+                    <div className="flex items-center mt-6">
+                      <input
+                        type="checkbox"
+                        id="isPaidTeacherBook"
+                        checked={bookFormData.is_paid}
+                        onChange={(e) =>
+                          setBookFormData({
+                            ...bookFormData,
+                            is_paid: e.target.checked,
+                          })
+                        }
+                        className="mr-2"
+                      />
+                      <label htmlFor="isPaidTeacherBook" className="text-sm">
+                        كتاب مدفوع
+                      </label>
+                    </div>
+                  </div>
+
+                  {bookSourceType === 'external' && (
+                    <div>
+                      <label className="block text-sm font-medium mb-2">
+                        رابط الكتاب (جوجل درايف أو رابط مباشر) *
+                      </label>
+                      <input
+                        type="url"
+                        value={bookExternalUrl}
+                        onChange={(e) => setBookExternalUrl(e.target.value)}
+                        className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500"
+                        placeholder="https://drive.google.com/..."
+                      />
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-sm font-medium mb-2">
+                      صورة الغلاف (اختياري)
+                    </label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0] || null;
+                        setSelectedCoverFile(file);
+                      }}
+                      className="w-full text-sm text-gray-600"
+                    />
+                    {selectedCoverFile && (
+                      <p className="mt-1 text-xs text-gray-500">
+                        سيتم استخدام الصورة: {selectedCoverFile.name} كغلاف للكتاب
+                      </p>
+                    )}
+                  </div>
+
+                  {bookUploading && selectedBookFile && totalBookSizeMB > 0 && (
+                    <div className="mt-4">
+                      <div className="flex justify-between text-xs text-gray-600 mb-1">
+                        <span>
+                          تم رفع {uploadedBookSizeMB.toFixed(1)} من {totalBookSizeMB.toFixed(1)} ميجا
+                        </span>
+                        <span>باقي {remainingBookSizeMB.toFixed(1)} ميجا</span>
+                      </div>
+                      <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-purple-500 transition-all duration-200"
+                          style={{ width: `${bookUploadProgress}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="isPublicBook"
+                      checked={bookFormData.is_public}
+                      onChange={(e) =>
+                        setBookFormData({
+                          ...bookFormData,
+                          is_public: e.target.checked,
+                        })
+                      }
+                      className="mr-2"
+                    />
+                    <label htmlFor="isPublicBook" className="text-sm">
+                      متاح للجميع
+                    </label>
+                  </div>
+
+                  <button
+                    onClick={uploadBookPDF}
+                    disabled={bookUploading}
+                    className="w-full bg-purple-600 text-white py-3 rounded-lg hover:bg-purple-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    {bookUploading ? (
+                      <>
+                        <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent" />
+                        جاري الرفع...
+                      </>
+                    ) : (
+                      <>
+                        <FaUpload />
+                        رفع الكتاب
+                      </>
+                    )}
+                  </button>
+                </motion.div>
+              )}
+            </div>
+
+            {/* قائمة كتب المدرس */}
+            <div className="bg-white rounded-xl shadow-lg p-6">
+              <h2 className="text-xl font-bold mb-4">الكتب المرفوعة</h2>
+
+              <div className="space-y-4 max-h-[600px] overflow-y-auto">
+                <AnimatePresence>
+                  {libraryBooks.map((book) => (
+                    <motion.div
+                      key={book.id}
+                      initial={{ opacity: 0, x: 20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: -20 }}
+                      className="border rounded-lg p-4 hover:shadow-md transition"
+                    >
+                      <div className="flex items-start gap-4">
+                        <FaFilePdf className="text-3xl text-red-500 flex-shrink-0 mt-1" />
+                        <div className="flex-1">
+                          <h3 className="font-bold">{book.title}</h3>
+                          <p className="text-sm text-gray-600">
+                            المؤلف: {book.author}
+                          </p>
+                          <p className="text-xs text-gray-500 mt-1">
+                            الحجم: {(book.file_size / 1024 / 1024).toFixed(2)} MB
+                          </p>
+                          <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
+                            <span>👁 {book.view_count} مشاهدة</span>
+                            <span>⬇ {book.download_count} تحميل</span>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => viewBookPDF(book)}
+                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                            title="عرض"
+                          >
+                            <FaEye />
+                          </button>
+                          <button
+                            onClick={() => downloadBookPDF(book)}
+                            className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition"
+                            title="تحميل"
+                          >
+                            <FaDownload />
+                          </button>
+                          <button
+                            onClick={() => deleteBook(book)}
+                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
+                            title="حذف"
+                          >
+                            <FaTrash />
+                          </button>
+                        </div>
+                      </div>
+                      {book.description && (
+                        <p className="text-sm text-gray-600 mt-2">{book.description}</p>
+                      )}
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+
+                {libraryBooks.length === 0 && (
+                  <div className="text-center py-8 text-gray-500">
+                    <FaBook className="text-4xl mx-auto mb-4 opacity-50" />
+                    <p>لا توجد كتب مرفوعة بعد</p>
+                  </div>
                 )}
               </div>
             </div>

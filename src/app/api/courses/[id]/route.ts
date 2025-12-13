@@ -63,6 +63,26 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
       .delete()
       .eq('course_id', courseId);
 
+    // حذف طلبات التسجيل المرتبطة بهذه الدورة لتجنب خطأ القيود المرجعية
+    const { error: enrollmentRequestsError } = await supabase
+      .from('enrollment_requests')
+      .delete()
+      .eq('course_id', courseId);
+
+    if (enrollmentRequestsError) {
+      return NextResponse.json({ error: enrollmentRequestsError.message }, { status: 500 });
+    }
+
+    // حذف سجلات المدفوعات المرتبطة بهذه الدورة لتجنب قيود payments_course_id_fkey
+    const { error: paymentsError } = await supabase
+      .from('payments')
+      .delete()
+      .eq('course_id', courseId);
+
+    if (paymentsError) {
+      return NextResponse.json({ error: paymentsError.message }, { status: 500 });
+    }
+
     const { error: courseError } = await supabase
       .from('courses')
       .delete()

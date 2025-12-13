@@ -86,6 +86,11 @@ const AdminLayout = memo(({ children }: AdminLayoutProps) => {
       ],
     },
     {
+      title: 'مكتبة الكتب',
+      icon: <FaBook />,
+      path: '/admin/library-books',
+    },
+    {
       title: 'المستخدمون',
       icon: <FaUsers />,
       path: '/admin/users',
@@ -104,6 +109,7 @@ const AdminLayout = memo(({ children }: AdminLayoutProps) => {
         { title: 'الطلبات', path: '/admin/sales/orders', icon: <FaClipboardList /> },
         { title: 'المدفوعات', path: '/admin/sales/payments', icon: <FaMoneyBillWave /> },
         { title: 'الكوبونات', path: '/admin/sales/coupons', icon: <FaTicketAlt /> },
+        { title: 'طلبات كتب المكتبة', path: '/admin/library-book-requests', icon: <FaBook /> },
       ],
     },
     {
