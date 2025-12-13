@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useParams } from 'next/navigation';
 import { toast } from 'react-hot-toast';
-import { FaArrowRight, FaPlus, FaVideo, FaTrash, FaEdit, FaSpinner } from 'react-icons/fa';
+import { FaArrowRight, FaPlus, FaVideo, FaTrash, FaEdit, FaSpinner, FaKey } from 'react-icons/fa';
 import { useAuth } from '@/contexts/AuthContext';
 import supabase from '@/lib/supabase-client';
 import { uploadLessonVideo } from '@/lib/supabase-upload';
@@ -118,6 +118,7 @@ export default function TeacherCourseLessonsPage() {
   const [editingLessonId, setEditingLessonId] = useState<string | null>(null);
   const [draggingLesson, setDraggingLesson] = useState<{ sectionId: string | null; lessonId: string } | null>(null);
   const [activeEditor, setActiveEditor] = useState<'lesson' | 'exam'>('lesson');
+  const [generatingCodeLessonId, setGeneratingCodeLessonId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -387,6 +388,57 @@ export default function TeacherCourseLessonsPage() {
       type: lesson.type || 'video',
       quizQuestions,
     });
+  };
+
+  const handleGenerateLessonCode = async (lesson: Lesson) => {
+    if (!courseId) {
+      toast.error('معرّف الكورس غير موجود');
+      return;
+    }
+
+    if (!user?.id) {
+      toast.error('يجب تسجيل الدخول كمدرس لإنشاء أكواد');
+      return;
+    }
+
+    if (!lesson.video_url) {
+      toast.error('يجب إضافة رابط فيديو للدرس أولاً قبل إنشاء كود له');
+      return;
+    }
+
+    try {
+      setGeneratingCodeLessonId(lesson.id);
+
+      const res = await fetch(
+        `/api/teacher/lessons/${lesson.id}/codes?courseId=${courseId}&teacherId=${user.id}`,
+        {
+          method: 'POST',
+        },
+      );
+
+      const json = await res.json().catch(() => null);
+
+      if (!res.ok || !json?.code) {
+        console.error('Error generating single-use lesson code:', json);
+        toast.error(json?.error || 'فشل إنشاء الكود، حاول مرة أخرى');
+        return;
+      }
+
+      const code: string = String(json.code);
+
+      try {
+        await navigator.clipboard.writeText(code);
+        toast.success(`تم إنشاء الكود ونسخه: ${code}`);
+      } catch (clipboardError) {
+        console.warn('Failed to copy lesson code to clipboard:', clipboardError);
+        toast.success(`تم إنشاء الكود: ${code}`);
+      }
+    } catch (error) {
+      console.error('Unexpected error while generating lesson code:', error);
+      toast.error('حدث خطأ أثناء إنشاء الكود');
+    } finally {
+      setGeneratingCodeLessonId(null);
+    }
   };
 
   const handleVideoFileChange = async (event: any) => {
@@ -1092,6 +1144,19 @@ export default function TeacherCourseLessonsPage() {
                             <div className="flex flex-col gap-1 items-end">
                               <button
                                 type="button"
+                                onClick={() => handleGenerateLessonCode(lesson)}
+                                disabled={generatingCodeLessonId === lesson.id}
+                                className="flex items-center gap-1 px-2 py-1 rounded bg-purple-50 text-xs text-purple-700 hover:bg-purple-100 disabled:opacity-50"
+                              >
+                                {generatingCodeLessonId === lesson.id ? (
+                                  <FaSpinner className="animate-spin" />
+                                ) : (
+                                  <FaKey />
+                                )}
+                                إنشاء كود
+                              </button>
+                              <button
+                                type="button"
                                 onClick={() => handleStartEditLesson(lesson)}
                                 className="flex items-center gap-1 px-2 py-1 rounded bg-white border text-xs text-gray-700 hover:bg-gray-100"
                               >
@@ -1188,6 +1253,19 @@ export default function TeacherCourseLessonsPage() {
                           </div>
                         </div>
                         <div className="flex flex-col gap-1 items-end">
+                          <button
+                            type="button"
+                            onClick={() => handleGenerateLessonCode(lesson)}
+                            disabled={generatingCodeLessonId === lesson.id}
+                            className="flex items-center gap-1 px-2 py-1 rounded bg-purple-50 text-xs text-purple-700 hover:bg-purple-100 disabled:opacity-50"
+                          >
+                            {generatingCodeLessonId === lesson.id ? (
+                              <FaSpinner className="animate-spin" />
+                            ) : (
+                              <FaKey />
+                            )}
+                            إنشاء كود
+                          </button>
                           <button
                             type="button"
                             onClick={() => handleStartEditLesson(lesson)}

@@ -22,6 +22,61 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'missing_required_fields' }, { status: 400 });
     }
 
+    // تأكيد أن الطالب مشترك في هذا الكورس قبل السماح له بدخول/تقديم الامتحان
+    let isEnrolled = false;
+    try {
+      const { data: enrollment, error: enrollmentError } = await supabase
+        .from('course_enrollments')
+        .select('id, is_active')
+        .eq('student_id', userId)
+        .eq('course_id', courseId)
+        .maybeSingle();
+
+      if (enrollmentError) {
+        console.error('Error checking course_enrollments in /api/exams/submit:', enrollmentError);
+        return NextResponse.json(
+          { error: 'enrollment_check_failed' },
+          { status: 500 }
+        );
+      }
+
+      if (enrollment && enrollment.is_active !== false) {
+        isEnrolled = true;
+      } else {
+        const { data: legacyEnrollment, error: legacyError } = await supabase
+          .from('enrollments')
+          .select('id, is_active')
+          .eq('user_id', userId)
+          .eq('course_id', courseId)
+          .maybeSingle();
+
+        if (legacyError) {
+          console.warn('Error checking legacy enrollments in /api/exams/submit:', legacyError);
+        }
+
+        if (legacyEnrollment && legacyEnrollment.is_active !== false) {
+          isEnrolled = true;
+        }
+      }
+    } catch (enrollmentException) {
+      console.error('Unexpected error while checking enrollment in /api/exams/submit:', enrollmentException);
+      return NextResponse.json(
+        { error: 'enrollment_check_failed' },
+        { status: 500 }
+      );
+    }
+
+    if (!isEnrolled) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'not_enrolled',
+          message: 'ليس لديك صلاحية لدخول هذا الامتحان. يجب الاشتراك في الكورس أولاً.',
+        },
+        { status: 403 }
+      );
+    }
+
     // أولاً نحاول تحميل الامتحان من جدول exams في Supabase
     let exam: any | null = null;
     try {
@@ -58,7 +113,7 @@ export async function POST(request: NextRequest) {
     }
 
     // قبل احتساب الدرجة، نتحقق من وجود محاولات سابقة لهذا الطالب في هذا الامتحان
-    const CHEAT_LIMIT = 2;
+    const CHEAT_LIMIT = 1;
 
     try {
       const { data: existingAttempts, error: attemptsError } = await supabase

@@ -28,6 +28,56 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    let isEnrolled = false;
+    try {
+      const { data: enrollment, error: enrollmentError } = await supabase
+        .from('course_enrollments')
+        .select('id, is_active')
+        .eq('student_id', userId)
+        .eq('course_id', courseId)
+        .maybeSingle();
+
+      if (enrollmentError) {
+        console.error('Error checking course_enrollments in student exam status API:', enrollmentError);
+        return NextResponse.json(
+          { error: 'Failed to verify enrollment' },
+          { status: 500 },
+        );
+      }
+
+      if (enrollment && enrollment.is_active !== false) {
+        isEnrolled = true;
+      } else {
+        const { data: legacyEnrollment, error: legacyError } = await supabase
+          .from('enrollments')
+          .select('id, is_active')
+          .eq('user_id', userId)
+          .eq('course_id', courseId)
+          .maybeSingle();
+
+        if (legacyError) {
+          console.warn('Error checking legacy enrollments in student exam status API:', legacyError);
+        }
+
+        if (legacyEnrollment && legacyEnrollment.is_active !== false) {
+          isEnrolled = true;
+        }
+      }
+    } catch (enrollmentException) {
+      console.error('Unexpected error while checking enrollment in student exam status API:', enrollmentException);
+      return NextResponse.json(
+        { error: 'Failed to verify enrollment' },
+        { status: 500 },
+      );
+    }
+
+    if (!isEnrolled) {
+      return NextResponse.json(
+        { success: false, error: 'not_enrolled' },
+        { status: 403 },
+      );
+    }
+
     const { data: attempts, error } = await supabase
       .from('quiz_results')
       .select('id, answers, score, passed, attempted_at, created_at')

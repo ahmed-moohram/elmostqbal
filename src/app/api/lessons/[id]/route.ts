@@ -35,7 +35,33 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Lesson not found' }, { status: 404 });
     }
 
-    const hasCode = !!(data.access_code && String(data.access_code).trim() !== '');
+    let hasSingleUseCodes = false;
+    try {
+      const { data: codeRows, error: codesError } = await supabase
+        .from('lesson_access_codes')
+        .select('id')
+        .eq('lesson_id', lessonId)
+        .limit(1);
+
+      if (codesError) {
+        console.warn(
+          'Error checking lesson_access_codes in GET /api/lessons/[id]:',
+          codesError,
+        );
+      } else if (Array.isArray(codeRows) && codeRows.length > 0) {
+        hasSingleUseCodes = true;
+      }
+    } catch (codesException) {
+      console.error(
+        'Unexpected error while checking lesson_access_codes in GET /api/lessons/[id]:',
+        codesException,
+      );
+    }
+
+    const hasLegacyCode =
+      !!data.access_code && String(data.access_code).trim() !== '';
+
+    const hasCode = hasSingleUseCodes || hasLegacyCode;
 
     return NextResponse.json({
       id: data.id,
@@ -85,6 +111,89 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
       );
     }
 
+    let singleUseCodes: any[] = [];
+    let hasAnySingleUseCodes = false;
+    let matchedSingleUseCode: any | null = null;
+
+    const inputCode = String(code).trim();
+
+    try {
+      const { data: codeRows, error: codesError } = await supabase
+        .from('lesson_access_codes')
+        .select('id, code, is_used')
+        .eq('lesson_id', lessonId);
+
+      if (codesError) {
+        console.warn(
+          'Error checking lesson_access_codes in POST /api/lessons/[id]:',
+          codesError,
+        );
+      } else if (Array.isArray(codeRows)) {
+        singleUseCodes = codeRows;
+        hasAnySingleUseCodes = singleUseCodes.length > 0;
+        matchedSingleUseCode = singleUseCodes.find((row: any) => {
+          const rowCode =
+            row.code !== undefined && row.code !== null
+              ? String(row.code).trim()
+              : '';
+          return rowCode !== '' && rowCode === inputCode;
+        });
+      }
+    } catch (codesException) {
+      console.error(
+        'Unexpected error while checking lesson_access_codes in POST /api/lessons/[id]:',
+        codesException,
+      );
+    }
+
+    if (hasAnySingleUseCodes) {
+      if (!matchedSingleUseCode) {
+        return NextResponse.json(
+          { success: false, requiresCode: true, error: 'الكود غير صحيح' },
+          { status: 401 },
+        );
+      }
+
+      if (matchedSingleUseCode.is_used) {
+        return NextResponse.json(
+          {
+            success: false,
+            requiresCode: true,
+            error: 'تم استخدام هذا الكود من قبل',
+          },
+          { status: 401 },
+        );
+      }
+
+      try {
+        const { error: updateError } = await supabase
+          .from('lesson_access_codes')
+          .update({
+            is_used: true,
+            used_at: new Date().toISOString(),
+          })
+          .eq('id', matchedSingleUseCode.id);
+
+        if (updateError) {
+          console.error(
+            'Error marking single-use lesson code as used in POST /api/lessons/[id]:',
+            updateError,
+          );
+        }
+      } catch (updateException) {
+        console.error(
+          'Unexpected error while marking single-use lesson code as used in POST /api/lessons/[id]:',
+          updateException,
+        );
+      }
+
+      return NextResponse.json({
+        success: true,
+        requiresCode: true,
+        singleUse: true,
+      });
+    }
+
     const storedCode = data.access_code ? String(data.access_code).trim() : '';
     const requiresCode = storedCode !== '';
 
@@ -92,8 +201,6 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
       // لا يوجد كود مخزن لهذا الدرس، نعتبره غير محمي بالكود
       return NextResponse.json({ success: true, requiresCode: false });
     }
-
-    const inputCode = String(code).trim();
 
     if (inputCode !== storedCode) {
       return NextResponse.json(

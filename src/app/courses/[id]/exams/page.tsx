@@ -36,7 +36,7 @@ export default function CourseExamsPage() {
     lastPassed: boolean | null;
   }>>({});
   const [loadingStatuses, setLoadingStatuses] = useState(false);
-  const CHEAT_LIMIT = 2;
+  const CHEAT_LIMIT = 1;
 
   const totalQuestions = selectedExam?.questions?.length || 0;
   const progressPercent = totalQuestions > 0
@@ -165,7 +165,16 @@ export default function CourseExamsPage() {
       );
       const json = await res.json().catch(() => null);
 
-      if (!res.ok || !json?.success) {
+      if (!res.ok) {
+        if (res.status === 403 && json?.error === 'not_enrolled') {
+          alert('ليس لديك صلاحية لدخول هذا الامتحان. يرجى الاشتراك في الكورس أولاً.');
+        } else {
+          alert('تعذر التحقق من حالة هذا الامتحان حالياً، برجاء المحاولة لاحقاً.');
+        }
+        return;
+      }
+
+      if (!json?.success) {
         alert('تعذر التحقق من حالة هذا الامتحان حالياً، برجاء المحاولة لاحقاً.');
         return;
       }
