@@ -3,9 +3,8 @@ import { API_BASE_URL } from '@/lib/api';
 
 export async function GET(request: NextRequest, { params }: { params: { courseId: string } }) {
   try {
-    const url = new URL(request.url);
     const token = request.headers.get('authorization');
-    const qs = url.searchParams.toString();
+    const qs = request.nextUrl.searchParams.toString();
     if (API_BASE_URL) {
       const endpoint = `${API_BASE_URL}/api/questions/course/${params.courseId}${qs ? `?${qs}` : ''}`;
       const res = await fetch(endpoint, { headers: token ? { Authorization: token } : undefined });

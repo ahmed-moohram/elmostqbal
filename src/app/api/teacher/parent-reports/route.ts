@@ -55,7 +55,7 @@ function mapRow(row: ParentReportRow): ParentReportDto {
 
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
+    const { searchParams } = request.nextUrl;
     const teacherId = searchParams.get('teacherId');
     const daysParam = searchParams.get('days');
 

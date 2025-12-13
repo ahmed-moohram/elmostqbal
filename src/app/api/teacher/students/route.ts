@@ -21,7 +21,7 @@ interface StudentRow {
 
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
+    const { searchParams } = request.nextUrl;
     const courseIdsParam = searchParams.get('courseIds');
     const teacherId = searchParams.get('teacherId') || undefined;
 

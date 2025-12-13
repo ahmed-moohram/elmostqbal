@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (!url || !key) return NextResponse.json({ error: 'Supabase service role key is missing' }, { status: 500 });
     const supabase = createClient(url, key);
-    const courseId = new URL(request.url).searchParams.get('courseId');
+    const courseId = request.nextUrl.searchParams.get('courseId');
     if (!courseId) return NextResponse.json([]);
     const { data, error } = await supabase
       .from('sections')

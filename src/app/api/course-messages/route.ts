@@ -15,7 +15,7 @@ const supabase = createClient(supabaseUrl, supabaseKey as string);
 
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
+    const { searchParams } = request.nextUrl;
     const courseId = searchParams.get('courseId');
     const teacherId = searchParams.get('teacherId');
 

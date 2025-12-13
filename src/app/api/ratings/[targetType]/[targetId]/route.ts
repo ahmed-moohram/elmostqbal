@@ -3,7 +3,7 @@ import { API_BASE_URL } from '@/lib/api';
 
 export async function GET(request: NextRequest, { params }: { params: { targetType: string; targetId: string } }) {
   const token = request.headers.get('authorization');
-  const search = new URL(request.url).search;
+  const search = request.nextUrl.search;
   if (API_BASE_URL) {
     const res = await fetch(`${API_BASE_URL}/api/ratings/${params.targetType}/${params.targetId}${search}`, { headers: token ? { Authorization: token } : undefined });
     const data = await res.json();

@@ -41,7 +41,7 @@ interface ExamResultDto {
 
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
+    const { searchParams } = request.nextUrl;
     const courseId = searchParams.get('courseId');
     const examId = searchParams.get('examId');
     const teacherId = searchParams.get('teacherId');

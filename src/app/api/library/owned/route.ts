@@ -15,7 +15,7 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 // 2) كاحتياط: من جدول library_book_purchase_requests للحالات المعتمدة approved
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
+    const { searchParams } = request.nextUrl;
     const bookId = searchParams.get('bookId');
     const userId = searchParams.get('userId');
     const studentPhone = searchParams.get('studentPhone');

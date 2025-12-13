@@ -98,7 +98,7 @@ export async function POST(request: NextRequest) {
 // GET - جلب طلبات الدفع
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
+    const { searchParams } = request.nextUrl;
     const status = searchParams.get('status');
     const studentPhone = searchParams.get('studentPhone');
     const requestId = searchParams.get('id');
