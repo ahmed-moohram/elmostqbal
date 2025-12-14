@@ -43,6 +43,7 @@ function CoursePage() {
   // تحذير عند فتح أداة المطوّر (الكونسول) في صفحة الكورس
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    if (process.env.NODE_ENV !== 'production') return;
 
     let handled = false;
 

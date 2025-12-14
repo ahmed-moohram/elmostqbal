@@ -119,6 +119,8 @@ export default function TeacherCourseLessonsPage() {
   const [draggingLesson, setDraggingLesson] = useState<{ sectionId: string | null; lessonId: string } | null>(null);
   const [activeEditor, setActiveEditor] = useState<'lesson' | 'exam'>('lesson');
   const [generatingCodeLessonId, setGeneratingCodeLessonId] = useState<string | null>(null);
+  const [generatingBatchLessonId, setGeneratingBatchLessonId] = useState<string | null>(null);
+  const [batchCodeCounts, setBatchCodeCounts] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -438,6 +440,77 @@ export default function TeacherCourseLessonsPage() {
       toast.error('حدث خطأ أثناء إنشاء الكود');
     } finally {
       setGeneratingCodeLessonId(null);
+    }
+  };
+
+  const handleGenerateLessonCodesBatch = async (lesson: Lesson) => {
+    if (!courseId) {
+      toast.error('معرّف الكورس غير موجود');
+      return;
+    }
+
+    if (!user?.id) {
+      toast.error('يجب تسجيل الدخول كمدرس لإنشاء أكواد');
+      return;
+    }
+
+    if (!lesson.video_url) {
+      toast.error('يجب إضافة رابط فيديو للدرس أولاً قبل إنشاء أكواد له');
+      return;
+    }
+
+    const rawCount = batchCodeCounts[lesson.id] || '';
+    let count = Number(rawCount || 0);
+
+    if (!Number.isFinite(count) || count <= 0) {
+      toast.error('يرجى إدخال عدد الأكواد (مثلاً 5 أو 10 أو 20 أو 30)');
+      return;
+    }
+
+    if (count > 100) {
+      count = 100;
+    }
+
+    try {
+      setGeneratingBatchLessonId(lesson.id);
+
+      const res = await fetch(
+        `/api/teacher/lessons/${lesson.id}/codes?courseId=${courseId}&teacherId=${user.id}&count=${count}`,
+        {
+          method: 'POST',
+        },
+      );
+
+      const json = await res.json().catch(() => null);
+
+      if (!res.ok || !json?.codes || !Array.isArray(json.codes)) {
+        console.error('Error generating batch single-use lesson codes:', json);
+        toast.error(json?.error || 'فشل إنشاء الأكواد، حاول مرة أخرى');
+        return;
+      }
+
+      const codes: string[] = json.codes.map((c: any) => String(c));
+
+      if (!codes.length) {
+        toast.error('لم يتم إنشاء أي أكواد');
+        return;
+      }
+
+      const textToCopy = codes.join('\n');
+
+      try {
+        await navigator.clipboard.writeText(textToCopy);
+        toast.success(`تم إنشاء ${codes.length} كود ونسخهم إلى الحافظة`);
+      } catch (clipboardError) {
+        console.warn('Failed to copy batch lesson codes to clipboard:', clipboardError);
+        toast.success(`تم إنشاء ${codes.length} كود. يمكنك نسخهم من النافذة التالية.`);
+        alert(codes.join('\n'));
+      }
+    } catch (error) {
+      console.error('Unexpected error while generating batch lesson codes:', error);
+      toast.error('حدث خطأ أثناء إنشاء الأكواد');
+    } finally {
+      setGeneratingBatchLessonId(null);
     }
   };
 
@@ -1155,6 +1228,29 @@ export default function TeacherCourseLessonsPage() {
                                 )}
                                 إنشاء كود
                               </button>
+                              <div className="flex items-center gap-1">
+                                <input
+                                  type="number"
+                                  min={1}
+                                  placeholder="عدد الأكواد"
+                                  value={batchCodeCounts[lesson.id] ?? ''}
+                                  onChange={(e) =>
+                                    setBatchCodeCounts((prev) => ({
+                                      ...prev,
+                                      [lesson.id]: e.target.value,
+                                    }))
+                                  }
+                                  className="w-20 px-1 py-0.5 border rounded text-[11px] text-right"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => handleGenerateLessonCodesBatch(lesson)}
+                                  disabled={generatingBatchLessonId === lesson.id}
+                                  className="px-2 py-1 rounded bg-purple-100 text-[11px] text-purple-800 hover:bg-purple-200 disabled:opacity-50"
+                                >
+                                  {generatingBatchLessonId === lesson.id ? 'جاري إنشاء مجموعة' : 'إنشاء مجموعة'}
+                                </button>
+                              </div>
                               <button
                                 type="button"
                                 onClick={() => handleStartEditLesson(lesson)}
@@ -1266,6 +1362,29 @@ export default function TeacherCourseLessonsPage() {
                             )}
                             إنشاء كود
                           </button>
+                          <div className="flex items-center gap-1">
+                            <input
+                              type="number"
+                              min={1}
+                              placeholder="عدد الأكواد"
+                              value={batchCodeCounts[lesson.id] ?? ''}
+                              onChange={(e) =>
+                                setBatchCodeCounts((prev) => ({
+                                  ...prev,
+                                  [lesson.id]: e.target.value,
+                                }))
+                              }
+                              className="w-20 px-1 py-0.5 border rounded text-[11px] text-right"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleGenerateLessonCodesBatch(lesson)}
+                              disabled={generatingBatchLessonId === lesson.id}
+                              className="px-2 py-1 rounded bg-purple-100 text-[11px] text-purple-800 hover:bg-purple-200 disabled:opacity-50"
+                            >
+                              {generatingBatchLessonId === lesson.id ? 'جاري إنشاء مجموعة' : 'إنشاء مجموعة'}
+                            </button>
+                          </div>
                           <button
                             type="button"
                             onClick={() => handleStartEditLesson(lesson)}

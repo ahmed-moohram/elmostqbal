@@ -36,6 +36,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const { searchParams } = request.nextUrl;
     const courseId = searchParams.get('courseId');
     const teacherId = searchParams.get('teacherId');
+    const countParam = searchParams.get('count');
+
+    let count = Number(countParam || '1');
+    if (!Number.isFinite(count) || count <= 0) count = 1;
+    if (count > 100) count = 100;
 
     if (!lessonId) {
       return NextResponse.json(
@@ -92,6 +97,38 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     if (!lessonRow) {
       return NextResponse.json({ error: 'Lesson not found' }, { status: 404 });
+    }
+
+    if (count > 1) {
+      const rowsToInsert: { lesson_id: string; code: string; is_used: boolean }[] = [];
+
+      for (let i = 0; i < count; i++) {
+        rowsToInsert.push({
+          lesson_id: lessonId,
+          code: generateSingleUseCode(8),
+          is_used: false,
+        });
+      }
+
+      const { data: insertedRows, error: insertError } = await supabase
+        .from('lesson_access_codes')
+        .insert(rowsToInsert)
+        .select('code');
+
+      if (insertError || !insertedRows) {
+        console.error(
+          'Error inserting batch lesson_access_codes rows in teacher lesson codes API:',
+          insertError,
+        );
+        return NextResponse.json(
+          { error: 'Failed to create lesson codes batch' },
+          { status: 500 },
+        );
+      }
+
+      const codes = (insertedRows as any[]).map((row: any) => String(row.code));
+
+      return NextResponse.json({ success: true, codes });
     }
 
     let newCode = '';

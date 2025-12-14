@@ -7,6 +7,7 @@ import { toast } from "react-hot-toast";
 export default function DevtoolsGuard() {
   useEffect(() => {
     if (typeof window === "undefined") return;
+    if (process.env.NODE_ENV !== "production") return;
 
     let handled = false;
 
