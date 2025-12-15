@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import AdminLayout from '@/components/AdminLayout';
 import { 
@@ -13,6 +13,7 @@ import { achievementsService } from '@/services/achievements.service';
 
 export default function StudentDetailsPage() {
   const params = useParams();
+  const router = useRouter();
   const studentId = params?.id as string;
   const [student, setStudent] = useState<any>(null);
   const [achievements, setAchievements] = useState<any[]>([]);
@@ -122,6 +123,32 @@ export default function StudentDetailsPage() {
     }
   };
 
+  const handleDeleteStudent = async () => {
+    if (!studentId) return;
+
+    if (!window.confirm('هل أنت متأكد من حذف هذا الطالب نهائيًا؟')) return;
+
+    try {
+      const res = await fetch(`/api/admin/users/${studentId}`, {
+        method: 'DELETE',
+      });
+
+      const data = await res.json().catch(() => null as any);
+
+      if (!res.ok || !data?.success) {
+        console.error('❌ فشل حذف الطالب:', data?.errors || data?.error);
+        alert('فشل حذف الطالب. الرجاء المحاولة مرة أخرى.');
+        return;
+      }
+
+      alert('✅ تم حذف الطالب نهائيًا من قاعدة البيانات.');
+      router.push('/admin/all-students');
+    } catch (error) {
+      console.error('❌ خطأ في حذف الطالب:', error);
+      alert('حدث خطأ أثناء حذف الطالب');
+    }
+  };
+
   if (loading) {
     return (
       <AdminLayout>
@@ -153,7 +180,16 @@ export default function StudentDetailsPage() {
           >
             <FaArrowLeft /> رجوع للطلاب
           </Link>
-          <h1 className="text-3xl font-bold">تفاصيل الطالب</h1>
+          <div className="flex items-center justify-between gap-4">
+            <h1 className="text-3xl font-bold">تفاصيل الطالب</h1>
+            <button
+              type="button"
+              onClick={handleDeleteStudent}
+              className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm"
+            >
+              حذف الطالب نهائيًا
+            </button>
+          </div>
         </div>
 
         {/* معلومات الطالب الأساسية */}

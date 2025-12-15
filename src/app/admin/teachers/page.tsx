@@ -302,22 +302,26 @@ export default function TeachersManagement() {
     });
 
   const handleDeleteTeacher = async (id: string) => {
-    if (window.confirm('هل أنت متأكد من حذف هذا المدرس؟')) {
-      try {
-        const { deleteUser } = await import('@/lib/supabase-admin');
-        const result = await deleteUser(id);
-        
-        if (result.success) {
-          setTeachers(teachers.filter(teacher => teacher.id !== id));
-          console.log('✅ تم حذف المدرس بنجاح');
-        } else {
-          console.error('❌ فشل حذف المدرس');
-          alert('فشل حذف المدرس. الرجاء المحاولة مرة أخرى.');
-        }
-      } catch (error) {
-        console.error('❌ خطأ في حذف المدرس:', error);
-        alert('حدث خطأ أثناء حذف المدرس');
+    if (!window.confirm('هل أنت متأكد من حذف هذا المدرس؟')) return;
+
+    try {
+      const res = await fetch(`/api/admin/users/${id}`, {
+        method: 'DELETE',
+      });
+
+      const data = await res.json().catch(() => null as any);
+
+      if (!res.ok || !data?.success) {
+        console.error('❌ فشل حذف المدرس:', data?.errors || data?.error);
+        alert('فشل حذف المدرس. الرجاء المحاولة مرة أخرى.');
+        return;
       }
+
+      setTeachers(prev => prev.filter(teacher => teacher.id !== id));
+      console.log('✅ تم حذف المدرس نهائيًا من قاعدة البيانات');
+    } catch (error) {
+      console.error('❌ خطأ في حذف المدرس:', error);
+      alert('حدث خطأ أثناء حذف المدرس');
     }
   };
 
