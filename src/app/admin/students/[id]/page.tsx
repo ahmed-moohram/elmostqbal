@@ -18,6 +18,7 @@ export default function StudentDetailsPage() {
   const [student, setStudent] = useState<any>(null);
   const [achievements, setAchievements] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [resetLoading, setResetLoading] = useState(false);
 
   useEffect(() => {
     fetchStudentDetails();
@@ -123,6 +124,55 @@ export default function StudentDetailsPage() {
     }
   };
 
+  const handleGenerateResetLink = async () => {
+    if (!studentId) return;
+
+    if (!student?.email) {
+      alert('لا يوجد بريد إلكتروني مسجل لهذا الطالب.');
+      return;
+    }
+
+    try {
+      setResetLoading(true);
+
+      const res = await fetch(`/api/admin/users/${studentId}/reset-password-link`, {
+        method: 'POST',
+      });
+
+      const data = await res.json().catch(() => null as any);
+
+      if (!res.ok || !data?.success || !data.link) {
+        console.error('❌ فشل إنشاء رابط إعادة تعيين كلمة المرور:', data?.error);
+
+        if (res.status === 404) {
+          alert(
+            'لا يمكن إنشاء رابط لإعادة تعيين كلمة المرور لهذا الطالب لأنه لا يملك حساب تسجيل دخول في نظام المصادقة (Supabase Auth).',
+          );
+        } else {
+          alert('فشل إنشاء رابط إعادة تعيين كلمة المرور. الرجاء المحاولة مرة أخرى.');
+        }
+
+        return;
+      }
+
+      const link = data.link as string;
+
+      try {
+        await navigator.clipboard.writeText(link);
+        alert('✅ تم إنشاء رابط إعادة تعيين كلمة المرور ونسخه في الحافظة. يمكنك لصقه وإرساله للطالب.');
+      } catch {
+        // في حال فشل النسخ، نظهر الرابط ليتم نسخه يدويًا
+        // eslint-disable-next-line no-alert
+        window.prompt('تم إنشاء رابط إعادة تعيين كلمة المرور. انسخه وأرسله للطالب:', link);
+      }
+    } catch (error) {
+      console.error('❌ خطأ في إنشاء رابط إعادة تعيين كلمة المرور:', error);
+      alert('حدث خطأ أثناء إنشاء رابط إعادة تعيين كلمة المرور');
+    } finally {
+      setResetLoading(false);
+    }
+  };
+
   const handleDeleteStudent = async () => {
     if (!studentId) return;
 
@@ -182,13 +232,23 @@ export default function StudentDetailsPage() {
           </Link>
           <div className="flex items-center justify-between gap-4">
             <h1 className="text-3xl font-bold">تفاصيل الطالب</h1>
-            <button
-              type="button"
-              onClick={handleDeleteStudent}
-              className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm"
-            >
-              حذف الطالب نهائيًا
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleGenerateResetLink}
+                disabled={resetLoading}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm disabled:opacity-60"
+              >
+                {resetLoading ? 'جاري إنشاء رابط الباسورد...' : 'إنشاء رابط إعادة تعيين الباسورد'}
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteStudent}
+                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm"
+              >
+                حذف الطالب نهائيًا
+              </button>
+            </div>
           </div>
         </div>
 

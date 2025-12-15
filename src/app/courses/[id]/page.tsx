@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Image from 'next/image';
 import ProtectedVideoPlayer from '@/components/ProtectedVideoPlayer';
-import { FaPlay, FaLock, FaStar, FaCheck, FaUsers, FaClock, FaBookOpen, FaChartLine, FaTrophy, FaAward, FaComments, FaUserGraduate, FaQuestionCircle } from 'react-icons/fa';
+import { FaPlay, FaLock, FaStar, FaCheck, FaUsers, FaClock, FaBookOpen, FaChartLine, FaTrophy, FaAward, FaComments, FaUserGraduate, FaQuestionCircle, FaExpand, FaCompress } from 'react-icons/fa';
 import { ImSpinner9 } from 'react-icons/im';
 import { toast } from 'react-hot-toast';
 import VideoProtection from '@/components/VideoProtection';
@@ -37,6 +37,7 @@ function CoursePage() {
   const [videoProgress, setVideoProgress] = useState<{[key: string]: number}>({});
   const [videoCompleted, setVideoCompleted] = useState<{[key: string]: boolean}>({});
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
+  const [isVideoExpanded, setIsVideoExpanded] = useState(false);
   const [showChat, setShowChat] = useState(false);
   const [teacherInfo, setTeacherInfo] = useState<{id: string; name: string; avatar: string; phone?: string} | null>(null);
 
@@ -1134,7 +1135,7 @@ ${randomMsg}`);
       {activeLesson && (
         <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100">
           <h3 className="text-2xl font-bold mb-4 flex items-center gap-2">
-            <FaPlay className="text-primary" /> 
+
             {(() => {
               const selectedLesson = course?.sections
                 ?.flatMap((section: any) => section.lessons || [])
@@ -1170,126 +1171,160 @@ ${randomMsg}`);
                     ?.find((lesson: any) => String(lesson.id) === activeLesson);
                   return !!selectedLesson?.isPreview || isEnrolled;
                 })()}
-                onEnroll={handleEnrollment}
               />
             </div>
           ) : (
             /* الفيديو العادي للمشتركين */
-            <div 
-              className="aspect-video bg-black rounded-lg overflow-hidden mb-8 relative select-none"
-              onContextMenu={(e) => {
-                e.preventDefault();
-                toast.error('🚫 النقر الأيمن محظور على الفيديو');
-                return false;
-              }}
-              onDragStart={(e) => e.preventDefault()}
-              style={{ 
-                userSelect: 'none',
-                WebkitUserSelect: 'none',
-                MozUserSelect: 'none',
-                msUserSelect: 'none'
-              }}
-            >
-            {/* طبقة حماية شفافة فوق الفيديو */}
-            <div 
-              className="absolute inset-0 z-30 pointer-events-none"
-              style={{ 
-                background: 'repeating-linear-gradient(45deg, transparent, transparent 35px, rgba(255,255,255,.03) 35px, rgba(255,255,255,.03) 70px)' 
-              }}
-            />
-            
-            {/* العلامة المائية - أعلى يسار */}
-            {(
-              <>
-                <div className="absolute top-4 left-4 text-white/80 text-sm font-bold z-40 select-none pointer-events-none animate-pulse">
-                  <div>{studentInfo?.name || 'مستخدم'}</div>
-                  <div>{studentInfo?.phone || userIP}</div>
-                  <div className="text-[11px]">{new Date().toLocaleString('ar-EG')}</div>
-                </div>
+            <div className={isVideoExpanded ? 'fixed inset-0 z-50 bg-black/99 flex flex-col items-center justify-start pt-2 px-2' : ''}>
+              <div 
+                className="w-full max-w-6xl max-h-[90vh] aspect-video bg-black rounded-lg overflow-hidden mb-8 relative select-none"
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  toast.error('🚫 النقر الأيمن محظور على الفيديو');
+                  return false;
+                }}
+                onDragStart={(e) => e.preventDefault()}
+                style={{ 
+                  userSelect: 'none',
+                  WebkitUserSelect: 'none',
+                  MozUserSelect: 'none',
+                  msUserSelect: 'none'
+                }}
+              >
+                {/* طبقة حماية شفافة فوق الفيديو */}
+                <div 
+                  className="absolute inset-0 z-30 pointer-events-none"
+                  style={{ 
+                    background: 'repeating-linear-gradient(45deg, transparent, transparent 35px, rgba(255,255,255,.03) 35px, rgba(255,255,255,.03) 70px)' 
+                  }}
+                />
                 
-                {/* العلامة المائية - أعلى يمين */}
-                <div className="absolute top-4 right-4 text-white/80 text-sm font-bold z-40 select-none pointer-events-none">
-                  <div className="text-right text-red-400/80">⚠️ محمي</div>
-                  <div className="text-right">{studentInfo?.name || 'مستخدم'}</div>
-                  <div className="text-right">{studentInfo?.phone || userIP}</div>
-                </div>
+                {/* العلامة المائية - أعلى يسار */}
+                <>
+                  <div className="absolute top-4 left-4 text-white/80 text-sm font-bold z-40 select-none pointer-events-none animate-pulse">
+                    <div>{studentInfo?.name || 'مستخدم'}</div>
+                    <div>{studentInfo?.phone || userIP}</div>
+                    <div className="text-[11px]">{new Date().toLocaleString('ar-EG')}</div>
+                  </div>
+                  
+                  {/* العلامة المائية - أعلى يمين */}
+                  <div className="absolute top-4 right-4 text-white/80 text-sm font-bold z-40 select-none pointer-events-none">
+                    <div className="text-right text-red-400/80">⚠️ محمي</div>
+                    <div className="text-right">{studentInfo?.name || 'مستخدم'}</div>
+                    <div className="text-right">{studentInfo?.phone || userIP}</div>
+                  </div>
+                  
+                  {/* العلامة المائية - أسفل يسار */}
+                  <div className="absolute bottom-4 left-4 text-white/80 text-sm font-bold z-40 select-none pointer-events-none">
+                    <div className="text-yellow-400/80">🔒 محتوى محمي</div>
+                    <div>{studentInfo?.name || 'مستخدم'}</div>
+                    <div>{studentInfo?.phone || userIP}</div>
+                  </div>
+                  
+                  {/* العلامة المائية - أسفل يمين */}
+                  <div className="absolute bottom-4 right-4 text-white/80 text-sm font-bold z-40 select-none pointer-events-none animate-pulse">
+                    <div className="text-right">Course ID: {courseId?.substring(0, 8)}</div>
+                    <div className="text-right">{studentInfo?.name || 'مستخدم'}</div>
+                    <div className="text-right">{studentInfo?.phone || userIP}</div>
+                  </div>
+                  
+                  {/* العلامة المائية - المنتصف (مائلة) */}
+                  <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-white/40 text-4xl font-bold rotate-[-30deg] z-40 select-none pointer-events-none whitespace-nowrap drop-shadow-md">
+                    {studentInfo?.name || 'محتوى محمي'} • {studentInfo?.phone || userIP}
+                  </div>
+                  
+                  {/* علامات مائية إضافية متحركة */}
+                  <div className="absolute top-1/3 left-1/4 text-white/40 text-xl font-bold rotate-[45deg] z-40 select-none pointer-events-none animate-pulse">
+                    🔐 PROTECTED
+                  </div>
+                  <div className="absolute bottom-1/3 right-1/4 text-white/40 text-xl font-bold rotate-[-45deg] z-40 select-none pointer-events-none animate-pulse">
+                    © {new Date().getFullYear()}
+                  </div>
+                </>
                 
-                {/* العلامة المائية - أسفل يسار */}
-                <div className="absolute bottom-4 left-4 text-white/80 text-sm font-bold z-40 select-none pointer-events-none">
-                  <div className="text-yellow-400/80">🔒 محتوى محمي</div>
-                  <div>{studentInfo?.name || 'مستخدم'}</div>
-                  <div>{studentInfo?.phone || userIP}</div>
-                </div>
-                
-                {/* العلامة المائية - أسفل يمين */}
-                <div className="absolute bottom-4 right-4 text-white/80 text-sm font-bold z-40 select-none pointer-events-none animate-pulse">
-                  <div className="text-right">Course ID: {courseId?.substring(0, 8)}</div>
-                  <div className="text-right">{studentInfo?.name || 'مستخدم'}</div>
-                  <div className="text-right">{studentInfo?.phone || userIP}</div>
-                </div>
-                
-                {/* العلامة المائية - المنتصف (مائلة) */}
-                <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-white/40 text-4xl font-bold rotate-[-30deg] z-40 select-none pointer-events-none whitespace-nowrap drop-shadow-md">
-                  {studentInfo?.name || 'محتوى محمي'} • {studentInfo?.phone || userIP}
-                </div>
-                
-                {/* علامات مائية إضافية متحركة */}
-                <div className="absolute top-1/3 left-1/4 text-white/40 text-xl font-bold rotate-[45deg] z-40 select-none pointer-events-none animate-pulse">
-                  🔐 PROTECTED
-                </div>
-                <div className="absolute bottom-1/3 right-1/4 text-white/40 text-xl font-bold rotate-[-45deg] z-40 select-none pointer-events-none animate-pulse">
-                  © {new Date().getFullYear()}
-                </div>
-              </>
-            )}
-            
-            {/* مشغل YouTube الفعلي */}
-            {(() => {
-              // البحث عن الدرس المحدد للحصول على رابط الفيديو
-              const selectedLesson = course?.sections
-                ?.flatMap((section: any) => section.lessons || [])
-                ?.find((lesson: any) => String(lesson.id) === activeLesson);
-              
-              console.log('🎬 الدرس المحدد:', selectedLesson);
-              console.log('🔗 رابط الفيديو:', selectedLesson?.videoUrl);
-              
-              if (selectedLesson?.videoUrl) {
-                const url = selectedLesson.videoUrl;
+                {/* مشغل YouTube الفعلي */}
+                {(() => {
+                  // البحث عن الدرس المحدد للحصول على رابط الفيديو
+                  const selectedLesson = course?.sections
+                    ?.flatMap((section: any) => section.lessons || [])
+                    ?.find((lesson: any) => String(lesson.id) === activeLesson);
+                  
+                  console.log('🎬 الدرس المحدد:', selectedLesson);
+                  console.log('🔗 رابط الفيديو:', selectedLesson?.videoUrl);
+                  
+                  if (selectedLesson?.videoUrl) {
+                    const url = selectedLesson.videoUrl;
 
-                // محاولة دعم روابط Google Drive
-                try {
-                  if (url.includes('drive.google.com')) {
-                    const parsed = new URL(url);
-                    let fileId = '';
+                    // محاولة دعم روابط Google Drive
+                    try {
+                      if (url.includes('drive.google.com')) {
+                        const parsed = new URL(url);
+                        let fileId = '';
 
-                    const pathParts = parsed.pathname.split('/').filter(Boolean);
-                    const dIndex = pathParts.indexOf('d');
-                    if (dIndex !== -1 && pathParts[dIndex + 1]) {
-                      fileId = pathParts[dIndex + 1];
-                    }
+                        const pathParts = parsed.pathname.split('/').filter(Boolean);
+                        const dIndex = pathParts.indexOf('d');
+                        if (dIndex !== -1 && pathParts[dIndex + 1]) {
+                          fileId = pathParts[dIndex + 1];
+                        }
 
-                    if (!fileId) {
-                      const idParam = parsed.searchParams.get('id');
-                      if (idParam) {
-                        fileId = idParam;
+                        if (!fileId) {
+                          const idParam = parsed.searchParams.get('id');
+                          if (idParam) {
+                            fileId = idParam;
+                          }
+                        }
+
+                        if (fileId) {
+                          const driveUrl = `https://drive.google.com/file/d/${fileId}/preview`;
+                          return (
+                            <>
+                              <iframe
+                                width="100%"
+                                height="100%"
+                                src={driveUrl}
+                                title={selectedLesson.title}
+                                frameBorder="0"
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                                allowFullScreen
+                                className="absolute inset-0 w-full h-full pointer-events-auto"
+                                style={{ zIndex: 1 }}
+                              />
+                              <div 
+                                className="absolute inset-0 z-10" 
+                                style={{ pointerEvents: 'none', background: 'transparent' }}
+                                onContextMenu={(e) => e.preventDefault()}
+                              />
+                            </>
+                          );
+                        }
                       }
-                    }
+                    } catch (e) {}
 
-                    if (fileId) {
-                      const driveUrl = `https://drive.google.com/file/d/${fileId}/preview`;
+                    // استخراج معرف فيديو YouTube من الرابط
+                    const getYouTubeId = (innerUrl: string) => {
+                      const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
+                      const match = innerUrl.match(regex);
+                      return match ? match[1] : null;
+                    };
+                    
+                    const videoId = getYouTubeId(url);
+                    console.log('📺 معرف فيديو YouTube:', videoId);
+                    
+                    if (videoId) {
                       return (
                         <>
                           <iframe
                             width="100%"
                             height="100%"
-                            src={driveUrl}
+                            src={`https://www.youtube.com/embed/${videoId}?autoplay=0&rel=0&modestbranding=1&controls=1&disablekb=1&loop=1&playlist=${videoId}&fs=0`}
                             title={selectedLesson.title}
                             frameBorder="0"
-                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope"
-                            allowFullScreen={false}
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                            allowFullScreen
                             className="absolute inset-0 w-full h-full pointer-events-auto"
                             style={{ zIndex: 1 }}
                           />
+                          {/* طبقة حماية شفافة فوق الـ iframe */}
                           <div 
                             className="absolute inset-0 z-10" 
                             style={{ pointerEvents: 'none', background: 'transparent' }}
@@ -1297,71 +1332,57 @@ ${randomMsg}`);
                           />
                         </>
                       );
+                    } else {
+                      return (
+                        <div className="flex items-center justify-center h-full">
+                          <div className="text-center text-white">
+                            <FaPlay className="text-6xl mb-4 mx-auto opacity-50" />
+                            <p className="text-xl">رابط الفيديو غير صحيح</p>
+                            <p className="text-sm opacity-70 mt-2">{selectedLesson.videoUrl}</p>
+                          </div>
+                        </div>
+                      );
                     }
-                  }
-                } catch (e) {}
-
-                // استخراج معرف فيديو YouTube من الرابط
-                const getYouTubeId = (innerUrl: string) => {
-                  const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
-                  const match = innerUrl.match(regex);
-                  return match ? match[1] : null;
-                };
-                
-                const videoId = getYouTubeId(url);
-                console.log('📺 معرف فيديو YouTube:', videoId);
-                
-                if (videoId) {
-                  return (
-                    <>
-                      <iframe
-                        width="100%"
-                        height="100%"
-                        src={`https://www.youtube.com/embed/${videoId}?autoplay=0&rel=0&modestbranding=1&controls=1&disablekb=1&fs=0&loop=1&playlist=${videoId}`}
-                        title={selectedLesson.title}
-                        frameBorder="0"
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                        allowFullScreen={false}
-                        className="absolute inset-0 w-full h-full pointer-events-auto"
-                        style={{ zIndex: 1 }}
-                      />
-                      {/* طبقة حماية شفافة فوق الـ iframe */}
-                      <div 
-                        className="absolute inset-0 z-10" 
-                        style={{ pointerEvents: 'none', background: 'transparent' }}
-                        onContextMenu={(e) => e.preventDefault()}
-                      />
-                    </>
-                  );
-                } else {
-                  return (
-                    <div className="flex items-center justify-center h-full">
-                      <div className="text-center text-white">
-                        <FaPlay className="text-6xl mb-4 mx-auto opacity-50" />
-                        <p className="text-xl">رابط الفيديو غير صحيح</p>
-                        <p className="text-sm opacity-70 mt-2">{selectedLesson.videoUrl}</p>
+                  } else {
+                    return (
+                      <div className="flex items-center justify-center h-full">
+                        <div className="text-center text-white">
+                          <FaPlay className="text-6xl mb-4 mx-auto opacity-50" />
+                          <p className="text-xl">لا يوجد فيديو لهذا الدرس</p>
+                        </div>
                       </div>
-                    </div>
-                  );
-                }
-              } else {
-                return (
-                  <div className="flex items-center justify-center h-full">
-                    <div className="text-center text-white">
-                      <FaPlay className="text-6xl mb-4 mx-auto opacity-50" />
-                      <p className="text-xl">لا يوجد فيديو لهذا الدرس</p>
-                    </div>
+                    );
+                  }
+                })()}
+                
+                {/* شريط قفل علوي مع زر تكبير/تصغير */}
+                <div className="absolute top-0 left-0 right-0 h-16 bg-black/35 flex items-center justify-between px-4 pointer-events-auto z-50 select-none">
+                  <div className="flex items-center gap-2 text-white/85 text-sm font-bold">
+                    <FaLock className="text-lg" />
+                    <span>محتوى محمي</span>
                   </div>
-                );
-              }
-            })()}
-
-            {/* شريط قفل في أعلى الفيديو لمنع الضغط على أزرار المشاركة ونسخ الرابط */}
-            <div className="absolute top-0 left-0 right-0 h-16 bg-black/55 flex items-center justify-end px-4 pointer-events-auto z-50 select-none">
-              <FaLock className="text-white/85 text-xl" />
+                  <button
+                    type="button"
+                    onClick={() => setIsVideoExpanded((prev) => !prev)}
+                    className="flex items-center gap-2 text-white/90 bg-black/40 hover:bg-black/60 rounded-full px-3 py-1 text-xs font-semibold transition"
+                  >
+                    {isVideoExpanded ? (
+                      <>
+                        <FaCompress className="text-sm" />
+                        <span>تصغير الفيديو</span>
+                      </>
+                    ) : (
+                      <>
+                        <FaExpand className="text-sm" />
+                        <span>تكبير الفيديو</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
             </div>
-          </div>
           )}
+
           {/* معلومات التقدم والتحكم */}
           {isEnrolled && (
             <div className="mt-6 space-y-4">

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { FaLock, FaShoppingCart, FaWhatsapp, FaPhone, FaCopy, FaCheckCircle } from 'react-icons/fa';
+import { FaLock, FaShoppingCart, FaWhatsapp, FaPhone, FaCopy, FaCheckCircle, FaExpand, FaCompress, FaPlus, FaMinus } from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
 
 interface ProtectedVideoPlayerProps {
@@ -43,10 +43,12 @@ export default function ProtectedVideoPlayer({
   const [lessonHasCode, setLessonHasCode] = useState(false);
   const [lessonIsFreeOrPreview, setLessonIsFreeOrPreview] = useState(false);
   const [metaLoaded, setMetaLoaded] = useState(false);
-  
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [zoomLevel, setZoomLevel] = useState(1);
+
   // رقم فودافون كاش للمدرس
   const vodafoneCashNumber = actualTeacherPhone || teacherPhone || '01012345678';
-  
+
   useEffect(() => {
     // جلب بيانات الطالب من localStorage
     const student = localStorage.getItem('studentInfo');
@@ -55,13 +57,13 @@ export default function ProtectedVideoPlayer({
       setStudentName(data.name || '');
       setStudentPhone(data.phone || '');
     }
-    
+
     // جلب بيانات الكورس من localStorage كـ fallback
     const currentCourse = localStorage.getItem('currentCourse');
     if (currentCourse) {
       const courseData = JSON.parse(currentCourse);
       console.log('📚 بيانات الكورس من localStorage:', courseData);
-      
+
       // استخدام البيانات من localStorage إذا لم تكن موجودة في props
       if (!courseName || courseName === '') {
         setActualCourseName(courseData.title || 'الكورس');
@@ -116,7 +118,14 @@ export default function ProtectedVideoPlayer({
     };
 
     fetchMeta();
-  }, [lessonId, useAccessCode]);
+  }, [lessonId, useAccessCode, courseId]);
+
+  // إعادة ضبط مستوى الزووم عند الخروج من وضع التكبير المخصص
+  useEffect(() => {
+    if (!isExpanded) {
+      setZoomLevel(1);
+    }
+  }, [isExpanded]);
 
   const handleVerifyCode = async () => {
     if (!lessonId || !courseId) return;
@@ -181,11 +190,11 @@ export default function ProtectedVideoPlayer({
       toast.error('من فضلك أكمل بياناتك أولاً');
       return;
     }
-    
+
     // التحقق من بيانات الكورس
     const finalCourseName = actualCourseName || courseName;
     const finalCoursePrice = actualCoursePrice || coursePrice;
-    
+
     if (!finalCourseName || !finalCoursePrice) {
       console.error('❌ بيانات الكورس غير متوفرة:', { 
         actualCourseName, 
@@ -193,7 +202,7 @@ export default function ProtectedVideoPlayer({
         actualCoursePrice, 
         coursePrice 
       });
-      
+
       // محاولة جلب البيانات من localStorage مرة أخرى
       const savedCourse = localStorage.getItem('currentCourse');
       if (savedCourse) {
@@ -229,13 +238,13 @@ export default function ProtectedVideoPlayer({
       });
 
       const result = await response.json();
-      
+
       if (result.success) {
         toast.success('تم إرسال طلب الدفع بنجاح! سيتم مراجعته قريباً');
-        
+
         // حفظ معرف الطلب
         localStorage.setItem('lastPaymentRequestId', result.requestId);
-        
+
         // إنشاء نص الرسالة التلقائية
         const message = `*طلب اشتراك في كورس*
     
@@ -255,7 +264,7 @@ export default function ProtectedVideoPlayer({
 
         // تحويل النص لـ URL encoding
         const encodedMessage = encodeURIComponent(message);
-        
+
         // رقم الواتساب الذي سيستقبل الرسالة (يمكن تغييره)
         const whatsappNumber = '201012345678'; // ضع رقمك هنا بدون +
         
@@ -309,21 +318,21 @@ export default function ProtectedVideoPlayer({
           const urlObj = new URL(url);
           const v = urlObj.searchParams.get('v');
           if (v) {
-            return `https://www.youtube.com/embed/${v}?autoplay=0&rel=0&modestbranding=1&controls=1&disablekb=1&fs=0&iv_load_policy=3`;
+            return `https://www.youtube.com/embed/${v}?autoplay=0&rel=0&modestbranding=1&controls=1&disablekb=1&iv_load_policy=3&fs=0`;
           }
         }
 
         if (url.includes('youtu.be/')) {
           const id = url.split('youtu.be/')[1]?.split(/[?&]/)[0];
           if (id) {
-            return `https://www.youtube.com/embed/${id}?autoplay=0&rel=0&modestbranding=1&controls=1&disablekb=1&fs=0&iv_load_policy=3`;
+            return `https://www.youtube.com/embed/${id}?autoplay=0&rel=0&modestbranding=1&controls=1&disablekb=1&iv_load_policy=3&fs=0`;
           }
         }
 
         if (url.includes('youtube.com/embed/')) {
           const hasQuery = url.includes('?');
           const base = hasQuery ? url.split('?')[0] : url;
-          return `${base}?autoplay=0&rel=0&modestbranding=1&controls=1&disablekb=1&fs=0&iv_load_policy=3`;
+          return `${base}?autoplay=0&rel=0&modestbranding=1&controls=1&disablekb=1&iv_load_policy=3&fs=0`;
         }
       } catch (e) {}
 
@@ -331,16 +340,68 @@ export default function ProtectedVideoPlayer({
     };
 
     return (
-      <div className="w-full aspect-video bg-black rounded-xl overflow-hidden relative">
-        <iframe
-          src={getEmbeddedUrl()}
-          title="Course Video"
-          className="w-full h-full"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope"
-          allowFullScreen={false}
-        />
-        <div className="absolute top-0 left-0 right-0 h-16 bg-black/55 flex items-center justify-end px-4 pointer-events-auto z-10 select-none">
-          <FaLock className="text-white/85 text-xl" />
+      <div className={isExpanded ? 'fixed inset-0 z-50 bg-black/90 flex flex-col items-center justify-start pt-2 px-2' : 'w-full'}>
+        <div
+          className="w-full max-w-6xl max-h-[90vh] aspect-video bg-black rounded-xl overflow-hidden relative"
+          style={{
+            transform: isExpanded ? `scale(${zoomLevel})` : 'scale(1)',
+            transformOrigin: 'top center',
+            transition: 'transform 0.2s ease-out',
+          }}
+        >
+          <iframe
+            src={getEmbeddedUrl()}
+            title="Course Video"
+            className="w-full h-full"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+            allowFullScreen
+          />
+          <div className="absolute top-0 left-0 right-0 h-16 bg-black/35 flex items-center justify-between px-4 pointer-events-auto z-10 select-none">
+            <div className="flex items-center gap-2 text-white/85 text-sm font-bold">
+              <FaLock className="text-lg" />
+              <span>محتوى محمي</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsExpanded((prev) => !prev)}
+              className="flex items-center gap-2 text-white/90 bg-black/40 hover:bg-black/60 rounded-full px-3 py-1 text-xs font-semibold transition"
+            >
+              {isExpanded ? (
+                <>
+                  <FaCompress className="text-sm" />
+                  <span>تصغير الفيديو</span>
+                </>
+              ) : (
+                <>
+                  <FaExpand className="text-sm" />
+                  <span>تكبير الفيديو</span>
+                </>
+              )}
+            </button>
+          </div>
+
+          {/* أزرار الزووم في الأسفل */}
+          {isExpanded && (
+            <div className="absolute bottom-4 right-4 z-10 flex items-center gap-2 bg-black/40 text-white px-3 py-1 rounded-full text-xs pointer-events-auto select-none">
+              <span className="opacity-80">الزووم</span>
+              <button
+                type="button"
+                onClick={() => setZoomLevel((prev) => Math.max(1, Number((prev - 0.15).toFixed(2))))}
+                className="flex items-center justify-center w-7 h-7 rounded-full bg-black/60 hover:bg-black/80 transition disabled:opacity-40"
+                disabled={zoomLevel <= 1}
+              >
+                <FaMinus className="text-xs" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setZoomLevel((prev) => Math.min(2, Number((prev + 0.15).toFixed(2))))}
+                className="flex items-center justify-center w-7 h-7 rounded-full bg-black/60 hover:bg-black/80 transition disabled:opacity-40"
+                disabled={zoomLevel >= 2}
+              >
+                <FaPlus className="text-xs" />
+              </button>
+            </div>
+          )}
         </div>
       </div>
     );
