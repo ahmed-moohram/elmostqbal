@@ -746,8 +746,9 @@ export default function TeacherDashboard() {
   useEffect(() => {
     if (isLoading || !isAuthenticated || !user) return;
 
-    if (user.role !== 'teacher') {
-      toast.error('يجب تسجيل الدخول كمدرس');
+    // السماح للمدرس أو الأدمن بالدخول للوحة تحكم المدرس
+    if (user.role !== 'teacher' && user.role !== 'admin') {
+      toast.error('يجب تسجيل الدخول كمدرس أو أدمن');
       router.replace('/');
       return;
     }
