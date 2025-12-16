@@ -83,7 +83,8 @@ export async function POST(
       return NextResponse.json({ success: false, error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ success: true, link: data?.action_link });
+    // generateLink يُرجع الرابط داخل data.properties.action_link طبقاً لتعريف Supabase
+    return NextResponse.json({ success: true, link: data?.properties?.action_link });
   } catch (e: any) {
     console.error('Unexpected error in reset-password-link API:', e);
     return NextResponse.json({ success: false, error: 'Internal server error' }, { status: 500 });
