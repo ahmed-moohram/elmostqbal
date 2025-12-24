@@ -68,6 +68,11 @@ interface StudentDetailsState {
   completedLessons: number;
   totalLessons: number;
   averageQuizScore: number;
+  achievementsCount: number;
+  courseAchievementsCount: number;
+  latestAchievements: string[];
+  latestCourseAchievements: string[];
+  totalPoints: number;
 }
 
 interface ParentReport {
@@ -111,7 +116,16 @@ interface TeacherLibraryBook {
 }
 export default function TeacherDashboard() {
   const router = useRouter();
-  const { user, isAuthenticated, isLoading, logout } = useAuth();
+  const { user, isAuthenticated, isLoading, logout, updateUser } = useAuth();
+
+  const getDisplayStudentsCount = (seed: string): number => {
+    const s = String(seed || '');
+    let hash = 0;
+    for (let i = 0; i < s.length; i++) {
+      hash = (hash * 31 + s.charCodeAt(i)) >>> 0;
+    }
+    return 500 + (hash % 501);
+  };
 
   const [teacher, setTeacher] = useState<TeacherData | null>(null);
   const [activeTab, setActiveTab] = useState<
@@ -139,6 +153,11 @@ export default function TeacherDashboard() {
     completedLessons: 0,
     totalLessons: 0,
     averageQuizScore: 0,
+    achievementsCount: 0,
+    courseAchievementsCount: 0,
+    latestAchievements: [],
+    latestCourseAchievements: [],
+    totalPoints: 0,
   });
   const [parentReportMode, setParentReportMode] = useState(false);
   const [parentReports, setParentReports] = useState<ParentReport[]>([]);
@@ -234,6 +253,16 @@ export default function TeacherDashboard() {
     const passedQuizzes = studentDetails.quizResults.filter((q: any) => q.passed).length;
     const failedQuizzes = Math.max(totalQuizAttempts - passedQuizzes, 0);
 
+    const totalPoints = studentDetails.totalPoints || 0;
+    const achievementsCount = studentDetails.achievementsCount || 0;
+    const courseAchievementsCount = studentDetails.courseAchievementsCount || 0;
+    const latestCourseAchievements = Array.isArray(studentDetails.latestCourseAchievements)
+      ? studentDetails.latestCourseAchievements.filter(Boolean)
+      : [];
+    const latestCourseAchievementsLine = latestCourseAchievements.length > 0
+      ? `\n- آخر إنجازات في هذا الكورس: ${latestCourseAchievements.join('، ')}`
+      : '';
+
     let weeklyStatus = 'لا توجد بيانات حديثة عن حضور هذا الأسبوع.';
     if (selectedStudent.lastActiveAt) {
       const last = new Date(selectedStudent.lastActiveAt as any);
@@ -249,7 +278,7 @@ export default function TeacherDashboard() {
     const avgScore =
       studentDetails.quizResults.length > 0 ? studentDetails.averageQuizScore : 0;
 
-    return `السلام عليكم ورحمة الله وبركاته\n\nولي أمر الطالب/ة ${selectedStudent.name}\n\nنود إبلاغكم بتقرير مختصر عن أداء ابنكم/ابنتكم في كورس "${selectedStudent.courseName}" على المنصة.\n\n- نسبة إنجاز الكورس الحالية: ${selectedStudent.progress}%\n- عدد الدروس المكتملة: ${completedLessons} من ${totalLessons} درس\n- الدروس المتبقية: ${remainingLessons} درس\n- عدد محاولات الاختبارات: ${totalQuizAttempts}\n- عدد مرات النجاح في الامتحان: ${passedQuizzes}\n- عدد مرات الرسوب في الامتحان: ${failedQuizzes}\n- متوسط درجة الاختبارات: ${avgScore}%\n- حالة الحضور هذا الأسبوع: ${weeklyStatus}\n\nنشكركم على متابعتكم، وأي تقصير يتم التنبيه عليه أولاً للطالب ثم التنسيق معكم عند الحاجة.`;
+    return `السلام عليكم ورحمة الله وبركاته\n\nولي أمر الطالب/ة ${selectedStudent.name}\n\nنود إبلاغكم بتقرير مختصر عن أداء ابنكم/ابنتكم في كورس "${selectedStudent.courseName}" على المنصة.\n\n- نسبة إنجاز الكورس الحالية: ${selectedStudent.progress}%\n- عدد الدروس المكتملة: ${completedLessons} من ${totalLessons} درس\n- الدروس المتبقية: ${remainingLessons} درس\n- عدد محاولات الاختبارات: ${totalQuizAttempts}\n- عدد مرات النجاح في الامتحان: ${passedQuizzes}\n- عدد مرات الرسوب في الامتحان: ${failedQuizzes}\n- متوسط درجة الاختبارات: ${avgScore}%\n- إجمالي نقاط الطالب على المنصة: ${totalPoints} نقطة\n- عدد الإنجازات المحققة (إجمالي): ${achievementsCount}\n- إنجازات هذا الكورس: ${courseAchievementsCount}${latestCourseAchievementsLine}\n- حالة الحضور هذا الأسبوع: ${weeklyStatus}\n\nنشكركم على متابعتكم، وأي تقصير يتم التنبيه عليه أولاً للطالب ثم التنسيق معكم عند الحاجة.`;
   };
 
   // جلب كتب المدرس من جدول library_books
@@ -573,25 +602,21 @@ export default function TeacherDashboard() {
 
         const url = result.url;
 
-        const { error: userError } = await supabase
-          .from('users')
-          .update({ avatar_url: url })
-          .eq('id', user.id);
+        const persistRes = await fetch('/api/profile/avatar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url }),
+        });
 
-        if (userError) {
-          console.error('Error updating user avatar:', userError);
-        }
-
-        const { error: teacherError } = await supabase
-          .from('teachers')
-          .update({ avatar_url: url })
-          .eq('user_id', user.id);
-
-        if (teacherError) {
-          console.error('Error updating teacher avatar:', teacherError);
+        const persistJson = await persistRes.json().catch(() => null as any);
+        if (!persistRes.ok || !persistJson?.success) {
+          console.error('Error persisting avatar url:', persistJson);
+          toast.error('فشل حفظ الصورة في الحساب');
+          return;
         }
 
         setTeacher((prev) => (prev ? { ...prev, profileImage: url } : prev));
+        updateUser({ image: url });
         toast.success('تم تحديث صورتك بنجاح');
       } catch (error) {
         console.error('Error uploading teacher avatar:', error);
@@ -673,6 +698,43 @@ export default function TeacherDashboard() {
         averageQuizScore = Number((totalScore / quizData.length).toFixed(1));
       }
 
+      let achievementsCount = 0;
+      let courseAchievementsCount = 0;
+      let latestCourseAchievements: string[] = [];
+      let totalPoints = 0;
+
+      try {
+        const { data: pointsRow, error: pointsError } = await supabase
+          .from('user_points')
+          .select('total_points')
+          .eq('user_id', student.userId)
+          .maybeSingle();
+
+        if (!pointsError && pointsRow) {
+          totalPoints = Number((pointsRow as any).total_points || 0) || 0;
+        }
+
+        const { data: achievementsRows, error: achievementsError } = await supabase
+          .from('user_achievements')
+          .select('course_id, earned_at, achievement:achievements(title)')
+          .eq('user_id', student.userId)
+          .order('earned_at', { ascending: false });
+
+        if (!achievementsError && Array.isArray(achievementsRows)) {
+          achievementsCount = achievementsRows.length;
+          const courseRows = achievementsRows.filter(
+            (row: any) => String(row.course_id || '') === String(student.courseId)
+          );
+          courseAchievementsCount = courseRows.length;
+          latestCourseAchievements = courseRows
+            .map((row: any) => row.achievement?.title)
+            .filter((t: any) => typeof t === 'string' && t.trim().length > 0)
+            .slice(0, 3);
+        }
+      } catch (achError) {
+        console.error('Error loading achievements for parent report:', achError);
+      }
+
       let weeklyStatus = 'لا توجد بيانات حديثة عن حضور هذا الأسبوع.';
       if (student.lastActiveAt) {
         const last = new Date(student.lastActiveAt as any);
@@ -685,7 +747,12 @@ export default function TeacherDashboard() {
         }
       }
 
-      const text = `السلام عليكم ورحمة الله وبركاته\n\nولي أمر الطالب/ة ${student.name}\n\nنود إبلاغكم بتقرير مختصر عن أداء ابنكم/ابنتكم في كورس "${student.courseName}" على المنصة.\n\n- نسبة إنجاز الكورس الحالية: ${student.progress}%\n- عدد الدروس المكتملة: ${completedLessons} من ${totalLessons} درس\n- الدروس المتبقية: ${remainingLessons} درس\n- عدد محاولات الاختبارات: ${totalQuizAttempts}\n- عدد مرات النجاح في الامتحان: ${passedQuizzes}\n- عدد مرات الرسوب في الامتحان: ${failedQuizzes}\n- متوسط درجة الاختبارات: ${averageQuizScore}%\n- حالة الحضور هذا الأسبوع: ${weeklyStatus}\n\nنشكركم على متابعتكم، وأي تقصير يتم التنبيه عليه أولاً للطالب ثم التنسيق معكم عند الحاجة.`;
+      const latestCourseAchievementsLine =
+        latestCourseAchievements.length > 0
+          ? `\n- آخر إنجازات في هذا الكورس: ${latestCourseAchievements.join('، ')}`
+          : '';
+
+      const text = `السلام عليكم ورحمة الله وبركاته\n\nولي أمر الطالب/ة ${student.name}\n\nنود إبلاغكم بتقرير مختصر عن أداء ابنكم/ابنتكم في كورس "${student.courseName}" على المنصة.\n\n- نسبة إنجاز الكورس الحالية: ${student.progress}%\n- عدد الدروس المكتملة: ${completedLessons} من ${totalLessons} درس\n- الدروس المتبقية: ${remainingLessons} درس\n- عدد محاولات الاختبارات: ${totalQuizAttempts}\n- عدد مرات النجاح في الامتحان: ${passedQuizzes}\n- عدد مرات الرسوب في الامتحان: ${failedQuizzes}\n- متوسط درجة الاختبارات: ${averageQuizScore}%\n- إجمالي نقاط الطالب على المنصة: ${totalPoints} نقطة\n- عدد الإنجازات المحققة (إجمالي): ${achievementsCount}\n- إنجازات هذا الكورس: ${courseAchievementsCount}${latestCourseAchievementsLine}\n- حالة الحضور هذا الأسبوع: ${weeklyStatus}\n\nنشكركم على متابعتكم، وأي تقصير يتم التنبيه عليه أولاً للطالب ثم التنسيق معكم عند الحاجة.`;
 
       const rawPhone = String(student.parentPhone || '').replace(/[^0-9]/g, '');
       if (!rawPhone) {
@@ -746,9 +813,8 @@ export default function TeacherDashboard() {
   useEffect(() => {
     if (isLoading || !isAuthenticated || !user) return;
 
-    // السماح للمدرس أو الأدمن بالدخول للوحة تحكم المدرس
-    if (user.role !== 'teacher' && user.role !== 'admin') {
-      toast.error('يجب تسجيل الدخول كمدرس أو أدمن');
+    if (user.role !== 'teacher') {
+      toast.error('يجب تسجيل الدخول كمدرس');
       router.replace('/');
       return;
     }
@@ -771,9 +837,14 @@ export default function TeacherDashboard() {
           email: user.email || '',
           bio: teacherRow?.bio || '',
           specialization: teacherRow?.specialization || 'مدرس',
-          profileImage: (user as any).avatar_url || '/placeholder-avatar.png',
-          rating: teacherRow?.average_rating || 0,
-          studentsCount: teacherRow?.total_students || 0,
+          profileImage:
+            (user as any).image ||
+            (user as any).avatar_url ||
+            (user as any).profile_picture ||
+            (user as any).avatar ||
+            '/placeholder-avatar.png',
+          rating: 5,
+          studentsCount: getDisplayStudentsCount(user.id),
           coursesCount: teacherRow?.total_courses || 0,
           isVerified: true,
           status: (teacherRow as any)?.status || 'approved',
@@ -1019,6 +1090,11 @@ export default function TeacherDashboard() {
       completedLessons: 0,
       totalLessons: 0,
       averageQuizScore: 0,
+      achievementsCount: 0,
+      courseAchievementsCount: 0,
+      latestAchievements: [],
+      latestCourseAchievements: [],
+      totalPoints: 0,
     });
 
     try {
@@ -1074,6 +1150,11 @@ export default function TeacherDashboard() {
           completedLessons,
           totalLessons: lessonIds.length,
           averageQuizScore: 0,
+          achievementsCount: 0,
+          courseAchievementsCount: 0,
+          latestAchievements: [],
+          latestCourseAchievements: [],
+          totalPoints: 0,
         });
         return;
       }
@@ -1086,6 +1167,51 @@ export default function TeacherDashboard() {
             ) / quizData.length
           : 0;
 
+      let achievementsCount = 0;
+      let courseAchievementsCount = 0;
+      let latestAchievements: string[] = [];
+      let latestCourseAchievements: string[] = [];
+      let totalPoints = 0;
+
+      try {
+        const { data: pointsRow, error: pointsError } = await supabase
+          .from('user_points')
+          .select('total_points')
+          .eq('user_id', student.userId)
+          .maybeSingle();
+
+        if (!pointsError && pointsRow) {
+          totalPoints = Number((pointsRow as any).total_points || 0) || 0;
+        }
+
+        const { data: achievementsRows, error: achievementsError } = await supabase
+          .from('user_achievements')
+          .select('course_id, earned_at, achievement:achievements(title)')
+          .eq('user_id', student.userId)
+          .order('earned_at', { ascending: false });
+
+        if (!achievementsError && Array.isArray(achievementsRows)) {
+          achievementsCount = achievementsRows.length;
+
+          const courseRows = achievementsRows.filter(
+            (row: any) => String(row.course_id || '') === String(student.courseId)
+          );
+
+          courseAchievementsCount = courseRows.length;
+          latestAchievements = achievementsRows
+            .map((row: any) => row.achievement?.title)
+            .filter((t: any) => typeof t === 'string' && t.trim().length > 0)
+            .slice(0, 3);
+
+          latestCourseAchievements = courseRows
+            .map((row: any) => row.achievement?.title)
+            .filter((t: any) => typeof t === 'string' && t.trim().length > 0)
+            .slice(0, 3);
+        }
+      } catch (achError) {
+        console.error('Error loading achievements for student details:', achError);
+      }
+
       setStudentDetails({
         loading: false,
         error: null,
@@ -1093,6 +1219,11 @@ export default function TeacherDashboard() {
         completedLessons,
         totalLessons: lessonIds.length,
         averageQuizScore: Number(averageQuizScore.toFixed(1)),
+        achievementsCount,
+        courseAchievementsCount,
+        latestAchievements,
+        latestCourseAchievements,
+        totalPoints,
       });
     } catch (error) {
       console.error('Error loading student details:', error);
@@ -1113,6 +1244,11 @@ export default function TeacherDashboard() {
       completedLessons: 0,
       totalLessons: 0,
       averageQuizScore: 0,
+      achievementsCount: 0,
+      courseAchievementsCount: 0,
+      latestAchievements: [],
+      latestCourseAchievements: [],
+      totalPoints: 0,
     });
   };
 
@@ -2322,3 +2458,7 @@ export default function TeacherDashboard() {
     </div>
   );
 }
+
+
+
+

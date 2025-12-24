@@ -124,7 +124,7 @@ const CourseCard = ({ course, variant = 'default' }: CourseCardProps) => {
       <motion.div 
         whileHover={{ y: -5 }}
         transition={{ duration: 0.2 }}
-        className="bg-white dark:bg-gray-800 rounded-xl overflow-hidden shadow-sm hover:shadow-md border border-gray-100 dark:border-gray-700 transition-all"
+        className="group bg-white dark:bg-gray-800 rounded-2xl overflow-hidden shadow-sm hover:shadow-md border border-gray-100 dark:border-gray-700 transition-all"
       >
         <Link href={`/courses/${course.id}`} className="block relative">
           <div className="relative aspect-[16/9] overflow-hidden">
@@ -132,9 +132,17 @@ const CourseCard = ({ course, variant = 'default' }: CourseCardProps) => {
               src={imageSource} 
               alt={course.title}
               fill
-              className="object-cover transition-transform group-hover:scale-105"
+              className="object-cover transition-transform duration-300 group-hover:scale-105"
               onError={handleImageError}
             />
+
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/55 via-black/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+              <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-white/90 text-gray-900 shadow-lg">
+                <FaPlay className="text-sm" />
+              </span>
+            </div>
             
             {course.isBestseller && (
               <div className="absolute top-3 right-3 bg-yellow-500 text-white px-2 py-1 text-xs font-bold rounded">

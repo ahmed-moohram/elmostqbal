@@ -125,6 +125,10 @@ export async function middleware(request: NextRequest) {
     if (!token || userRole?.value !== 'admin') {
       return NextResponse.redirect(new URL('/login', request.url));
     }
+
+    if (url.pathname === '/admin' || url.pathname === '/admin/') {
+      return NextResponse.redirect(new URL('/admin/dashboard', request.url));
+    }
   }
 
   // Protected teacher routes (only paths starting with /teacher, NOT /teachers)

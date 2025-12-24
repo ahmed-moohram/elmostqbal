@@ -14,6 +14,19 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 export async function POST(request: NextRequest) {
   try {
+    const roleCookie = request.cookies.get('user-role')?.value;
+    const authCookie =
+      request.cookies.get('auth-token')?.value || request.cookies.get('auth_token')?.value;
+    const cookieUserId = request.cookies.get('user-id')?.value;
+
+    if (!authCookie || !roleCookie || !cookieUserId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    if (roleCookie !== 'teacher' && roleCookie !== 'admin') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
     const body = await request.json().catch(() => null);
     const { courseId, examId, teacherId } = body || {};
 
@@ -26,6 +39,10 @@ export async function POST(request: NextRequest) {
 
     // التحقق من أن الكورس يخص هذا المدرس (إن وجد teacherId)
     if (teacherId) {
+      if (String(teacherId) !== String(cookieUserId)) {
+        return NextResponse.json({ error: 'forbidden' }, { status: 403 });
+      }
+
       const { data: courseRow, error: courseError } = await supabase
         .from('courses')
         .select('id, instructor_id')

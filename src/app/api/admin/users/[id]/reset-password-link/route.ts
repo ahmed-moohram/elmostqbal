@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import jwt from 'jsonwebtoken';
+import { createHash } from 'crypto';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -12,11 +14,18 @@ if (!supabaseUrl || !supabaseServiceKey) {
 
 const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
+const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_key_replace_in_production';
+
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } },
 ) {
   const { id } = params;
+
+  const roleCookie = request.cookies.get('user-role')?.value;
+  if (roleCookie !== 'admin') {
+    return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
+  }
 
   if (!id) {
     return NextResponse.json({ success: false, error: 'Missing user id' }, { status: 400 });
@@ -25,7 +34,7 @@ export async function POST(
   try {
     const { data: userRow, error: userError } = await supabaseAdmin
       .from('users')
-      .select('email')
+      .select('id, password_hash')
       .eq('id', id)
       .maybeSingle();
 
@@ -34,57 +43,25 @@ export async function POST(
       return NextResponse.json({ success: false, error: userError.message }, { status: 500 });
     }
 
-    // أولاً: نحاول العثور على المستخدم في Supabase Auth باستخدام الـ id
-    const { data: authData, error: authError } = await (supabaseAdmin as any).auth.admin.getUserById(id);
-
-    if (authError) {
-      console.error('Error fetching auth user by id for reset-password-link:', authError);
+    if (!userRow?.id) {
+      return NextResponse.json({ success: false, error: 'User not found' }, { status: 404 });
     }
 
-    const authUser = authData?.user;
+    const passwordMaterial = String((userRow as any).password_hash || '');
+    const passwordHashFingerprint = createHash('sha256').update(passwordMaterial).digest('hex');
 
-    // نحدد البريد الذي سنستخدمه لإنشاء رابط الاسترجاع
-    const emailForRecovery = (authUser?.email as string | null | undefined) ?? (userRow?.email as string | null | undefined);
-
-    if (!authUser && !emailForRecovery) {
-      // لا يوجد مستخدم Auth ولا بريد من جدول users
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'No Supabase Auth user or email found for this user',
-        },
-        { status: 404 },
-      );
-    }
-
-    const redirectTo = `${request.nextUrl.origin}/reset-password`;
-
-    const { data, error } = await supabaseAdmin.auth.admin.generateLink({
-      type: 'recovery',
-      email: emailForRecovery!,
-      options: {
-        redirectTo,
+    const token = jwt.sign(
+      {
+        sub: id,
+        purpose: 'password_reset',
+        ph: passwordHashFingerprint,
       },
-    } as any);
+      JWT_SECRET,
+      { expiresIn: '30m' },
+    );
 
-    if (error) {
-      console.error('Error generating reset password link:', error);
-
-      if (error.message === 'User with this email not found') {
-        return NextResponse.json(
-          {
-            success: false,
-            error: 'Supabase Auth user not found for this email',
-          },
-          { status: 404 },
-        );
-      }
-
-      return NextResponse.json({ success: false, error: error.message }, { status: 500 });
-    }
-
-    // generateLink يُرجع الرابط داخل data.properties.action_link طبقاً لتعريف Supabase
-    return NextResponse.json({ success: true, link: data?.properties?.action_link });
+    const link = `${request.nextUrl.origin}/reset-password/${encodeURIComponent(token)}`;
+    return NextResponse.json({ success: true, link });
   } catch (e: any) {
     console.error('Unexpected error in reset-password-link API:', e);
     return NextResponse.json({ success: false, error: 'Internal server error' }, { status: 500 });

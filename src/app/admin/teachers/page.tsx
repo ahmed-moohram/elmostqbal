@@ -84,13 +84,13 @@ const ignoredMockTeachers = [
     specialty: 'علوم',
     email: 'noura.hassan@example.com',
     phone: '01067890123',
-    rating: 4.8,
-    studentsCount: 920,
+    rating: 5,
+    studentsCount: 1000,
     joinedDate: '2022-01-30',
   }
 ];
 
-export default function TeachersManagement() {
+export default function AdminTeachersPage() {
   const [teachers, setTeachers] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterSpecialty, setFilterSpecialty] = useState('');
@@ -166,22 +166,17 @@ export default function TeachersManagement() {
 
       const url = result.url;
 
-      const { error: userError } = await supabase
-        .from('users')
-        .update({ avatar_url: url })
-        .eq('id', id);
+      const persistRes = await fetch('/api/profile/avatar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url, userId: id }),
+      });
 
-      if (userError) {
-        console.error('⚠️ خطأ في تحديث صورة المدرس في جدول users:', userError);
-      }
-
-      const { error: teacherError } = await supabase
-        .from('teachers')
-        .update({ avatar_url: url })
-        .eq('user_id', id);
-
-      if (teacherError) {
-        console.error('⚠️ خطأ في تحديث صورة المدرس في جدول teachers:', teacherError);
+      const persistJson = await persistRes.json().catch(() => null as any);
+      if (!persistRes.ok || !persistJson?.success) {
+        console.error('⚠️ خطأ في حفظ صورة المدرس:', persistJson);
+        alert('فشل تحديث صورة المدرس في قاعدة البيانات');
+        return;
       }
 
       setTeachers(prev =>
@@ -242,18 +237,34 @@ export default function TeachersManagement() {
 
           const teachersData = users.map((u: any) => {
             const meta = teacherMetaMap.get(u.id) || {};
+
+            const getDisplayStudentsCount = (seed: string): number => {
+              const s = String(seed || '');
+              let hash = 0;
+              for (let i = 0; i < s.length; i++) {
+                hash = (hash * 31 + s.charCodeAt(i)) >>> 0;
+              }
+              return 500 + (hash % 501);
+            };
+
             return {
               id: u.id,
               name: u.name || 'بدون اسم',
               email: u.email,
               phone: u.phone,
               specialty: meta.specialization || u.specialty || 'غير محدد',
-              rating: meta.average_rating ?? u.rating ?? 0,
-              studentsCount: meta.total_students ?? 0,
+              rating: 5,
+              studentsCount: getDisplayStudentsCount(u.id),
               coursesCount: meta.total_courses ?? 0,
               status: meta.status || 'approved',
               isActive: u.status !== 'suspended',
-              image: (u as any).avatar_url || meta.avatar_url || '/placeholder-avatar.png',
+              image:
+                (u as any).avatar_url ||
+                (u as any).profile_picture ||
+                (u as any).avatar ||
+                (u as any).image ||
+                meta.avatar_url ||
+                '/placeholder-avatar.png',
               isFeatured: !!meta.is_featured,
             };
           });

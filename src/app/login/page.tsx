@@ -98,6 +98,7 @@ export default function LoginPage() {
       if (typeof document !== 'undefined') {
         document.cookie = `auth-token=${encodeURIComponent('local-' + Date.now())}; path=/`;
         document.cookie = `user-role=${encodeURIComponent(user.role)}; path=/`;
+        document.cookie = `user-id=${encodeURIComponent(user.id)}; path=/`;
       }
 
       const redirect = searchParams.get('redirect');

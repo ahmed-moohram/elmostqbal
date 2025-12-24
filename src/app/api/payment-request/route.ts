@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { AchievementsService } from '@/services/achievements.service';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -9,6 +10,7 @@ if (!supabaseUrl || !supabaseServiceKey) {
 }
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
+const achievementsService = new AchievementsService(supabase);
 
 // POST - إنشاء طلب دفع جديد
 export async function POST(request: NextRequest) {
@@ -329,6 +331,12 @@ export async function PATCH(request: NextRequest) {
             });
         } catch (notifError) {
           console.error('Error creating approval notification:', notifError);
+        }
+
+        try {
+          await achievementsService.checkAndGrantAchievements(studentIdForEnrollment, paymentRequest.course_id);
+        } catch (achievementsError) {
+          console.error('Error granting achievements after enrollment approval:', achievementsError);
         }
       }
 

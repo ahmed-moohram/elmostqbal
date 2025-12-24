@@ -7,6 +7,7 @@ import { FaBookOpen, FaClock, FaPlus, FaTrash, FaUsers, FaWhatsapp, FaCheckCircl
 import { toast } from 'react-hot-toast';
 import { Exam } from '@/types/exam';
 import { useAuth } from '@/contexts/AuthContext';
+import supabase from '@/lib/supabase-client';
 
 interface ExamResultDto {
   id: string;
@@ -26,6 +27,8 @@ export default function TeacherCourseExamsPage() {
   const router = useRouter();
   const courseId = (params as any)?.courseId as string | undefined;
   const { user, isAuthenticated, isLoading } = useAuth();
+
+  const backPath = user?.role === 'admin' ? '/admin/my-courses' : '/teacher/dashboard';
 
   const [exams, setExams] = useState<Exam[]>([]);
   const [loading, setLoading] = useState(true);
@@ -48,6 +51,51 @@ export default function TeacherCourseExamsPage() {
   const [resultsExamId, setResultsExamId] = useState<string | null>(null);
   const [results, setResults] = useState<ExamResultDto[]>([]);
   const [loadingResults, setLoadingResults] = useState(false);
+
+  const [checkingOwnership, setCheckingOwnership] = useState(true);
+
+  useEffect(() => {
+    const checkOwnership = async () => {
+      if (!courseId || !user?.id) {
+        setCheckingOwnership(false);
+        return;
+      }
+
+      try {
+        setCheckingOwnership(true);
+        const { data: courseRow, error } = await supabase
+          .from('courses')
+          .select('id, instructor_id')
+          .eq('id', courseId)
+          .maybeSingle();
+
+        if (error || !courseRow) {
+          console.error('Error verifying course ownership in teacher exams page:', error);
+          toast.error('تعذر تحميل بيانات الكورس');
+          router.replace(backPath);
+          return;
+        }
+
+        if (String(courseRow.instructor_id) !== String(user.id)) {
+          toast.error('لا يمكنك إدارة امتحانات كورس لا تملكه');
+          router.replace(backPath);
+          return;
+        }
+      } catch (err) {
+        console.error('Unexpected error verifying course ownership in teacher exams page:', err);
+        toast.error('حدث خطأ أثناء التحقق من صلاحيات الكورس');
+        router.replace(backPath);
+      } finally {
+        setCheckingOwnership(false);
+      }
+    };
+
+    if (!isLoading && isAuthenticated && user && courseId) {
+      checkOwnership();
+    } else {
+      setCheckingOwnership(false);
+    }
+  }, [courseId, user, isLoading, isAuthenticated, router, backPath]);
 
   useEffect(() => {
     const loadExams = async () => {
@@ -363,8 +411,16 @@ export default function TeacherCourseExamsPage() {
     );
   }
 
-  if (!isAuthenticated || !user || user.role !== 'teacher') {
+  if (!isAuthenticated || !user || (user.role !== 'teacher' && user.role !== 'admin')) {
     return null;
+  }
+
+  if (checkingOwnership) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
   }
 
   if (!courseId) {
@@ -385,7 +441,7 @@ export default function TeacherCourseExamsPage() {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Link
-              href={`/teacher/dashboard`}
+              href={backPath}
               className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition whitespace-nowrap"
             >
               رجوع للوحة المدرس

@@ -47,6 +47,20 @@ export const createCourseWithLessons = async (courseData: any, sections: any[]) 
       }
     }
 
+    let instructorName = courseData.instructor_name || courseData.instructorName || null;
+    if (!instructorName && instructorId) {
+      try {
+        const { data: instructorRow } = await supabase
+          .from('users')
+          .select('name')
+          .eq('id', instructorId)
+          .maybeSingle();
+        instructorName = instructorRow?.name || null;
+      } catch (nameErr) {
+        console.error('❌ خطأ في تحديد instructor_name:', nameErr);
+      }
+    }
+
     const shortDescription =
       courseData.short_description ||
       courseData.shortDescription ||
@@ -62,6 +76,7 @@ export const createCourseWithLessons = async (courseData: any, sections: any[]) 
       description: courseData.description || '',
       short_description: shortDescription,
       instructor_id: instructorId,
+      instructor_name: instructorName,
       category: courseData.category || 'عام',
       sub_category: courseData.sub_category || null,
       level: courseData.level || 'all-levels',

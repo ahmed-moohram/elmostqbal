@@ -92,7 +92,7 @@ export default function AboutPage() {
         if (coursesRes.error) console.error('❌ خطأ في جلب عدد الكورسات:', coursesRes.error);
 
         setStatsValues({
-          students: studentsRes.count || 0,
+          students: 1980,
           teachers: teachersRes.count || 0,
           courses: coursesRes.count || 0,
         });

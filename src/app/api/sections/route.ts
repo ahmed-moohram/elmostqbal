@@ -66,6 +66,7 @@ export async function POST(request: NextRequest) {
     let insertedLessons: any[] = [];
     if (Array.isArray(lessons) && lessons.length > 0) {
       const payload = lessons.map((l: any, idx: number) => ({
+        course_id: courseId,
         section_id: section.id,
         title: l.title,
         description: l.description || '',

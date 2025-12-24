@@ -182,6 +182,7 @@ export const updateCourse = async (courseId: string, updates: any) => {
     // حقول إضافية تستخدمها بعض الصفحات مثل صورة الكورس والمدة
     if (updates.thumbnail != null) form.append('thumbnail', String(updates.thumbnail));
     if (updates.duration != null) form.append('duration', String(updates.duration));
+    if (updates.studentsCount != null) form.append('studentsCount', String(updates.studentsCount));
 
     const res = await fetch(`/api/courses/${courseId}`, {
       method: 'PUT',
@@ -423,7 +424,12 @@ export const getUserProfile = async (userId: string) => {
       .single();
     
     if (error) throw error;
-    const avatarUrl = data.avatar_url || data.avatar || '/placeholder-avatar.png';
+    const avatarUrl =
+      data.avatar_url ||
+      data.profile_picture ||
+      data.avatar ||
+      data.image ||
+      '/placeholder-avatar.png';
 
     const transformedUser = {
       id: data.id,
@@ -451,21 +457,39 @@ export const getUserProfile = async (userId: string) => {
 
 export const updateUserProfile = async (userId: string, updates: any) => {
   try {
-    const { data, error } = await supabase
+    const basePatch: any = {
+      name: updates.name,
+      email: updates.email,
+      phone: updates.phone,
+      bio: updates.bio,
+      city: updates.city,
+      grade_level: updates.gradeLevel,
+    };
+
+    let { data, error } = await supabase
       .from('users')
       .update({
-        name: updates.name,
-        email: updates.email,
-        phone: updates.phone,
+        ...basePatch,
         avatar_url: updates.avatar,
-        bio: updates.bio,
-        city: updates.city,
-        grade_level: updates.gradeLevel
       })
       .eq('id', userId)
       .select()
       .single();
-    
+
+    if (error && String(error.message || '').toLowerCase().includes('avatar_url')) {
+      const retry = await supabase
+        .from('users')
+        .update({
+          ...basePatch,
+          profile_picture: updates.avatar,
+        })
+        .eq('id', userId)
+        .select()
+        .single();
+      data = retry.data as any;
+      error = retry.error as any;
+    }
+
     if (error) throw error;
     return { success: true, data };
   } catch (error) {

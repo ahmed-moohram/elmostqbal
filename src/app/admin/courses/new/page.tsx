@@ -31,8 +31,8 @@ export default function EnhancedNewCoursePage() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [shortDescription, setShortDescription] = useState("");
-  const [price, setPrice] = useState<number>(0);
-  const [category, setCategory] = useState("برمجة");
+  const [price, setPrice] = useState<string>("");
+  const [category, setCategory] = useState("اللغة العربية");
   const [level, setLevel] = useState<"beginner" | "intermediate" | "advanced" | "all-levels">("all-levels");
   
   // الوسائط
@@ -230,7 +230,14 @@ export default function EnhancedNewCoursePage() {
     }
 
     // الحد الأقصى المسموح به للسعر حسب نوع الحقل DECIMAL(10,2)
-    if (price > 99999999) {
+    const parsedPrice = price.trim() === '' ? 0 : Number(price);
+
+    if (Number.isNaN(parsedPrice) || parsedPrice < 0) {
+      toast.error("⚠️ من فضلك أدخل سعر صحيح");
+      return;
+    }
+
+    if (parsedPrice > 99999999) {
       toast.error("⚠️ الحد الأقصى للسعر هو 99,999,999 جنيه");
       return;
     }
@@ -254,14 +261,40 @@ export default function EnhancedNewCoursePage() {
     try {
       // استخدام دالة Supabase المحدثة
       const { createCourseWithLessons } = await import('@/lib/supabase-courses');
+      const { default: supabase } = await import('@/lib/supabase-client');
       
       console.log('🌐 استخدام Supabase لإنشاء الكورس');
+
+      const storedUserRaw = localStorage.getItem('user');
+      const storedUser = storedUserRaw ? JSON.parse(storedUserRaw) : null;
+      const adminName: string = 'مستر معتصم';
+      const adminPhone: string | null = storedUser?.phone || null;
+
+      let instructorId: string | null = storedUser?.id || null;
+
+      // لو id المخزّن شكل تجريبي (admin-001) نحاول نجيب الـ UUID الحقيقي من جدول users عبر رقم الهاتف
+      if (adminPhone) {
+        try {
+          const { data: userRow } = await supabase
+            .from('users')
+            .select('id')
+            .or(`phone.eq.${adminPhone},student_phone.eq.${adminPhone}`)
+            .maybeSingle();
+
+          if (userRow?.id) {
+            instructorId = String(userRow.id);
+          }
+        } catch (resolveErr) {
+          console.error('❌ فشل تحديد instructor_id من Supabase:', resolveErr);
+        }
+      }
       
       const courseData = {
         title,
         description,
-        instructor_name: 'المدرب',
-        price,
+        instructor_id: instructorId,
+        instructor_name: adminName,
+        price: parsedPrice,
         level,
         category,
         duration_hours: getTotalStats().totalDuration / 60,
@@ -420,11 +453,24 @@ export default function EnhancedNewCoursePage() {
                   onChange={(e) => setCategory(e.target.value)}
                   className="input-field"
                 >
-                  <option value="برمجة">برمجة</option>
-                  <option value="تصميم">تصميم</option>
-                  <option value="تسويق">تسويق</option>
-                  <option value="أعمال">أعمال</option>
-                  <option value="لغات">لغات</option>
+                  <option value="اللغة العربية">اللغة العربية</option>
+                  <option value="اللغة الإنجليزية">اللغة الإنجليزية</option>
+                  <option value="اللغة الفرنسية">اللغة الفرنسية</option>
+                  <option value="الرياضيات">الرياضيات</option>
+                  <option value="الفيزياء">الفيزياء</option>
+                  <option value="الكيمياء">الكيمياء</option>
+                  <option value="الأحياء">الأحياء</option>
+                  <option value="الجيولوجيا">الجيولوجيا</option>
+                  <option value="العلوم المتكاملة">العلوم المتكاملة</option>
+                  <option value="التاريخ">التاريخ</option>
+                  <option value="الجغرافيا">الجغرافيا</option>
+                  <option value="الفلسفة والمنطق">الفلسفة والمنطق</option>
+                  <option value="علم النفس والاجتماع">علم النفس والاجتماع</option>
+                  <option value="التربية الدينية">التربية الدينية</option>
+                  <option value="التربية الوطنية">التربية الوطنية</option>
+                  <option value="الحاسب الآلي">الحاسب الآلي</option>
+                  <option value="الإحصاء">الإحصاء</option>
+                  <option value="اقتصاد">اقتصاد</option>
                   <option value="أخرى">أخرى</option>
                 </select>
               </div>
@@ -450,7 +496,7 @@ export default function EnhancedNewCoursePage() {
                   min="0"
                   max="99999999"
                   value={price}
-                  onChange={(e) => setPrice(Number(e.target.value))}
+                  onChange={(e) => setPrice(e.target.value)}
                   className="input-field"
                   placeholder="0 = مجاني (الحد الأقصى 99,999,999)"
                 />

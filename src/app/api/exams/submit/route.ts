@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getExam } from '../_store';
+import { AchievementsService } from '@/services/achievements.service';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -12,6 +13,7 @@ if (!supabaseUrl || !supabaseServiceKey) {
 }
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
+const achievementsService = new AchievementsService(supabase);
 
 export async function POST(request: NextRequest) {
   try {
@@ -211,8 +213,9 @@ export async function POST(request: NextRequest) {
       storedAnswers = { __cheated: isCheated };
     }
 
+    let quizResultSaved = false;
     try {
-      await supabase.from('quiz_results').insert({
+      const { error: insertError } = await supabase.from('quiz_results').insert({
         user_id: userId,
         course_id: courseId,
         quiz_id: exam.id,
@@ -223,9 +226,23 @@ export async function POST(request: NextRequest) {
         time_taken: null,
         answers: storedAnswers,
       });
+
+      if (insertError) {
+        console.error('Error inserting quiz_results for exam submit:', insertError);
+      } else {
+        quizResultSaved = true;
+      }
     } catch (err) {
       console.error('Error inserting quiz_results for exam submit:', err);
       // لا نمنع الطالب من الحصول على النتيجة حتى لو فشل الحفظ
+    }
+
+    if (quizResultSaved) {
+      try {
+        await achievementsService.checkAndGrantAchievements(userId, courseId);
+      } catch (achievementsError) {
+        console.error('Error granting achievements after quiz submit:', achievementsError);
+      }
     }
 
     return NextResponse.json({

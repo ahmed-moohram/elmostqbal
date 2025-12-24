@@ -93,10 +93,68 @@ export default function TeacherDashboardById() {
   const [durationMinutes, setDurationMinutes] = useState('');
   const [isFreeLesson, setIsFreeLesson] = useState(false);
 
+  // تحميل بيانات المدرس والكورسات والطلاب بناءً على teacherId في الرابط
   useEffect(() => {
-    // إعادة توجيه أي طلب على /teachers/[id]/dashboard إلى لوحة المدرس الرسمية
-    router.replace('/teacher/dashboard');
-  }, [router]);
+    const loadData = async () => {
+      try {
+        if (!teacherId) {
+          toast.error('معرّف المدرس غير موجود في الرابط');
+          router.replace('/');
+          return;
+        }
+
+        // جلب بيانات المدرس من جدول users أو teachers
+        const { data: teacherRow, error: teacherError } = await supabase
+          .from('teachers')
+          .select('*')
+          .eq('user_id', teacherId)
+          .maybeSingle();
+
+        if (teacherError) {
+          console.error('❌ خطأ في جلب بيانات المدرس:', teacherError);
+        }
+
+        setTeacher({
+          id: teacherId,
+          name: (teacherRow as any)?.name || 'مدرس',
+          email: (teacherRow as any)?.email || '',
+          specialty: (teacherRow as any)?.specialization || 'مدرس',
+          role: 'teacher',
+        });
+
+        // جلب كورسات المدرس
+        const { data: coursesRows, error: coursesError } = await supabase
+          .from('courses')
+          .select('id, title, students_count, total_lessons, status')
+          .eq('instructor_id', teacherId)
+          .order('created_at', { ascending: false });
+
+        if (coursesError) {
+          console.error('❌ خطأ في جلب كورسات المدرس:', coursesError);
+          setCourses([]);
+        } else {
+          const mappedCourses: Course[] = (coursesRows || []).map((c: any) => ({
+            id: c.id,
+            title: c.title,
+            studentsCount: c.students_count ?? 0,
+            lessonsCount: c.total_lessons ?? 0,
+            status: c.status === 'published' ? 'published' : 'draft',
+          }));
+          setCourses(mappedCourses);
+        }
+
+        // يمكن لاحقاً إضافة جلب الطلاب والأنشطة هنا إذا لزم الأمر
+      } catch (error) {
+        console.error('❌ خطأ غير متوقع أثناء تحميل لوحة المدرس بالمعرّف:', error);
+        toast.error('حدث خطأ أثناء تحميل بيانات لوحة المدرس');
+      } finally {
+        setIsLoading(false);
+        setDataLoading(false);
+      }
+    };
+
+    loadData();
+  }, [teacherId, router]);
 
   const handleUploadVideo = () => {
     setActiveTab('upload');

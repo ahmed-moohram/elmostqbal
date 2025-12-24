@@ -127,11 +127,6 @@ export default function StudentDetailsPage() {
   const handleGenerateResetLink = async () => {
     if (!studentId) return;
 
-    if (!student?.email) {
-      alert('لا يوجد بريد إلكتروني مسجل لهذا الطالب.');
-      return;
-    }
-
     try {
       setResetLoading(true);
 
@@ -144,12 +139,10 @@ export default function StudentDetailsPage() {
       if (!res.ok || !data?.success || !data.link) {
         console.error('❌ فشل إنشاء رابط إعادة تعيين كلمة المرور:', data?.error);
 
-        if (res.status === 404) {
-          alert(
-            'لا يمكن إنشاء رابط لإعادة تعيين كلمة المرور لهذا الطالب لأنه لا يملك حساب تسجيل دخول في نظام المصادقة (Supabase Auth).',
-          );
+        if (res.status === 403) {
+          alert('غير مصرح. تأكد أنك مسجل دخول كأدمن.');
         } else {
-          alert('فشل إنشاء رابط إعادة تعيين كلمة المرور. الرجاء المحاولة مرة أخرى.');
+          alert(data?.error || 'فشل إنشاء رابط إعادة تعيين كلمة المرور. الرجاء المحاولة مرة أخرى.');
         }
 
         return;

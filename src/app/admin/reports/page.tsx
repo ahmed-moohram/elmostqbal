@@ -1,10 +1,9 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import AdminLayout from '@/components/AdminLayout';
 import { FaChartLine, FaDownload, FaCalendar, FaUsers, FaMoneyBillWave, FaGraduationCap, FaArrowUp } from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
-import supabase from '@/lib/supabase-client';
 
 export default function ReportsPage() {
   const [dateFrom, setDateFrom] = useState('2024-10-01');
@@ -19,191 +18,17 @@ export default function ReportsPage() {
     }
     setLoading(true);
     try {
-      const fromDate = new Date(dateFrom);
-      const toDate = new Date(dateTo);
-      toDate.setHours(23, 59, 59, 999);
+      const params = new URLSearchParams();
+      params.set('from', dateFrom);
+      params.set('to', dateTo);
 
-      const fromIso = fromDate.toISOString();
-      const toIso = toDate.toISOString();
-
-      const [
-        { data: studentsData, error: studentsError },
-        { data: paymentsData, error: paymentsError },
-        { data: enrollmentsData, error: enrollmentsError }
-      ] = await Promise.all([
-        supabase
-          .from('users')
-          .select('id, created_at')
-          .eq('role', 'student')
-          .gte('created_at', fromIso)
-          .lte('created_at', toIso),
-        supabase
-          .from('payment_requests')
-          .select('id, amount_paid, course_price, status, course_id, approved_at, created_at')
-          .gte('created_at', fromIso)
-          .lte('created_at', toIso),
-        supabase
-          .from('enrollments')
-          .select('id, course_id, enrolled_at')
-          .gte('enrolled_at', fromIso)
-          .lte('enrolled_at', toIso),
-      ]);
-
-      if (studentsError) {
-        console.error('خطأ في جلب تسجيلات الطلاب للتقرير:', studentsError);
-      }
-      if (paymentsError) {
-        console.error('خطأ في جلب المدفوعات للتقرير:', paymentsError);
-      }
-      if (enrollmentsError) {
-        console.error('خطأ في جلب التسجيلات للتقرير:', enrollmentsError);
+      const res = await fetch(`/api/admin/reports?${params.toString()}`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err?.error || 'فشل تحميل التقرير');
       }
 
-      const safeStudents = (studentsData || []) as any[];
-      const safePayments = (paymentsData || []) as any[];
-      const safeEnrollments = (enrollmentsData || []) as any[];
-
-      const successfulPayments = safePayments.filter((p: any) => {
-        const status = String(p.status || '').toLowerCase();
-        return ['approved', 'success', 'completed', 'paid'].includes(status);
-      });
-
-      const newRegistrations = safeStudents.length;
-
-      const revenue = successfulPayments.reduce(
-        (sum: number, p: any) =>
-          sum + (Number(p.amount_paid ?? p.course_price ?? 0) || 0),
-        0
-      );
-
-      const soldCourseIds = new Set<string>();
-      successfulPayments.forEach((p: any) => {
-        if (p.course_id) {
-          soldCourseIds.add(String(p.course_id));
-        }
-      });
-      safeEnrollments.forEach((e: any) => {
-        if (e.course_id) {
-          soldCourseIds.add(String(e.course_id));
-        }
-      });
-
-      const coursesSold = soldCourseIds.size;
-
-      const dayMap = new Map<
-        string,
-        { registrations: number; revenue: number; courses: Set<string> }
-      >();
-
-      const addDayEntry = (
-        dateStr: string | null | undefined,
-        updater: (entry: {
-          registrations: number;
-          revenue: number;
-          courses: Set<string>;
-        }) => void
-      ) => {
-        if (!dateStr) return;
-        const d = new Date(dateStr);
-        if (Number.isNaN(d.getTime())) return;
-        const dayKey = d.toISOString().slice(0, 10);
-        if (!dayMap.has(dayKey)) {
-          dayMap.set(dayKey, {
-            registrations: 0,
-            revenue: 0,
-            courses: new Set<string>(),
-          });
-        }
-        const entry = dayMap.get(dayKey)!;
-        updater(entry);
-      };
-
-      safeStudents.forEach((s: any) => {
-        addDayEntry(s.created_at, (entry) => {
-          entry.registrations += 1;
-        });
-      });
-
-      successfulPayments.forEach((p: any) => {
-        const paymentDate = p.approved_at || p.created_at;
-        addDayEntry(paymentDate, (entry) => {
-          entry.revenue += Number(p.amount_paid ?? p.course_price ?? 0) || 0;
-          if (p.course_id) {
-            entry.courses.add(String(p.course_id));
-          }
-        });
-      });
-
-      safeEnrollments.forEach((e: any) => {
-        addDayEntry(e.enrolled_at, (entry) => {
-          if (e.course_id) {
-            entry.courses.add(String(e.course_id));
-          }
-        });
-      });
-
-      const details = Array.from(dayMap.entries())
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([date, value]) => ({
-          date,
-          registrations: value.registrations,
-          revenue: value.revenue,
-          courses: value.courses.size,
-        }));
-
-      const courseRevenueMap = new Map<
-        string,
-        { revenue: number; sales: number }
-      >();
-
-      successfulPayments.forEach((p: any) => {
-        if (!p.course_id) return;
-        const courseId = String(p.course_id);
-        const current = courseRevenueMap.get(courseId) || {
-          revenue: 0,
-          sales: 0,
-        };
-        current.revenue += Number(p.amount_paid ?? p.course_price ?? 0) || 0;
-        current.sales += 1;
-        courseRevenueMap.set(courseId, current);
-      });
-
-      let courseTitlesMap = new Map<string, string>();
-      const courseIds = Array.from(courseRevenueMap.keys());
-
-      if (courseIds.length > 0) {
-        const { data: coursesData, error: coursesError } = await supabase
-          .from('courses')
-          .select('id, title')
-          .in('id', courseIds);
-
-        if (coursesError) {
-          console.error('خطأ في جلب عناوين الكورسات للتقرير:', coursesError);
-        } else {
-          courseTitlesMap = new Map(
-            (coursesData || []).map((c: any) => [String(c.id), c.title as string])
-          );
-        }
-      }
-
-      const topCourses = Array.from(courseRevenueMap.entries())
-        .map(([courseId, info]) => ({
-          name: courseTitlesMap.get(courseId) || 'دورة بدون اسم',
-          sales: info.sales,
-          revenue: info.revenue,
-        }))
-        .sort((a, b) => b.revenue - a.revenue)
-        .slice(0, 5);
-
-      const report = {
-        newRegistrations,
-        revenue,
-        coursesSold,
-        growthRate: null,
-        details,
-        topCourses,
-      };
-
+      const report = await res.json();
       setReportData(report);
       toast.success('تم إنشاء التقرير بنجاح');
     } catch (error) {

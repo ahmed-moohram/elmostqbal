@@ -93,6 +93,8 @@ export default function TeacherCourseLessonsPage() {
 
   const courseId = (params as any)?.courseId as string | undefined;
 
+  const backPath = user?.role === 'admin' ? '/admin/my-courses' : '/teacher/dashboard';
+
   const [courseTitle, setCourseTitle] = useState('');
   const [loading, setLoading] = useState(true);
   const [savingSection, setSavingSection] = useState(false);
@@ -132,7 +134,7 @@ export default function TeacherCourseLessonsPage() {
     const loadData = async () => {
       if (!user || !courseId) return;
 
-      if (user.role !== 'teacher') {
+      if (user.role !== 'teacher' && user.role !== 'admin') {
         toast.error('يجب تسجيل الدخول كمدرس');
         router.replace('/');
         return;
@@ -151,13 +153,13 @@ export default function TeacherCourseLessonsPage() {
         if (courseError || !courseRow) {
           console.error('Error loading course for teacher lessons page:', courseError);
           toast.error('تعذر تحميل بيانات الكورس');
-          router.replace('/teacher/dashboard');
+          router.replace(backPath);
           return;
         }
 
         if (courseRow.instructor_id !== user.id) {
           toast.error('لا يمكنك إدارة محتوى كورس لا تملكه');
-          router.replace('/teacher/dashboard');
+          router.replace(backPath);
           return;
         }
 
@@ -956,7 +958,7 @@ export default function TeacherCourseLessonsPage() {
     );
   }
 
-  if (!isAuthenticated || !user || user.role !== 'teacher' || !courseId) {
+  if (!isAuthenticated || !user || (user.role !== 'teacher' && user.role !== 'admin') || !courseId) {
     return null;
   }
 
@@ -967,7 +969,7 @@ export default function TeacherCourseLessonsPage() {
           <div>
             <button
               type="button"
-              onClick={() => router.push('/teacher/dashboard')}
+              onClick={() => router.push(backPath)}
               className="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-purple-700 mb-1"
             >
               <FaArrowRight />

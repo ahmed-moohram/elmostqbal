@@ -21,6 +21,8 @@ export default function TeacherEditCoursePage() {
 
   const courseId = (params as any)?.courseId as string | undefined;
 
+  const backPath = user?.role === 'admin' ? '/admin/my-courses' : '/teacher/dashboard';
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -72,7 +74,7 @@ export default function TeacherEditCoursePage() {
     const loadCourse = async () => {
       if (authLoading || !isAuthenticated || !user || !courseId) return;
 
-      if (user.role !== 'teacher') {
+      if (user.role !== 'teacher' && user.role !== 'admin') {
         toast.error('يجب تسجيل الدخول كمدرس');
         router.replace('/');
         return;
@@ -90,13 +92,13 @@ export default function TeacherEditCoursePage() {
         if (error || !data) {
           console.error('Error loading course for teacher edit page:', error);
           toast.error('تعذر تحميل بيانات الكورس');
-          router.replace('/teacher/dashboard');
+          router.replace(backPath);
           return;
         }
 
         if (data.instructor_id !== user.id) {
           toast.error('لا يمكنك تعديل كورس لا تملكه');
-          router.replace('/teacher/dashboard');
+          router.replace(backPath);
           return;
         }
 
@@ -203,7 +205,7 @@ export default function TeacherEditCoursePage() {
       }
 
       toast.success('تم تحديث بيانات الكورس بنجاح');
-      router.push('/teacher/dashboard');
+      router.push(backPath);
     } catch (err) {
       console.error('Unexpected error updating course from teacher edit page:', err);
       toast.error('حدث خطأ أثناء حفظ التعديلات');
@@ -223,7 +225,7 @@ export default function TeacherEditCoursePage() {
     );
   }
 
-  if (!isAuthenticated || !user || user.role !== 'teacher' || !courseId) {
+  if (!isAuthenticated || !user || (user.role !== 'teacher' && user.role !== 'admin') || !courseId) {
     return null;
   }
 
@@ -235,7 +237,7 @@ export default function TeacherEditCoursePage() {
           <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={() => router.push('/teacher/dashboard')}
+              onClick={() => router.push(backPath)}
               className="bg-gray-100 hover:bg-gray-200 text-gray-700 p-2 rounded-full flex items-center justify-center"
             >
               <FaArrowRight />
@@ -382,7 +384,7 @@ export default function TeacherEditCoursePage() {
           <div className="flex justify-end gap-3 pt-4">
             <button
               type="button"
-              onClick={() => router.push('/teacher/dashboard')}
+              onClick={() => router.push(backPath)}
               className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
             >
               إلغاء

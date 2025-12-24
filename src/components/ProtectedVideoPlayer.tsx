@@ -283,64 +283,72 @@ export default function ProtectedVideoPlayer({
     }
   };
 
-  const renderVideoPlayer = () => {
-    const isDriveVideo = !!videoUrl && videoUrl.includes('drive.google.com');
-    const getEmbeddedUrl = () => {
-      const url = videoUrl;
-      if (!url) return '';
+  const getEmbeddedUrl = () => {
+    const url = videoUrl;
+    if (!url) return '';
 
-      try {
-        if (url.includes('drive.google.com')) {
-          try {
-            const parsed = new URL(url);
-            let fileId = '';
+    try {
+      if (url.includes('drive.google.com')) {
+        try {
+          const parsed = new URL(url);
+          let fileId = '';
 
-            const pathParts = parsed.pathname.split('/').filter(Boolean);
-            const dIndex = pathParts.indexOf('d');
-            if (dIndex !== -1 && pathParts[dIndex + 1]) {
-              fileId = pathParts[dIndex + 1];
-            }
-
-            if (!fileId) {
-              const idParam = parsed.searchParams.get('id');
-              if (idParam) {
-                fileId = idParam;
-              }
-            }
-
-            if (fileId) {
-              return `https://drive.google.com/file/d/${fileId}/preview`;
-            }
-          } catch (e) {}
-        }
-
-        if (url.includes('youtube.com/watch')) {
-          const urlObj = new URL(url);
-          const v = urlObj.searchParams.get('v');
-          if (v) {
-            return `https://www.youtube.com/embed/${v}?autoplay=0&rel=0&modestbranding=1&controls=1&disablekb=1&iv_load_policy=3&fs=0`;
+          const pathParts = parsed.pathname.split('/').filter(Boolean);
+          const dIndex = pathParts.indexOf('d');
+          if (dIndex !== -1 && pathParts[dIndex + 1]) {
+            fileId = pathParts[dIndex + 1];
           }
-        }
 
-        if (url.includes('youtu.be/')) {
-          const id = url.split('youtu.be/')[1]?.split(/[?&]/)[0];
-          if (id) {
-            return `https://www.youtube.com/embed/${id}?autoplay=0&rel=0&modestbranding=1&controls=1&disablekb=1&iv_load_policy=3&fs=0`;
+          if (!fileId) {
+            const idParam = parsed.searchParams.get('id');
+            if (idParam) {
+              fileId = idParam;
+            }
           }
-        }
 
-        if (url.includes('youtube.com/embed/')) {
-          const hasQuery = url.includes('?');
-          const base = hasQuery ? url.split('?')[0] : url;
-          return `${base}?autoplay=0&rel=0&modestbranding=1&controls=1&disablekb=1&iv_load_policy=3&fs=0`;
+          if (fileId) {
+            return `https://drive.google.com/file/d/${fileId}/preview`;
+          }
+        } catch (e) {}
+      }
+
+      if (url.includes('youtube.com/watch')) {
+        const urlObj = new URL(url);
+        const v = urlObj.searchParams.get('v');
+        if (v) {
+          return `https://www.youtube.com/embed/${v}?autoplay=0&rel=0&modestbranding=1&controls=1&disablekb=1&iv_load_policy=3&fs=0`;
         }
-      } catch (e) {}
+      }
+
+      if (url.includes('youtu.be/')) {
+        const id = url.split('youtu.be/')[1]?.split(/[?&]/)[0];
+        if (id) {
+          return `https://www.youtube.com/embed/${id}?autoplay=0&rel=0&modestbranding=1&controls=1&disablekb=1&iv_load_policy=3&fs=0`;
+        }
+      }
+
+      if (url.includes('youtube.com/embed/')) {
+        const hasQuery = url.includes('?');
+        const base = hasQuery ? url.split('?')[0] : url;
+        return `${base}?autoplay=0&rel=0&modestbranding=1&controls=1&disablekb=1&iv_load_policy=3&fs=0`;
+      }
 
       return url;
-    };
+    } catch (e) {
+      console.error('Error parsing video URL in ProtectedVideoPlayer:', e);
+      return url;
+    }
+  };
 
+  const renderVideoPlayer = () => {
     return (
-      <div className={isExpanded ? 'fixed inset-0 z-50 bg-black/90 flex flex-col items-center justify-start pt-2 px-2' : 'w-full'}>
+      <div
+        className={
+          isExpanded
+            ? 'fixed inset-0 z-50 bg-black/90 flex flex-col items-center justify-start pt-2 px-2'
+            : 'w-full'
+        }
+      >
         <div
           className="w-full max-w-6xl max-h-[90vh] aspect-video bg-black rounded-xl overflow-hidden relative"
           style={{
@@ -356,6 +364,15 @@ export default function ProtectedVideoPlayer({
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
             allowFullScreen
           />
+
+          <div
+            className="absolute bottom-2 right-2 z-20 px-3 py-1.5 bg-black/90 rounded-full flex items-center gap-1.5 text-white/90 text-xs md:text-sm select-none shadow-lg"
+            style={{ pointerEvents: 'auto' }}
+          >
+            <FaLock className="text-sm md:text-base" />
+            <span>مغلق</span>
+          </div>
+
           <div className="absolute top-0 left-0 right-0 h-16 bg-black/35 flex items-center justify-between px-4 pointer-events-auto z-10 select-none">
             <div className="flex items-center gap-2 text-white/85 text-sm font-bold">
               <FaLock className="text-lg" />
@@ -386,7 +403,11 @@ export default function ProtectedVideoPlayer({
               <span className="opacity-80">الزووم</span>
               <button
                 type="button"
-                onClick={() => setZoomLevel((prev) => Math.max(1, Number((prev - 0.15).toFixed(2))))}
+                onClick={() =>
+                  setZoomLevel((prev) =>
+                    Math.max(1, Number((prev - 0.15).toFixed(2))),
+                  )
+                }
                 className="flex items-center justify-center w-7 h-7 rounded-full bg-black/60 hover:bg-black/80 transition disabled:opacity-40"
                 disabled={zoomLevel <= 1}
               >
@@ -394,7 +415,11 @@ export default function ProtectedVideoPlayer({
               </button>
               <button
                 type="button"
-                onClick={() => setZoomLevel((prev) => Math.min(2, Number((prev + 0.15).toFixed(2))))}
+                onClick={() =>
+                  setZoomLevel((prev) =>
+                    Math.min(2, Number((prev + 0.15).toFixed(2))),
+                  )
+                }
                 className="flex items-center justify-center w-7 h-7 rounded-full bg-black/60 hover:bg-black/80 transition disabled:opacity-40"
                 disabled={zoomLevel >= 2}
               >
@@ -407,8 +432,190 @@ export default function ProtectedVideoPlayer({
     );
   };
 
-  const usesCodeFlow = !!lessonId && useAccessCode;
+  const renderLockedVideo = () => {
+    return (
+      <div className="w-full aspect-video bg-gradient-to-br from-gray-900 to-gray-800 rounded-xl overflow-hidden relative">
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-white p-8">
+          <div className="bg-white/10 backdrop-blur-sm rounded-full p-8 mb-6">
+            <FaLock className="text-6xl" />
+          </div>
 
+          <h2 className="text-2xl font-bold mb-2">هذا الفيديو محمي بكود</h2>
+          <p className="text-gray-300 text-center mb-4">
+            أدخل كود هذا الدرس الذي حصلت عليه من المدرس لفتح الفيديو.
+          </p>
+
+          <div className="w-full max-w-md space-y-3">
+            <input
+              type="text"
+              value={codeInput}
+              onChange={(e) => setCodeInput(e.target.value)}
+              className="w-full px-4 py-2 rounded-lg border border-gray-600 bg-gray-900/60 text-white focus:outline-none focus:ring-2 focus:ring-green-500"
+              placeholder="أدخل الكود هنا"
+            />
+            {codeError && (
+              <p className="text-sm text-red-400 text-center">{codeError}</p>
+            )}
+            <button
+              type="button"
+              onClick={handleVerifyCode}
+              disabled={isVerifyingCode}
+              className="w-full px-4 py-2 rounded-lg bg-green-500 hover:bg-green-600 text-white font-bold transition disabled:opacity-60"
+            >
+              {isVerifyingCode
+                ? 'جاري التحقق من الكود...'
+                : 'تفعيل الكود وفتح الفيديو'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderPaymentModal = () => {
+    return (
+      <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-start justify-center z-50 p-4 overflow-y-auto">
+        <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full my-8 overflow-hidden">
+          <div className="bg-gradient-to-r from-red-600 to-red-700 text-white p-6">
+            <div className="flex items-center justify-between">
+              <h3 className="text-2xl font-bold">الدفع بفودافون كاش</h3>
+              <button
+                onClick={() => setShowPaymentModal(false)}
+                className="text-white/80 hover:text-white text-2xl"
+              >
+                ✕
+              </button>
+            </div>
+            <p className="mt-2 text-red-100">ادفع بسهولة وأمان عبر فودافون كاش</p>
+          </div>
+          <div className="p-6 max-h-[75vh] overflow-y-auto">
+            <div className="bg-gray-50 rounded-xl p-4 mb-6">
+              <h4 className="font-bold text-gray-800 mb-3">تفاصيل الكورس:</h4>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">اسم الكورس:</span>
+                  <span className="font-medium">
+                    {actualCourseName || courseName || 'الكورس'}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">المدرس:</span>
+                  <span className="font-medium">{teacherName || 'المدرس'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">السعر:</span>
+                  <span className="font-bold text-green-600 text-lg">
+                    {actualCoursePrice || coursePrice || 299} جنيه
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-4 mb-6">
+              <div>
+                <label className="block text-gray-700 font-medium mb-2">
+                  اسمك الكامل *
+                </label>
+                <input
+                  type="text"
+                  value={studentName}
+                  onChange={(e) => setStudentName(e.target.value)}
+                  className="w-full px-4 py-3 border-2 rounded-lg focus:border-red-500 focus:outline-none"
+                  placeholder="أدخل اسمك بالكامل"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-gray-700 font-medium mb-2">
+                  رقم هاتفك *
+                </label>
+                <input
+                  type="tel"
+                  value={studentPhone}
+                  onChange={(e) => setStudentPhone(e.target.value)}
+                  className="w-full px-4 py-3 border-2 rounded-lg focus:border-red-500 focus:outline-none"
+                  placeholder="01xxxxxxxxx"
+                  pattern="[0-9]{11}"
+                  required
+                  dir="ltr"
+                />
+              </div>
+            </div>
+
+            <div className="bg-red-50 rounded-xl p-4 mb-6">
+              <h4 className="font-bold text-gray-800 mb-3">خطوات الدفع:</h4>
+              <ol className="space-y-3 text-sm">
+                <li className="flex gap-2">
+                  <span className="font-bold text-red-600">1.</span>
+                  <span>افتح تطبيق فودافون كاش</span>
+                </li>
+                <li className="flex gap-2">
+                  <span className="font-bold text-red-600">2.</span>
+                  <div>
+                    <span>حول المبلغ إلى الرقم:</span>
+                    <div className="flex items-center gap-2 mt-2">
+                      <code className="bg-white px-3 py-2 rounded-lg font-bold text-lg" dir="ltr">
+                        {vodafoneCashNumber}
+                      </code>
+                      <button
+                        onClick={handleCopyNumber}
+                        className="p-2 bg-red-100 hover:bg-red-200 rounded-lg transition"
+                        title="نسخ الرقم"
+                      >
+                        {copied ? (
+                          <FaCheckCircle className="text-green-600" />
+                        ) : (
+                          <FaCopy className="text-red-600" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </li>
+                <li className="flex gap-2">
+                  <span className="font-bold text-red-600">3.</span>
+                  <span>
+                    المبلغ المطلوب:{' '}
+                    <strong>{actualCoursePrice || coursePrice || 299} جنيه</strong>
+                  </span>
+                </li>
+                <li className="flex gap-2">
+                  <span className="font-bold text-red-600">4.</span>
+                  <span>بعد التحويل، اضغط على زر "أرسل للواتساب"</span>
+                </li>
+              </ol>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={handleWhatsAppClick}
+                className="flex-1 py-3 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-bold rounded-xl transition flex items-center justify-center gap-2"
+                disabled={!studentName || !studentPhone}
+              >
+                <FaWhatsapp className="text-xl" />
+                أرسل للواتساب
+              </button>
+
+              <button
+                onClick={() => setShowPaymentModal(false)}
+                className="px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold rounded-xl transition"
+              >
+                إلغاء
+              </button>
+            </div>
+
+            <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <p className="text-xs text-yellow-800">
+                <strong>ملاحظة:</strong> سيتم تفعيل اشتراكك خلال 30 دقيقة بعد التأكد من وصول المبلغ
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const usesCodeFlow = !!lessonId && useAccessCode;
   const isLessonUnlocked = !!lessonId && unlockedLessons.includes(lessonId);
 
   if (usesCodeFlow) {
@@ -420,55 +627,17 @@ export default function ProtectedVideoPlayer({
     // يوجد كود محدد لهذا الدرس: نطلب الكود لغير المشتركين
     if (lessonHasCode) {
       if (!isLessonUnlocked) {
-        return (
-          <div className="w-full aspect-video bg-gradient-to-br from-gray-900 to-gray-800 rounded-xl overflow-hidden relative">
-            <div className="absolute inset-0 flex flex-col items-center justify-center text-white p-8">
-              <div className="bg-white/10 backdrop-blur-sm rounded-full p-8 mb-6">
-                <FaLock className="text-6xl" />
-              </div>
-
-              <h2 className="text-2xl font-bold mb-2">هذا الفيديو محمي بكود</h2>
-              <p className="text-gray-300 text-center mb-4">
-                أدخل كود هذا الدرس الذي حصلت عليه من المدرس لفتح الفيديو.
-              </p>
-
-              <div className="w-full max-w-md space-y-3">
-                <input
-                  type="text"
-                  value={codeInput}
-                  onChange={(e) => setCodeInput(e.target.value)}
-                  className="w-full px-4 py-2 rounded-lg border border-gray-600 bg-gray-900/60 text-white focus:outline-none focus:ring-2 focus:ring-green-500"
-                  placeholder="أدخل الكود هنا"
-                />
-                {codeError && (
-                  <p className="text-sm text-red-400 text-center">{codeError}</p>
-                )}
-                <button
-                  type="button"
-                  onClick={handleVerifyCode}
-                  disabled={isVerifyingCode}
-                  className="w-full px-4 py-2 rounded-lg bg-green-500 hover:bg-green-600 text-white font-bold transition disabled:opacity-60"
-                >
-                  {isVerifyingCode ? 'جاري التحقق من الكود...' : 'تفعيل الكود وفتح الفيديو'}
-                </button>
-              </div>
-            </div>
-          </div>
-        );
+        return renderLockedVideo();
       }
 
       return renderVideoPlayer();
     }
-
-    // لا يوجد كود مضبوط لهذا الدرس وليس مجاني/معاينة:
-    // في هذه الحالة لا نفتح الفيديو لغير المشتركين، بل نعود لمسار الاشتراك في الأسفل.
   }
 
   if (isEnrolled) {
     return renderVideoPlayer();
   }
 
-  // عرض رسالة القفل وزر الشراء للغير مشتركين
   return (
     <>
       <div className="w-full aspect-video bg-gradient-to-br from-gray-900 to-gray-800 rounded-xl overflow-hidden relative">
@@ -498,146 +667,7 @@ export default function ProtectedVideoPlayer({
         </div>
       </div>
 
-      {/* نافذة الدفع */}
-      {showPaymentModal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden">
-            {/* Header */}
-            <div className="bg-gradient-to-r from-red-600 to-red-700 text-white p-6">
-              <div className="flex items-center justify-between">
-                <h3 className="text-2xl font-bold">الدفع بفودافون كاش</h3>
-                <button
-                  onClick={() => setShowPaymentModal(false)}
-                  className="text-white/80 hover:text-white text-2xl"
-                >
-                  ✕
-                </button>
-              </div>
-              <p className="mt-2 text-red-100">
-                ادفع بسهولة وأمان عبر فودافون كاش
-              </p>
-            </div>
-
-            {/* Content */}
-            <div className="p-6">
-              {/* معلومات الكورس */}
-              <div className="bg-gray-50 rounded-xl p-4 mb-6">
-                <h4 className="font-bold text-gray-800 mb-3">تفاصيل الكورس:</h4>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">اسم الكورس:</span>
-                    <span className="font-medium">{actualCourseName || courseName || 'الكورس'}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">المدرس:</span>
-                    <span className="font-medium">{teacherName || 'المدرس'}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">السعر:</span>
-                    <span className="font-bold text-green-600 text-lg">{actualCoursePrice || coursePrice || 299} جنيه</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* بيانات الطالب */}
-              <div className="space-y-4 mb-6">
-                <div>
-                  <label className="block text-gray-700 font-medium mb-2">
-                    اسمك الكامل *
-                  </label>
-                  <input
-                    type="text"
-                    value={studentName}
-                    onChange={(e) => setStudentName(e.target.value)}
-                    className="w-full px-4 py-3 border-2 rounded-lg focus:border-red-500 focus:outline-none"
-                    placeholder="أدخل اسمك بالكامل"
-                    required
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-gray-700 font-medium mb-2">
-                    رقم هاتفك *
-                  </label>
-                  <input
-                    type="tel"
-                    value={studentPhone}
-                    onChange={(e) => setStudentPhone(e.target.value)}
-                    className="w-full px-4 py-3 border-2 rounded-lg focus:border-red-500 focus:outline-none"
-                    placeholder="01xxxxxxxxx"
-                    pattern="[0-9]{11}"
-                    required
-                    dir="ltr"
-                  />
-                </div>
-              </div>
-
-              {/* خطوات الدفع */}
-              <div className="bg-red-50 rounded-xl p-4 mb-6">
-                <h4 className="font-bold text-gray-800 mb-3">خطوات الدفع:</h4>
-                <ol className="space-y-3 text-sm">
-                  <li className="flex gap-2">
-                    <span className="font-bold text-red-600">1.</span>
-                    <span>افتح تطبيق فودافون كاش</span>
-                  </li>
-                  <li className="flex gap-2">
-                    <span className="font-bold text-red-600">2.</span>
-                    <div>
-                      <span>حول المبلغ إلى الرقم:</span>
-                      <div className="flex items-center gap-2 mt-2">
-                        <code className="bg-white px-3 py-2 rounded-lg font-bold text-lg" dir="ltr">
-                          {vodafoneCashNumber}
-                        </code>
-                        <button
-                          onClick={handleCopyNumber}
-                          className="p-2 bg-red-100 hover:bg-red-200 rounded-lg transition"
-                          title="نسخ الرقم"
-                        >
-                          {copied ? <FaCheckCircle className="text-green-600" /> : <FaCopy className="text-red-600" />}
-                        </button>
-                      </div>
-                    </div>
-                  </li>
-                  <li className="flex gap-2">
-                    <span className="font-bold text-red-600">3.</span>
-                    <span>المبلغ المطلوب: <strong>{actualCoursePrice || coursePrice || 299} جنيه</strong></span>
-                  </li>
-                  <li className="flex gap-2">
-                    <span className="font-bold text-red-600">4.</span>
-                    <span>بعد التحويل، اضغط على زر "أرسل للواتساب"</span>
-                  </li>
-                </ol>
-              </div>
-
-              {/* أزرار الإجراءات */}
-              <div className="flex gap-3">
-                <button
-                  onClick={handleWhatsAppClick}
-                  className="flex-1 py-3 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-bold rounded-xl transition flex items-center justify-center gap-2"
-                  disabled={!studentName || !studentPhone}
-                >
-                  <FaWhatsapp className="text-xl" />
-                  أرسل للواتساب
-                </button>
-                
-                <button
-                  onClick={() => setShowPaymentModal(false)}
-                  className="px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold rounded-xl transition"
-                >
-                  إلغاء
-                </button>
-              </div>
-
-              {/* تنبيه */}
-              <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                <p className="text-xs text-yellow-800">
-                  <strong>ملاحظة:</strong> سيتم تفعيل اشتراكك خلال 30 دقيقة بعد التأكد من وصول المبلغ
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {showPaymentModal && renderPaymentModal()}
     </>
   );
-}
+};

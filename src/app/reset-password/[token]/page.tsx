@@ -1,19 +1,16 @@
 "use client";
 import { useState } from "react";
-import { motion } from "framer-motion";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { FaLock } from "react-icons/fa";
+import { useParams } from "next/navigation";
 
 export default function ResetPasswordPage() {
-  const router = useRouter();
+  const params = useParams();
+  const token = (params as any)?.token ? String((params as any).token) : '';
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [verificationCode, setVerificationCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
-  const [showVerification, setShowVerification] = useState(true); // إظهار نموذج التحقق أولاً
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -21,11 +18,9 @@ export default function ResetPasswordPage() {
     setError("");
 
     try {
-      // التحقق من رمز التحقق أولاً
-      if (showVerification) {
-        // TODO: التحقق من رمز التحقق مع الخادم
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        setShowVerification(false);
+      if (!token) {
+        setError('رابط غير صالح أو مفقود');
+        setLoading(false);
         return;
       }
 
@@ -50,8 +45,22 @@ export default function ResetPasswordPage() {
         return;
       }
 
-      // TODO: Update password with the server
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const res = await fetch('/api/auth/reset-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ token, password }),
+      });
+
+      const data = await res.json().catch(() => null as any);
+
+      if (!res.ok || !data?.success) {
+        setError(data?.error || 'حدث خطأ أثناء إعادة تعيين كلمة المرور. يرجى المحاولة مرة أخرى.');
+        setLoading(false);
+        return;
+      }
+
       setSuccess(true);
     } catch (err) {
       setError("حدث خطأ أثناء إعادة تعيين كلمة المرور. يرجى المحاولة مرة أخرى.");
@@ -110,59 +119,38 @@ export default function ResetPasswordPage() {
               )}
 
               <div className="rounded-md shadow-sm -space-y-px">
-                {showVerification ? (
-                  <div>
-                    <label htmlFor="verificationCode" className="sr-only">
-                      رمز التحقق
-                    </label>
-                    <input
-                      id="verificationCode"
-                      name="verificationCode"
-                      type="text"
-                      autoComplete="off"
-                      required
-                      value={verificationCode}
-                      onChange={(e) => setVerificationCode(e.target.value)}
-                      className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-gray-100 rounded-t-md focus:outline-none focus:ring-primary focus:border-primary focus:z-10 sm:text-sm"
-                      placeholder="رمز التحقق (تم إرساله إلى بريدك الإلكتروني)"
-                    />
-                  </div>
-                ) : (
-                  <>
-                    <div>
-                      <label htmlFor="password" className="sr-only">
-                        كلمة المرور الجديدة
-                      </label>
-                      <input
-                        id="password"
-                        name="password"
-                        type="password"
-                        autoComplete="new-password"
-                        required
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-gray-100 rounded-t-md focus:outline-none focus:ring-primary focus:border-primary focus:z-10 sm:text-sm"
-                        placeholder="كلمة المرور الجديدة"
-                      />
-                    </div>
-                    <div>
-                      <label htmlFor="confirmPassword" className="sr-only">
-                        تأكيد كلمة المرور
-                      </label>
-                      <input
-                        id="confirmPassword"
-                        name="confirmPassword"
-                        type="password"
-                        autoComplete="new-password"
-                        required
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                        className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-gray-100 rounded-b-md focus:outline-none focus:ring-primary focus:border-primary focus:z-10 sm:text-sm"
-                        placeholder="تأكيد كلمة المرور"
-                      />
-                    </div>
-                  </>
-                )}
+                <div>
+                  <label htmlFor="password" className="sr-only">
+                    كلمة المرور الجديدة
+                  </label>
+                  <input
+                    id="password"
+                    name="password"
+                    type="password"
+                    autoComplete="new-password"
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-gray-100 rounded-t-md focus:outline-none focus:ring-primary focus:border-primary focus:z-10 sm:text-sm"
+                    placeholder="كلمة المرور الجديدة"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="confirmPassword" className="sr-only">
+                    تأكيد كلمة المرور
+                  </label>
+                  <input
+                    id="confirmPassword"
+                    name="confirmPassword"
+                    type="password"
+                    autoComplete="new-password"
+                    required
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-gray-100 rounded-b-md focus:outline-none focus:ring-primary focus:border-primary focus:z-10 sm:text-sm"
+                    placeholder="تأكيد كلمة المرور"
+                  />
+                </div>
               </div>
 
               <div>

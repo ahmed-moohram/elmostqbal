@@ -34,8 +34,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // جلب التسجيلات النشطة للطالب
-    const { data: enrollments, error: enrollmentsError } = await supabase
+    // جلب التسجيلات النشطة للطالب من جدول enrollments
+    let enrollments: any[] = [];
+
+    const { data: legacyEnrollments, error: enrollmentsError } = await supabase
       .from('enrollments')
       .select(`
         *,
@@ -49,6 +51,151 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(
         { error: 'Failed to load enrollments' },
         { status: 500 }
+      );
+    }
+
+    enrollments = legacyEnrollments || [];
+
+    // دمج التسجيلات من نظام الدفع الجديد course_enrollments في حال عدم وجودها في enrollments
+    try {
+      const { data: paymentEnrollments, error: courseEnrollError } = await supabase
+        .from('course_enrollments')
+        .select(`
+          id,
+          student_id,
+          course_id,
+          is_active,
+          created_at,
+          course:courses(*)
+        `)
+        .eq('student_id', userId)
+        .eq('is_active', true);
+
+      if (courseEnrollError) {
+        console.warn(
+          'Error fetching course_enrollments for /api/student/dashboard (ignored):',
+          courseEnrollError.message
+        );
+      } else if (paymentEnrollments && paymentEnrollments.length > 0) {
+        const existingCourseIds = new Set(
+          (enrollments || []).map((enr: any) => String(enr.course_id))
+        );
+
+        const extraEnrollments = paymentEnrollments
+          .filter((ce: any) => !existingCourseIds.has(String(ce.course_id)))
+          .map((ce: any) => ({
+            id: ce.id,
+            user_id: ce.student_id,
+            course_id: ce.course_id,
+            status: 'active',
+            progress: 0,
+            is_active: ce.is_active ?? true,
+            enrolled_at: ce.created_at,
+            completed_at: null,
+            course: ce.course || null,
+          }));
+
+        enrollments = [...enrollments, ...extraEnrollments];
+      }
+    } catch (courseEnrollAggError) {
+      console.error(
+        'Error aggregating course_enrollments for /api/student/dashboard (ignored):',
+        courseEnrollAggError
+      );
+    }
+
+    // دمج الكورسات التي تمت الموافقة على طلب الدفع لها مباشرةً من جدول payment_requests
+    // هذا يضمن ظهور أي كورس مدفوع حتى لو فشل إنشاء صف في enrollments أو course_enrollments
+    try {
+      // الحصول على رقم هاتف الطالب من جدول users
+      const { data: userRow, error: userError } = await supabase
+        .from('users')
+        .select('id, phone, student_phone')
+        .eq('id', userId)
+        .maybeSingle();
+
+      if (userError) {
+        console.warn('Error fetching user phone for student dashboard (ignored):', userError.message);
+      }
+
+      const studentPhone = (userRow as any)?.phone || (userRow as any)?.student_phone || null;
+
+      if (studentPhone) {
+        // جلب طلبات الدفع المعتمدة لهذا الطالب بناءً على رقم الهاتف
+        const { data: approvedPayments, error: paymentsError } = await supabase
+          .from('payment_requests')
+          .select('id, course_id, status, student_phone, payment_phone, approved_at, created_at')
+          .or(`student_phone.eq.${studentPhone},payment_phone.eq.${studentPhone}`)
+          .eq('status', 'approved');
+
+        if (paymentsError) {
+          console.warn(
+            'Error fetching payment_requests for /api/student/dashboard (ignored):',
+            paymentsError.message
+          );
+        } else if (approvedPayments && approvedPayments.length > 0) {
+          const existingCourseIds = new Set(
+            (enrollments || []).map((enr: any) => String(enr.course_id))
+          );
+
+          // الكورسات التي لا تزال غير موجودة في قائمة التسجيلات
+          const extraPaymentRequests = approvedPayments.filter(
+            (pr: any) => pr.course_id && !existingCourseIds.has(String(pr.course_id))
+          );
+
+          if (extraPaymentRequests.length > 0) {
+            const courseIdsForPayments = Array.from(
+              new Set(
+                extraPaymentRequests
+                  .map((pr: any) => pr.course_id)
+                  .filter((cid: string | null | undefined) => !!cid)
+                  .map((cid: any) => String(cid))
+              )
+            );
+
+            // جلب بيانات الكورسات المرتبطة بهذه الطلبات
+            const { data: paymentCourses, error: paymentCoursesError } = await supabase
+              .from('courses')
+              .select('*')
+              .in('id', courseIdsForPayments as any);
+
+            if (paymentCoursesError) {
+              console.warn(
+                'Error fetching courses for payment_requests in /api/student/dashboard (ignored):',
+                paymentCoursesError.message
+              );
+            }
+
+            const courseMap = new Map<string, any>();
+            (paymentCourses || []).forEach((c: any) => {
+              courseMap.set(String(c.id), c);
+            });
+
+            const syntheticEnrollments = extraPaymentRequests.map((pr: any) => {
+              const courseIdStr = String(pr.course_id);
+              const course = courseMap.get(courseIdStr) || null;
+
+              return {
+                id: `payment_${pr.id}`,
+                user_id: userId,
+                course_id: pr.course_id,
+                status: 'active',
+                progress: 0,
+                is_active: true,
+                enrolled_at: pr.approved_at || pr.created_at,
+                completed_at: null,
+                course,
+              };
+            });
+
+            enrollments = [...enrollments, ...syntheticEnrollments];
+          }
+        }
+      }
+    } catch (paymentAggError) {
+      console.error(
+        'Error aggregating payment_requests for /api/student/dashboard (ignored):',
+        paymentAggError
       );
     }
 
@@ -135,6 +282,20 @@ export async function GET(request: NextRequest) {
     } catch (lessonsAggError) {
       console.error('Error aggregating lessons for student dashboard (ignored):', lessonsAggError);
     }
+
+    // إخفاء الكورسات المحذوفة أو غير النشطة أو التي لا تحتوي على عنوان من قائمة الكورسات النشطة
+    enrichedEnrollments = (enrichedEnrollments || []).filter((enr: any) => {
+      const course = enr.course;
+      if (!course) return false;
+
+      const title = (course.title || '').trim();
+      if (!title) return false;
+
+      if (course.is_active === false) return false;
+      if (course.is_published === false) return false;
+
+      return true;
+    });
 
     // جلب الجلسات والاختبارات القادمة المرتبطة بكورسات الطالب
     let upcomingEvents: any[] = [];

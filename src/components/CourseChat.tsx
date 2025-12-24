@@ -50,13 +50,31 @@ export default function CourseChat({
       const fetchMessages = async () => {
         try {
           setIsLoading(true);
+          const token = localStorage.getItem('token');
+          const studentInfoRaw = localStorage.getItem('studentInfo');
+          let studentPhone: string | null = null;
+          if (studentInfoRaw) {
+            try {
+              const parsed = JSON.parse(studentInfoRaw);
+              studentPhone = parsed?.phone || null;
+            } catch {
+              studentPhone = null;
+            }
+          }
+
           const params = new URLSearchParams();
           params.set('courseId', courseId);
+          params.set('userId', userId);
           if (teacherId) {
             params.set('teacherId', teacherId);
           }
 
-          const res = await fetch(`/api/course-messages?${params.toString()}`);
+          const res = await fetch(`/api/course-messages?${params.toString()}`, {
+            headers: {
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+              ...(studentPhone ? { 'x-student-phone': studentPhone } : {}),
+            },
+          });
           if (!res.ok) {
             return;
           }
@@ -126,17 +144,28 @@ export default function CourseChat({
     setNewMessage('');
 
     try {
+      const token = localStorage.getItem('token');
+      const studentInfoRaw = localStorage.getItem('studentInfo');
+      let studentPhone: string | null = null;
+      if (studentInfoRaw) {
+        try {
+          const parsed = JSON.parse(studentInfoRaw);
+          studentPhone = parsed?.phone || null;
+        } catch {
+          studentPhone = null;
+        }
+      }
+
       const res = await fetch('/api/course-messages', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...(studentPhone ? { 'x-student-phone': studentPhone } : {}),
         },
         body: JSON.stringify({
           courseId,
-          teacherId,
-          senderId: userId,
-          senderName: userName,
-          senderRole: userRole,
+          userId,
           content,
         }),
       });

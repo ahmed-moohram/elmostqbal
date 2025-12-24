@@ -544,7 +544,7 @@ const VideoPlayer = ({
       {(userPhone || userName) && (
         <div 
           ref={watermarkRef} 
-          className="absolute p-2 rounded-md text-white text-sm bg-black/20 backdrop-blur-sm z-10"
+          className="absolute p-1.5 rounded-md text-white text-xs bg-black/20 backdrop-blur-sm z-10"
           style={{ 
             left: '50%', 
             top: '50%', 
@@ -554,10 +554,10 @@ const VideoPlayer = ({
           }}
         >
           <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></div>
+            <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></div>
             <div>
               {userName && <span className="font-semibold">{userName}</span>}
-              {userPhone && <span className="text-xs opacity-80"> • {userPhone}</span>}
+              {userPhone && <span className="text-[10px] opacity-80"> • {userPhone}</span>}
             </div>
           </div>
         </div>

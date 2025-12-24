@@ -249,27 +249,6 @@ const CourseDetail = ({ course }: CourseDetailProps) => {
                         <p className="whitespace-pre-line">{course.description}</p>
                       </div>
                       
-                      <div className="mb-8">
-                        <h3 className="text-xl font-bold mb-4">ماذا ستتعلم</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          {course.objectives.map((objective, index) => (
-                            <div key={index} className="flex items-start gap-2">
-                              <FaCheckCircle className="text-primary mt-1 flex-shrink-0" />
-                              <span>{objective}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                      
-                      <div className="mb-8">
-                        <h3 className="text-xl font-bold mb-4">المتطلبات</h3>
-                        <ul className="list-disc list-inside space-y-2">
-                          {course.requirements.map((requirement, index) => (
-                            <li key={index}>{requirement}</li>
-                          ))}
-                        </ul>
-                      </div>
-                      
                       <div>
                         <h3 className="text-xl font-bold mb-4">الوسوم</h3>
                         <div className="flex flex-wrap gap-2">

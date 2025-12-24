@@ -46,7 +46,12 @@ export async function GET(request: NextRequest) {
     const { searchParams } = request.nextUrl;
     const courseId = searchParams.get('courseId');
     const examId = searchParams.get('examId');
-    const teacherId = searchParams.get('teacherId');
+    const teacherIdParam = searchParams.get('teacherId');
+
+    const roleCookie = request.cookies.get('user-role')?.value;
+    const authCookie =
+      request.cookies.get('auth-token')?.value || request.cookies.get('auth_token')?.value;
+    const cookieUserId = request.cookies.get('user-id')?.value;
 
     if (!courseId || !examId) {
       return NextResponse.json(
@@ -55,6 +60,20 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    if (!authCookie || !roleCookie || !cookieUserId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    if (roleCookie !== 'teacher' && roleCookie !== 'admin') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    if (teacherIdParam && String(teacherIdParam) !== String(cookieUserId)) {
+      return NextResponse.json({ error: 'forbidden' }, { status: 403 });
+    }
+
+    const teacherId = teacherIdParam || cookieUserId;
+
     // إذا كان examId ليس UUID صالحًا (مثلاً من امتحان قديم تم إنشاؤه بهوية بسيطة)،
     // نتجنب استعلام Supabase الذي قد يفشل بتحويل النوع ونعيد نتائج فارغة بدلاً من 500.
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -62,7 +81,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ results: [] as ExamResultDto[] });
     }
 
-    // التحقق من أن الكورس يخص هذا المدرس (إن وجد teacherId)
+    // التحقق من أن الكورس يخص هذا المدرس
     if (teacherId) {
       const { data: courseRow, error: courseError } = await supabase
         .from('courses')
@@ -81,7 +100,7 @@ export async function GET(request: NextRequest) {
         );
       }
 
-      if (!courseRow || String(courseRow.instructor_id) !== teacherId) {
+      if (!courseRow || String(courseRow.instructor_id) !== String(teacherId)) {
         return NextResponse.json({ error: 'forbidden' }, { status: 403 });
       }
     }

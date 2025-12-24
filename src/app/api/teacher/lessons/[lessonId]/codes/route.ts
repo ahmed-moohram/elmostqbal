@@ -38,6 +38,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const teacherId = searchParams.get('teacherId');
     const countParam = searchParams.get('count');
 
+    const roleCookie = request.cookies.get('user-role')?.value;
+    const authCookie =
+      request.cookies.get('auth-token')?.value || request.cookies.get('auth_token')?.value;
+    const cookieUserId = request.cookies.get('user-id')?.value;
+
     let count = Number(countParam || '1');
     if (!Number.isFinite(count) || count <= 0) count = 1;
     if (count > 100) count = 100;
@@ -49,11 +54,23 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       );
     }
 
+    if (!authCookie || !roleCookie || !cookieUserId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    if (roleCookie !== 'teacher' && roleCookie !== 'admin') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
     if (!courseId || !teacherId) {
       return NextResponse.json(
         { error: 'courseId and teacherId are required' },
         { status: 400 },
       );
+    }
+
+    if (String(cookieUserId) !== String(teacherId)) {
+      return NextResponse.json({ error: 'forbidden' }, { status: 403 });
     }
 
     const { data: courseRow, error: courseError } = await supabase

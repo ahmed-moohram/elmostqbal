@@ -1,5 +1,5 @@
 // خدمة الإنجازات المرتبطة بالكورسات
-import supabase from '@/lib/supabase-client';
+import defaultSupabase from '@/lib/supabase-client';
 
 export interface Achievement {
   id: string;
@@ -40,10 +40,17 @@ export interface CourseProgress {
   points_earned: number;
 }
 
-class AchievementsService {
+export class AchievementsService {
+  private supabase: any;
+
+  constructor(client: any = defaultSupabase) {
+    this.supabase = client;
+  }
+
   // جلب إنجازات المستخدم
   async getUserAchievements(userId: string): Promise<UserAchievement[]> {
     try {
+      const supabase = this.supabase;
       console.log('🏆 جلب إنجازات المستخدم:', userId);
       
       const { data, error } = await supabase
@@ -72,6 +79,7 @@ class AchievementsService {
   // جلب إنجازات كورس معين
   async getCourseAchievements(courseId: string): Promise<Achievement[]> {
     try {
+       const supabase = this.supabase;
       console.log('📚 جلب إنجازات الكورس:', courseId);
       
       const { data, error } = await supabase
@@ -95,6 +103,7 @@ class AchievementsService {
   // جلب تقدم المستخدم في الكورسات مع الإنجازات
   async getUserCourseProgress(userId: string): Promise<CourseProgress[]> {
     try {
+       const supabase = this.supabase;
       console.log('📊 جلب تقدم المستخدم في الكورسات');
       
       // جلب التسجيلات
@@ -133,13 +142,18 @@ class AchievementsService {
           .eq('course_id', enrollment.course_id);
         
         const lessonIds = courseLessons?.map(l => l.id) || [];
-        
-        const { count: completedLessons } = await supabase
-          .from('lesson_progress')
-          .select('*', { count: 'exact', head: true })
-          .eq('user_id', userId)
-          .eq('is_completed', true)
-          .in('lesson_id', lessonIds);
+
+        let completedLessons = 0;
+        if (lessonIds.length > 0) {
+          const { count } = await supabase
+            .from('lesson_progress')
+            .select('*', { count: 'exact', head: true })
+            .eq('user_id', userId)
+            .eq('is_completed', true)
+            .in('lesson_id', lessonIds);
+
+          completedLessons = count || 0;
+        }
 
         // جلب الإنجازات المحققة في هذا الكورس
         const { data: achievements } = await supabase
@@ -185,9 +199,30 @@ class AchievementsService {
     }
   }
 
+  private normalizeRequirementType(requirementType: any): string {
+    const normalized = String(requirementType || '').trim().toLowerCase();
+
+    switch (normalized) {
+      case 'lessons_watched':
+        return 'lessons_completed';
+      case 'days_active':
+        return 'study_streak';
+      case 'course_lessons':
+      case 'lessons_in_course':
+        return 'course_lessons';
+      case 'course_complete':
+      case 'complete_course':
+      case 'course_completed':
+        return 'course_complete';
+      default:
+        return normalized;
+    }
+  }
+
   // التحقق من الإنجازات وإضافتها
   async checkAndGrantAchievements(userId: string, courseId?: string): Promise<Achievement[]> {
     try {
+       const supabase = this.supabase;
       console.log('🔍 التحقق من الإنجازات الجديدة');
       
       // جلب إحصائيات المستخدم
@@ -195,6 +230,8 @@ class AchievementsService {
       
       // إذا كان هناك كورس محدد، احسب عدد الدروس المكتملة في هذا الكورس فقط
       let courseLessonsCompleted = 0;
+      let courseTotalLessons = 0;
+      let courseLessonsPercent = 0;
       if (courseId) {
         try {
           const { data: courseLessons, error: courseLessonsError } = await supabase
@@ -202,16 +239,24 @@ class AchievementsService {
             .select('id')
             .eq('course_id', courseId);
 
-          if (!courseLessonsError && courseLessons && courseLessons.length > 0) {
-            const lessonIds = courseLessons.map(l => l.id);
-            const { count: completedInCourse } = await supabase
-              .from('lesson_progress')
-              .select('*', { count: 'exact', head: true })
-              .eq('user_id', userId)
-              .eq('is_completed', true)
-              .in('lesson_id', lessonIds);
+          if (!courseLessonsError && courseLessons) {
+            courseTotalLessons = courseLessons.length;
 
-            courseLessonsCompleted = completedInCourse || 0;
+            const lessonIds = courseLessons.map(l => l.id);
+            if (lessonIds.length > 0) {
+              const { count: completedInCourse } = await supabase
+                .from('lesson_progress')
+                .select('*', { count: 'exact', head: true })
+                .eq('user_id', userId)
+                .eq('is_completed', true)
+                .in('lesson_id', lessonIds);
+
+              courseLessonsCompleted = completedInCourse || 0;
+            }
+
+            courseLessonsPercent = courseTotalLessons > 0
+              ? (courseLessonsCompleted / courseTotalLessons) * 100
+              : 0;
           }
         } catch (courseStatsError) {
           console.error('❌ خطأ في حساب تقدم الكورس للإنجازات:', courseStatsError);
@@ -239,7 +284,18 @@ class AchievementsService {
 
         let earned = false;
 
-        switch (achievement.requirement_type) {
+        const requirementType = this.normalizeRequirementType(achievement.requirement_type);
+
+        switch (requirementType) {
+          case 'registration':
+            earned = true;
+            break;
+          case 'first_enrollment':
+            earned = (stats.enrollments_count || 0) >= (achievement.requirement_value || 1);
+            break;
+          case 'first_lesson':
+            earned = stats.lessons_completed >= (achievement.requirement_value || 1);
+            break;
           case 'lessons_completed':
             // إذا كان الإنجاز مرتبطاً بكورس محدد، استخدم عدد دروس هذا الكورس فقط
             if (courseId && achievement.course_id === courseId) {
@@ -249,14 +305,41 @@ class AchievementsService {
               earned = stats.lessons_completed >= achievement.requirement_value;
             }
             break;
+          case 'course_lessons':
+            earned = !!courseId && courseLessonsCompleted >= achievement.requirement_value;
+            break;
+          case 'course_progress':
+            earned = !!courseId && courseLessonsPercent >= achievement.requirement_value;
+            break;
+          case 'course_complete': {
+            if (!courseId) {
+              earned = false;
+              break;
+            }
+
+            const requiredValue = Number(achievement.requirement_value || 1);
+            if (requiredValue <= 1) {
+              earned = courseLessonsPercent >= 100;
+            } else {
+              earned = courseLessonsPercent >= requiredValue;
+            }
+            break;
+          }
           case 'courses_completed':
             earned = stats.courses_completed >= achievement.requirement_value;
             break;
           case 'study_hours':
             earned = stats.study_hours >= achievement.requirement_value;
             break;
+          case 'perfect_quiz':
+            earned = (stats.perfect_quiz_count || 0) >= achievement.requirement_value;
+            break;
           case 'quiz_score':
-            earned = stats.average_quiz_score >= achievement.requirement_value;
+            if (achievement.requirement_value <= 10) {
+              earned = (stats.perfect_quiz_count || 0) >= achievement.requirement_value;
+            } else {
+              earned = stats.average_quiz_score >= achievement.requirement_value;
+            }
             break;
           case 'study_streak':
             earned = stats.current_streak >= achievement.requirement_value;
@@ -284,6 +367,7 @@ class AchievementsService {
   // منح إنجاز للمستخدم
   private async grantAchievement(userId: string, achievementId: string, courseId?: string, enrollmentId?: string) {
     try {
+       const supabase = this.supabase;
       // إضافة الإنجاز
       const { data: userAchievement, error } = await supabase
         .from('user_achievements')
@@ -328,6 +412,7 @@ class AchievementsService {
   // إضافة نقاط للمستخدم
   private async addPoints(userId: string, points: number, action: string, description: string, referenceId?: string) {
     try {
+       const supabase = this.supabase;
       // إضافة سجل النقاط
       await supabase
         .from('points_history')
@@ -384,6 +469,7 @@ class AchievementsService {
   // جلب إحصائيات المستخدم
   private async getUserStats(userId: string) {
     try {
+       const supabase = this.supabase;
       // عدد الدروس المكتملة
       const { count: lessonsCompleted } = await supabase
         .from('lesson_progress')
@@ -398,15 +484,26 @@ class AchievementsService {
         .eq('user_id', userId)
         .eq('progress', 100);
 
+      const { count: enrollmentsCount } = await supabase
+        .from('enrollments')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId);
+
       // متوسط درجات الاختبارات
       const { data: quizResults } = await supabase
         .from('quiz_results')
         .select('score')
         .eq('user_id', userId);
 
-      const averageQuizScore = quizResults && quizResults.length > 0
-        ? quizResults.reduce((sum, r) => sum + r.score, 0) / quizResults.length
+      const quizScores = Array.isArray(quizResults)
+        ? quizResults.map((r: any) => Number(r.score) || 0)
+        : [];
+
+      const averageQuizScore = quizScores.length > 0
+        ? quizScores.reduce((sum, score) => sum + score, 0) / quizScores.length
         : 0;
+
+      const perfectQuizCount = quizScores.filter(score => score >= 100).length;
 
       // النقاط والمستوى الحالي
       const { data: userPoints } = await supabase
@@ -418,7 +515,9 @@ class AchievementsService {
       return {
         lessons_completed: lessonsCompleted || 0,
         courses_completed: coursesCompleted || 0,
+        enrollments_count: enrollmentsCount || 0,
         average_quiz_score: averageQuizScore,
+        perfect_quiz_count: perfectQuizCount,
         study_hours: 0, // يمكن حسابها من سجل النشاط
         current_streak: userPoints?.current_streak || 0,
         total_points: userPoints?.total_points || 0,
@@ -429,7 +528,9 @@ class AchievementsService {
       return {
         lessons_completed: 0,
         courses_completed: 0,
+        enrollments_count: 0,
         average_quiz_score: 0,
+        perfect_quiz_count: 0,
         study_hours: 0,
         current_streak: 0,
         total_points: 0,
@@ -441,6 +542,7 @@ class AchievementsService {
   // تحديث إحصائيات المستخدم
   private async updateUserStats(userId: string) {
     try {
+       const supabase = this.supabase;
       const stats = await this.getUserStats(userId);
       
       const { data: userPoints } = await supabase
@@ -476,6 +578,7 @@ class AchievementsService {
 
   // عدد إنجازات المستخدم
   private async getUserAchievementsCount(userId: string): Promise<number> {
+    const supabase = this.supabase;
     const { count } = await supabase
       .from('user_achievements')
       .select('*', { count: 'exact', head: true })
@@ -488,6 +591,7 @@ class AchievementsService {
   // جلب لوحة المتصدرين
   async getLeaderboard(periodType: 'daily' | 'weekly' | 'monthly' | 'all_time' = 'all_time') {
     try {
+       const supabase = this.supabase;
       console.log('🏅 جلب لوحة المتصدرين:', periodType);
       
       const query = supabase

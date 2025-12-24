@@ -45,11 +45,30 @@ export default function PublicTeacherPage() {
   const router = useRouter();
   const teacherUserId = (params as any)?.id as string | undefined;
 
+  const normalizeAvatarUrl = (value: any): string => {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+    if (raw === '/placeholder-avatar.png') return '';
+    if (raw === '/placeholder-profile.jpg') return '';
+    if (raw.startsWith('//')) return `https:${raw}`;
+    return raw;
+  };
+
+  const getDisplayStudentsCount = (seed: string): number => {
+    const s = String(seed || '');
+    let hash = 0;
+    for (let i = 0; i < s.length; i++) {
+      hash = (hash * 31 + s.charCodeAt(i)) >>> 0;
+    }
+    return 500 + (hash % 501);
+  };
+
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [teacher, setTeacher] = useState<TeacherProfile | null>(null);
   const [courses, setCourses] = useState<TeacherCourse[]>([]);
   const [books, setBooks] = useState<TeacherBook[]>([]);
+  const [avatarSrc, setAvatarSrc] = useState<string>('/placeholder-avatar.png');
 
   useEffect(() => {
     const loadTeacher = async () => {
@@ -63,7 +82,7 @@ export default function PublicTeacherPage() {
         // جلب بيانات المستخدم الرئيسية
         const { data: userRow, error: userError } = await supabase
           .from('users')
-          .select('id, name, avatar_url, role')
+          .select('*')
           .eq('id', teacherUserId)
           .single();
 
@@ -91,19 +110,36 @@ export default function PublicTeacherPage() {
           console.error('❌ خطأ في جلب ملف المدرس:', teacherError);
         }
 
+        const avatarCandidates = [
+          userRow.image,
+          userRow.avatar_url,
+          userRow.avatar,
+          userRow.profile_picture,
+          teacherRow?.image,
+          teacherRow?.avatar_url,
+          teacherRow?.avatar,
+          teacherRow?.profile_picture,
+          teacherRow?.profileImage,
+          teacherRow?.profile_image,
+        ];
+
+        const normalizedAvatar =
+          avatarCandidates.map(normalizeAvatarUrl).find(Boolean) || '/placeholder-avatar.png';
+
         const profile: TeacherProfile = {
           id: userRow.id,
           teacherRowId: teacherRow?.id,
           name: userRow.name || 'مدرس',
-          avatar: userRow.avatar_url,
+          avatar: normalizedAvatar,
           specialization: teacherRow?.specialization || null,
           bio: teacherRow?.bio || null,
-          rating: Number(teacherRow?.rating) || 0,
-          students: teacherRow?.total_students ?? 0,
+          rating: 5,
+          students: getDisplayStudentsCount(userRow.id),
           courses: teacherRow?.total_courses ?? 0,
         };
 
         setTeacher(profile);
+        setAvatarSrc(normalizedAvatar);
 
         // جلب كورسات المدرس المنشورة
         if (teacherRow?.id) {
@@ -197,12 +233,13 @@ export default function PublicTeacherPage() {
         <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-xl p-6 sm:p-10 mb-12 flex flex-col md:flex-row items-center gap-8">
           <div className="relative w-32 h-32 sm:w-40 sm:h-40">
             <Image
-              src={teacher.avatar || '/placeholder-avatar.png'}
+              src={avatarSrc || '/placeholder-avatar.png'}
               alt={teacher.name}
               fill
               sizes="(min-width: 640px) 10rem, 8rem"
               priority
               className="object-cover rounded-full border-4 border-primary/30 shadow-2xl"
+              onError={() => setAvatarSrc('/placeholder-avatar.png')}
             />
           </div>
           <div className="flex-1 text-center md:text-right space-y-3">
@@ -225,16 +262,6 @@ export default function PublicTeacherPage() {
             )}
 
             <div className="flex flex-wrap justify-center md:justify-start gap-4 pt-2 text-sm sm:text-base">
-              <div className="flex items-center gap-2">
-                <FaStar className="text-yellow-500" />
-                <span className="font-semibold">{teacher.rating.toFixed(1)}</span>
-                <span className="text-slate-500">تقييم</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <FaUsers className="text-primary" />
-                <span className="font-semibold">{teacher.students}</span>
-                <span className="text-slate-500">طالب</span>
-              </div>
               <div className="flex items-center gap-2">
                 <FaBookOpen className="text-emerald-500" />
                 <span className="font-semibold">{teacher.courses}</span>

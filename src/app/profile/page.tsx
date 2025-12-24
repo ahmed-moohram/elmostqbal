@@ -208,27 +208,17 @@ export default function ProfilePage() {
 
         const url = result.url;
 
-        const { error: userError } = await supabase
-          .from('users')
-          .update({ avatar_url: url })
-          .eq('id', authUser.id);
+        const persistRes = await fetch('/api/profile/avatar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url }),
+        });
 
-        if (userError) {
-          console.error('Error updating profile avatar:', userError);
+        const persistJson = await persistRes.json().catch(() => null as any);
+        if (!persistRes.ok || !persistJson?.success) {
+          console.error('Error persisting avatar url:', persistJson);
           toast.error('فشل تحديث الصورة في الحساب');
           return;
-        }
-
-        // إذا كان المستخدم مدرساً، نحدّث جدول teachers أيضاً بنفس الصورة
-        if (authUser.role === 'teacher') {
-          const { error: teacherError } = await supabase
-            .from('teachers')
-            .update({ avatar_url: url })
-            .eq('user_id', authUser.id);
-
-          if (teacherError) {
-            console.error('Error updating teacher avatar:', teacherError);
-          }
         }
 
         setUser((prev) => (prev ? { ...prev, profileImage: url } : prev));

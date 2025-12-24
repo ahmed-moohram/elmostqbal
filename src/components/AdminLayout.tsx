@@ -76,6 +76,11 @@ const AdminLayout = memo(({ children }: AdminLayoutProps) => {
       path: '/admin/dashboard',
     },
     {
+      title: 'دوراتي',
+      icon: <FaBook />,
+      path: '/admin/my-courses',
+    },
+    {
       title: 'الدورات',
       icon: <FaBook />,
       path: '/admin/courses',

@@ -27,7 +27,26 @@ export async function GET(request: NextRequest) {
     const courseIdsParam = searchParams.get('courseIds');
     const teacherId = searchParams.get('teacherId') || undefined;
 
-    if (!courseIdsParam && !teacherId) {
+     const roleCookie = request.cookies.get('user-role')?.value;
+     const authCookie =
+       request.cookies.get('auth-token')?.value || request.cookies.get('auth_token')?.value;
+     const cookieUserId = request.cookies.get('user-id')?.value;
+
+     if (!authCookie || !roleCookie || !cookieUserId) {
+       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+     }
+
+     if (roleCookie !== 'teacher' && roleCookie !== 'admin') {
+       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+     }
+
+     if (teacherId && String(teacherId) !== String(cookieUserId)) {
+       return NextResponse.json({ error: 'forbidden' }, { status: 403 });
+     }
+
+     const effectiveTeacherId = teacherId || cookieUserId;
+
+    if (!courseIdsParam && !effectiveTeacherId) {
       return NextResponse.json(
         { error: 'courseIds or teacherId is required' },
         { status: 400 }
@@ -44,11 +63,11 @@ export async function GET(request: NextRequest) {
     }
 
     // في حال لم تُرسل courseIds لكن لدينا teacherId، نجلب كورسات هذا المدرس أولاً
-    if (!courseIds.length && teacherId) {
+    if (!courseIds.length && effectiveTeacherId) {
       const { data: teacherCourses, error: teacherCoursesError } = await supabase
         .from('courses')
         .select('id')
-        .eq('instructor_id', teacherId);
+        .eq('instructor_id', effectiveTeacherId);
 
       if (teacherCoursesError) {
         console.error('Error loading teacher courses in /api/teacher/students:', teacherCoursesError);
@@ -59,6 +78,25 @@ export async function GET(request: NextRequest) {
       }
 
       courseIds = (teacherCourses || []).map((c: any) => c.id as string);
+    }
+
+    // إذا أُرسلت courseIds مباشرة، نُقيّدها بكورسات المدرس/الأدمن
+    if (courseIds.length && effectiveTeacherId) {
+      const { data: allowedCourses, error: allowedError } = await supabase
+        .from('courses')
+        .select('id')
+        .in('id', courseIds as any)
+        .eq('instructor_id', effectiveTeacherId);
+
+      if (allowedError) {
+        console.error('Error verifying courseIds ownership in /api/teacher/students:', allowedError);
+        return NextResponse.json(
+          { error: 'Failed to verify courses ownership' },
+          { status: 500 }
+        );
+      }
+
+      courseIds = (allowedCourses || []).map((c: any) => String(c.id));
     }
 
     if (!courseIds.length) {

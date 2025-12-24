@@ -40,14 +40,55 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // تحميل بيانات المستخدم عند بدء التطبيق
   useEffect(() => {
-    const loadUser = () => {
+    const loadUser = async () => {
       try {
         const storedToken = localStorage.getItem('token');
         const storedUser = localStorage.getItem('user');
 
         if (storedToken && storedUser) {
+          const parsed = JSON.parse(storedUser);
           setToken(storedToken);
-          setUser(JSON.parse(storedUser));
+          setUser(parsed);
+
+          if (parsed?.role === 'admin' && parsed?.name !== 'مستر معتصم') {
+            const normalizedAdmin = { ...parsed, name: 'مستر معتصم' };
+            localStorage.setItem('user', JSON.stringify(normalizedAdmin));
+            setUser(normalizedAdmin);
+          }
+
+          if (typeof document !== 'undefined' && parsed?.id && parsed?.role) {
+            document.cookie = `auth-token=${encodeURIComponent(storedToken)}; path=/`;
+            document.cookie = `user-role=${encodeURIComponent(parsed.role)}; path=/`;
+            document.cookie = `user-id=${encodeURIComponent(parsed.id)}; path=/`;
+          }
+
+          if (
+            parsed?.role === 'admin' &&
+            typeof parsed?.phone === 'string' &&
+            parsed.phone &&
+            typeof parsed?.id === 'string' &&
+            parsed.id.startsWith('admin-')
+          ) {
+            try {
+              const { data: userRow } = await supabase
+                .from('users')
+                .select('id')
+                .or(`phone.eq.${parsed.phone},student_phone.eq.${parsed.phone}`)
+                .maybeSingle();
+
+              if (userRow?.id && String(userRow.id) !== String(parsed.id)) {
+                const updated = { ...parsed, id: String(userRow.id) };
+                localStorage.setItem('user', JSON.stringify(updated));
+                setUser(updated);
+
+                if (typeof document !== 'undefined') {
+                  document.cookie = `user-id=${encodeURIComponent(updated.id)}; path=/`;
+                }
+              }
+            } catch (resolveErr) {
+              console.error('Error resolving admin UUID on load:', resolveErr);
+            }
+          }
         }
       } catch (error) {
         console.error('Error loading user data:', error);
@@ -65,14 +106,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (phone: string, password: string): Promise<{ success: boolean; error?: string }> => {
     try {
       if (phone === '01005209667' && password === 'Ahmed@010052') {
-        const adminUser: User = {
+        let adminUser: User = {
           id: 'admin-001',
-          name: 'أحمد - مدير المنصة',
+          name: 'مستر معتصم',
           email: 'admin@platform.com',
           phone: '01005209667',
           role: 'admin',
           isVerified: true,
         };
+
+        try {
+          const { data: userRow } = await supabase
+            .from('users')
+            .select('id')
+            .or(`phone.eq.${adminUser.phone},student_phone.eq.${adminUser.phone}`)
+            .maybeSingle();
+
+          if (userRow?.id) {
+            adminUser = { ...adminUser, id: String(userRow.id) };
+          }
+        } catch (resolveErr) {
+          console.error('Error resolving admin UUID on login:', resolveErr);
+        }
 
         const token = 'admin-token-' + Date.now();
 
@@ -82,6 +137,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         localStorage.setItem('isAuthenticated', 'true');
         setToken(token);
         setUser(adminUser);
+
+        if (typeof document !== 'undefined') {
+          document.cookie = `auth-token=${encodeURIComponent(token)}; path=/`;
+          document.cookie = `user-role=${encodeURIComponent('admin')}; path=/`;
+          document.cookie = `user-id=${encodeURIComponent(adminUser.id)}; path=/`;
+        }
 
         setTimeout(() => {
           window.location.reload();
@@ -137,7 +198,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (phone === '01005209667' && password === 'Ahmed@010052') {
           const adminUser = {
             id: 'admin-001',
-            name: 'أحمد - مدير المنصة',
+            name: 'معتصم مدير المنصة',
             email: 'admin@platform.com',
             phone: '01005209667',
             role: 'admin' as const,
@@ -151,6 +212,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           localStorage.setItem('isAuthenticated', 'true');
           setToken(token);
           setUser(adminUser);
+
+          if (typeof document !== 'undefined') {
+            document.cookie = `auth-token=${encodeURIComponent(token)}; path=/`;
+            document.cookie = `user-role=${encodeURIComponent('admin')}; path=/`;
+            document.cookie = `user-id=${encodeURIComponent(adminUser.id)}; path=/`;
+          }
           
           console.log('✅ دخول الأدمن');
           
@@ -210,7 +277,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         phone: user.phone,
         role: user.role as 'student' | 'teacher' | 'admin',
         // نخزن صورة الحساب في الحقل image حتى يستخدمها الـ Navbar وباقي الواجهة
-        image: user.avatar_url || user.avatar || user.image || undefined,
+        image: user.avatar_url || user.profile_picture || user.avatar || user.image || undefined,
         isVerified: true
       };
       
@@ -221,6 +288,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.setItem('isAuthenticated', 'true');
       setToken(token);
       setUser(userData);
+
+      if (typeof document !== 'undefined') {
+        document.cookie = `auth-token=${encodeURIComponent(token)}; path=/`;
+        document.cookie = `user-role=${encodeURIComponent(userData.role)}; path=/`;
+        document.cookie = `user-id=${encodeURIComponent(userData.id)}; path=/`;
+      }
       
       console.log('✅ تسجيل دخول ناجح عبر Supabase');
       console.log('   Token:', token);
@@ -278,6 +351,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem('user');
     setToken(null);
     setUser(null);
+
+    if (typeof document !== 'undefined') {
+      document.cookie = 'auth-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+      document.cookie = 'user-role=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+      document.cookie = 'user-id=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+      document.cookie = 'auth_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+    }
     router.replace('/');
   };
 

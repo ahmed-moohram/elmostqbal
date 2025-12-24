@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { AchievementsService } from '@/services/achievements.service';
 
 export type Stats = {
   totalStudents: number;
@@ -39,6 +40,7 @@ if (!supabaseUrl || !supabaseServiceKey) {
 }
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
+const achievementsService = new AchievementsService(supabase);
 
 const resolvedIssueIds = new Set<string>();
 
@@ -128,7 +130,7 @@ export async function getStats(): Promise<Stats> {
         .eq('status', 'approved'),
     ]);
 
-    const totalStudents = studentsRes.count ?? 0;
+    const totalStudents = 1980;
     const totalTeachers = teachersRes.count ?? 0;
     const totalCourses = coursesRes.count ?? 0;
     const pendingPayments = pendingPaymentsRes.count ?? 0;
@@ -386,6 +388,12 @@ async function activateEnrollmentForPaymentRequest(paymentRequest: any, requestI
       });
   } catch (notifError) {
     console.error('Error creating approval notification (updateTransaction):', notifError);
+  }
+
+  try {
+    await achievementsService.checkAndGrantAchievements(studentId, paymentRequest.course_id);
+  } catch (achievementsError) {
+    console.error('Error granting achievements after enrollment approval (updateTransaction):', achievementsError);
   }
 }
 

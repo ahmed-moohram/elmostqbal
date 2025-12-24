@@ -13,17 +13,150 @@ if (!supabaseUrl || !supabaseKey) {
 
 const supabase = createClient(supabaseUrl, supabaseKey as string);
 
+type UserRow = {
+  id: string;
+  name: string | null;
+  role: 'student' | 'teacher' | 'admin' | string | null;
+  phone?: string | null;
+  student_phone?: string | null;
+};
+
+async function getUserById(userId: string): Promise<UserRow | null> {
+  const { data, error } = await supabase
+    .from('users')
+    .select('id,name,role,phone,student_phone')
+    .eq('id', userId)
+    .maybeSingle();
+
+  if (error) {
+    console.error('Error fetching user in /api/course-messages:', error);
+    return null;
+  }
+
+  return (data as any) || null;
+}
+
+async function getCourseInstructorId(courseId: string): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('courses')
+    .select('instructor_id')
+    .eq('id', courseId)
+    .maybeSingle();
+
+  if (error) {
+    console.error('Error fetching course instructor_id in /api/course-messages:', error);
+    return null;
+  }
+
+  return data?.instructor_id ? String(data.instructor_id) : null;
+}
+
+function normalizePhone(value: string | null | undefined): string {
+  return String(value || '')
+    .replace(/\s+/g, '')
+    .replace(/^\+?2/, '')
+    .trim();
+}
+
+function studentPhoneMatchesUser(user: UserRow, headerPhone: string | null): boolean {
+  const header = normalizePhone(headerPhone);
+  if (!header) return false;
+
+  const userPhone = normalizePhone(user.phone || null);
+  const userStudentPhone = normalizePhone((user as any).student_phone || null);
+
+  return header === userPhone || header === userStudentPhone;
+}
+
+async function isEnrollmentActive(courseId: string, userId: string): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('enrollments')
+    .select('is_active')
+    .eq('course_id', courseId)
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (error) {
+    console.error('Error checking enrollment in /api/course-messages:', error);
+    return false;
+  }
+
+  if (!data) return false;
+  return data.is_active !== false;
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = request.nextUrl;
     const courseId = searchParams.get('courseId');
-    const teacherId = searchParams.get('teacherId');
+    const userId = searchParams.get('userId');
 
-    if (!courseId && !teacherId) {
+    const roleCookie = request.cookies.get('user-role')?.value;
+    const authCookie =
+      request.cookies.get('auth-token')?.value || request.cookies.get('auth_token')?.value;
+    const cookieUserId = request.cookies.get('user-id')?.value;
+
+    if (!courseId) {
       return NextResponse.json(
-        { error: 'courseId or teacherId is required' },
+        { error: 'courseId is required' },
         { status: 400 }
       );
+    }
+
+    if (!userId) {
+      return NextResponse.json(
+        { error: 'userId is required' },
+        { status: 400 }
+      );
+    }
+
+    if (!authCookie || !roleCookie || !cookieUserId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    if (String(cookieUserId) !== String(userId)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    const user = await getUserById(userId);
+    if (!user || !user.role) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const role = String(user.role);
+
+    if (String(roleCookie) !== role) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    const headerPhone = request.headers.get('x-student-phone');
+    const hasPhoneOnUser = normalizePhone(user.phone || null) || normalizePhone((user as any).student_phone || null);
+    if (role === 'student' && hasPhoneOnUser && !studentPhoneMatchesUser(user, headerPhone)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    const instructorId = await getCourseInstructorId(courseId);
+    if (!instructorId) {
+      return NextResponse.json({ error: 'Course not found' }, { status: 404 });
+    }
+
+    if (role === 'teacher') {
+      if (String(user.id) !== String(instructorId)) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+    }
+
+    if (role === 'admin') {
+      if (String(user.id) !== String(instructorId)) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+    }
+
+    if (role === 'student') {
+      const enrolled = await isEnrollmentActive(courseId, userId);
+      if (!enrolled) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
     }
 
     let query = supabase
@@ -32,13 +165,7 @@ export async function GET(request: NextRequest) {
       .order('created_at', { ascending: true })
       .limit(200);
 
-    if (courseId) {
-      query = query.eq('course_id', courseId);
-    }
-
-    if (teacherId) {
-      query = query.eq('teacher_id', teacherId);
-    }
+    query = query.eq('course_id', courseId).eq('teacher_id', instructorId);
 
     const { data, error } = await query;
 
@@ -59,24 +186,87 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { courseId, teacherId, senderId, senderName, senderRole, content } = body;
+    const { courseId, userId, content } = body;
 
-    if (!courseId || !senderId || !senderRole || !content) {
+    const roleCookie = request.cookies.get('user-role')?.value;
+    const authCookie =
+      request.cookies.get('auth-token')?.value || request.cookies.get('auth_token')?.value;
+    const cookieUserId = request.cookies.get('user-id')?.value;
+
+    if (!courseId || !userId || !content) {
       return NextResponse.json(
-        { error: 'courseId, senderId, senderRole and content are required' },
+        { error: 'courseId, userId and content are required' },
         { status: 400 }
       );
     }
+
+    if (!authCookie || !roleCookie || !cookieUserId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    if (String(cookieUserId) !== String(userId)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    const user = await getUserById(String(userId));
+    if (!user || !user.role) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const role = String(user.role);
+
+    if (String(roleCookie) !== role) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+    const headerPhone = request.headers.get('x-student-phone');
+    const hasPhoneOnUser = normalizePhone(user.phone || null) || normalizePhone((user as any).student_phone || null);
+    if (role === 'student' && hasPhoneOnUser && !studentPhoneMatchesUser(user, headerPhone)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    const instructorId = await getCourseInstructorId(courseId);
+    if (!instructorId) {
+      return NextResponse.json({ error: 'Course not found' }, { status: 404 });
+    }
+
+    if (role === 'teacher') {
+      if (String(user.id) !== String(instructorId)) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+    }
+
+    if (role === 'admin') {
+      if (String(user.id) !== String(instructorId)) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+    }
+
+    if (role === 'student') {
+      const enrolled = await isEnrollmentActive(courseId, String(userId));
+      if (!enrolled) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+    }
+
+    const senderRole = role === 'admin' ? 'teacher' : role;
+    if (senderRole !== 'teacher' && senderRole !== 'student') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    const senderName =
+      role === 'admin'
+        ? 'مستر معتصم'
+        : user.name || (senderRole === 'teacher' ? 'المدرس' : 'طالب');
 
     const { data, error } = await supabase
       .from('course_messages')
       .insert({
         course_id: courseId,
-        teacher_id: teacherId || null,
-        sender_id: senderId,
-        sender_name: senderName || null,
+        teacher_id: instructorId,
+        sender_id: String(userId),
+        sender_name: senderName,
         sender_role: senderRole,
-        content,
+        content: String(content),
       })
       .select()
       .single();

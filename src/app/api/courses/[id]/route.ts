@@ -31,6 +31,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     level: form.get('level') != null ? String(form.get('level')) : undefined,
     thumbnail: form.get('thumbnail') != null ? String(form.get('thumbnail')) : undefined,
     duration_hours: form.get('duration') != null ? Number(form.get('duration')) : undefined,
+    students_count: form.get('studentsCount') != null ? Number(form.get('studentsCount')) : undefined,
   };
   const cleanUpdates = Object.fromEntries(Object.entries(updates).filter(([_, v]) => v !== undefined));
   const { data, error } = await supabase.from('courses').update(cleanUpdates).eq('id', params.id).select('*').single();

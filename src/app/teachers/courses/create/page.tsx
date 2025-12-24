@@ -8,8 +8,6 @@ import {
   FaArrowLeft,
   FaBook,
   FaGraduationCap,
-  FaListUl,
-  FaStar,
   FaUser,
   FaCheckCircle
 } from 'react-icons/fa';
@@ -32,9 +30,7 @@ export default function CreateCoursePage() {
   const [discountPrice, setDiscountPrice] = useState('');
   
   // Course Details (Optional)
-  const [requirements, setRequirements] = useState<string[]>(['']);
   const [targetAudience, setTargetAudience] = useState('');
-  const [features, setFeatures] = useState<string[]>(['']);
   const [instructorBio, setInstructorBio] = useState('');
   const [publishNow, setPublishNow] = useState(true);
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
@@ -85,34 +81,6 @@ export default function CreateCoursePage() {
     { value: 'advanced', label: 'الجامعة' },
     { value: 'all-levels', label: 'جميع المستويات' }
   ];
-
-  const handleAddRequirement = () => {
-    setRequirements([...requirements, '']);
-  };
-
-  const handleRemoveRequirement = (index: number) => {
-    setRequirements(requirements.filter((_, i) => i !== index));
-  };
-
-  const handleRequirementChange = (index: number, value: string) => {
-    const newRequirements = [...requirements];
-    newRequirements[index] = value;
-    setRequirements(newRequirements);
-  };
-
-  const handleAddFeature = () => {
-    setFeatures([...features, '']);
-  };
-
-  const handleRemoveFeature = (index: number) => {
-    setFeatures(features.filter((_, i) => i !== index));
-  };
-
-  const handleFeatureChange = (index: number, value: string) => {
-    const newFeatures = [...features];
-    newFeatures[index] = value;
-    setFeatures(newFeatures);
-  };
 
   const handleNext = () => {
     if (step === 1) {
@@ -434,88 +402,10 @@ export default function CreateCoursePage() {
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent resize-none"
                   />
                   <p className="text-sm text-gray-500 mt-2">
-                    وصف مختصر للطلاب المستهدفين
+                    اكتب لمن هذا الكورس مناسب (اختياري).
                   </p>
                 </div>
 
-                {/* Requirements */}
-                <div className="bg-white rounded-xl shadow-lg p-8">
-                  <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
-                    <FaListUl className="text-primary" />
-                    المتطلبات (اختياري)
-                  </h3>
-                  <p className="text-sm text-gray-600 mb-4">
-                    ما يجب أن يعرفه الطالب قبل البدء في الكورس
-                  </p>
-                  
-                  {requirements.map((req, index) => (
-                    <div key={index} className="flex gap-2 mb-3">
-                      <input
-                        type="text"
-                        value={req}
-                        onChange={(e) => handleRequirementChange(index, e.target.value)}
-                        placeholder="مثال: معرفة أساسيات الجبر"
-                        className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                      />
-                      {requirements.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveRequirement(index)}
-                          className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
-                        >
-                          حذف
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                  
-                  <button
-                    type="button"
-                    onClick={handleAddRequirement}
-                    className="mt-2 text-primary hover:text-primary-dark font-semibold"
-                  >
-                    + إضافة متطلب
-                  </button>
-                </div>
-
-                {/* Features */}
-                <div className="bg-white rounded-xl shadow-lg p-8">
-                  <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
-                    <FaStar className="text-primary" />
-                    مميزات الكورس (اختياري)
-                  </h3>
-                  
-                  {features.map((feature, index) => (
-                    <div key={index} className="flex gap-2 mb-3">
-                      <input
-                        type="text"
-                        value={feature}
-                        onChange={(e) => handleFeatureChange(index, e.target.value)}
-                        placeholder="مثال: 40 محاضرة متكاملة"
-                        className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                      />
-                      {features.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveFeature(index)}
-                          className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
-                        >
-                          حذف
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                  
-                  <button
-                    type="button"
-                    onClick={handleAddFeature}
-                    className="mt-2 text-primary hover:text-primary-dark font-semibold"
-                  >
-                    + إضافة ميزة
-                  </button>
-                </div>
-
-                {/* Instructor Bio */}
                 <div className="bg-white rounded-xl shadow-lg p-8">
                   <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
                     <FaGraduationCap className="text-primary" />
@@ -578,27 +468,7 @@ export default function CreateCoursePage() {
                     </div>
                   )}
 
-                  {requirements.filter(r => r.trim()).length > 0 && (
-                    <div>
-                      <span className="text-sm text-gray-500">المتطلبات:</span>
-                      <ul className="list-disc list-inside">
-                        {requirements.filter(r => r.trim()).map((req, i) => (
-                          <li key={i} className="font-semibold">{req}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {features.filter(f => f.trim()).length > 0 && (
-                    <div>
-                      <span className="text-sm text-gray-500">المميزات:</span>
-                      <ul className="list-disc list-inside">
-                        {features.filter(f => f.trim()).map((feat, i) => (
-                          <li key={i} className="font-semibold">{feat}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
+                  {null}
 
                   <div className="mt-4 flex items-center gap-3">
                     <input

@@ -2,7 +2,6 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useAuth } from './AuthContext';
-import { apiClient, API_BASE_URL } from '@/lib/api';
 import supabase from '@/lib/supabase-client';
 
 interface CourseProgress {
@@ -38,7 +37,7 @@ interface ProgressContextType {
 const ProgressContext = createContext<ProgressContextType | undefined>(undefined);
 
 export function ProgressProvider({ children }: { children: ReactNode }) {
-  const { user, token } = useAuth();
+  const { user } = useAuth();
   const [coursesProgress, setCoursesProgress] = useState<Record<string, CourseProgress>>({});
   const [quizResults, setQuizResults] = useState<QuizResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -165,26 +164,6 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
 
       setCoursesProgress(newProgress);
       saveLocalProgress(newProgress);
-
-      // إرسال للخادم إذا كان المستخدم مسجل
-      if (token) {
-        try {
-          await fetch(`${API_BASE_URL}/api/students/progress`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              courseId,
-              videoId,
-              action: 'complete',
-            }),
-          });
-        } catch (error) {
-          console.error('Error syncing progress:', error);
-        }
-      }
     }
   };
 
@@ -222,21 +201,6 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('Error saving quiz result:', error);
     }
-
-    if (token) {
-      try {
-        await fetch(`${API_BASE_URL}/api/students/quiz-results`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(result),
-        });
-      } catch (error) {
-        console.error('Error syncing quiz result:', error);
-      }
-    }
   };
 
   const getCourseProgress = (courseId: string): CourseProgress | null => {
@@ -244,7 +208,7 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
   };
 
   const refreshProgress = async () => {
-    if (user && token) {
+    if (user) {
       await loadProgress();
     } else {
       loadLocalProgress();
