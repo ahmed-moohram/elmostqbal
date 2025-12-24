@@ -15,7 +15,9 @@ export { supabase };
 
 export const getCourses = async (isPublished?: boolean) => {
   try {
-    let query = supabase.from('courses').select('*');
+    let query = supabase
+      .from('courses')
+      .select('*, instructor_user:users!courses_instructor_id_fkey(id, name, avatar_url, profile_picture)');
 
     // إذا طلبنا فقط الكورسات المنشورة، نستخدم حقل status ليتماشى مع RLS
     // RLS تسمح بالعرض عندما يكون status = 'published' و is_active = TRUE
@@ -34,13 +36,25 @@ export const getCourses = async (isPublished?: boolean) => {
     if (error) throw error;
     
     // تحويل البيانات للشكل المطلوب
-    const transformedCourses = (data || []).map(course => ({
+    const transformedCourses = (data || []).map((course: any) => {
+      const instructorName =
+        course?.instructor_user?.name ||
+        'غير محدد';
+
+      const instructorImage =
+        course?.instructor_user?.avatar_url ||
+        course?.instructor_user?.profile_picture ||
+        null;
+
+      return {
       id: course.id,
       _id: course.id, // للتوافق مع الكود القديم
       title: course.title || 'بدون عنوان',
       description: course.description || '',
-      instructor: course.instructor_name || 'غير محدد',
+      instructor: instructorName,
+      instructor_name: instructorName,
       instructorId: course.instructor_id,
+      instructor_image: instructorImage,
       price: course.price || 0,
       discountPrice: course.discount_price,
       thumbnail: course.thumbnail || '/placeholder-course.jpg',
@@ -53,7 +67,8 @@ export const getCourses = async (isPublished?: boolean) => {
       rating: course.rating || 0,
       studentsCount: course.students_count || 0,
       createdAt: course.created_at
-    }));
+      };
+    });
     
     return { success: true, data: transformedCourses };
   } catch (error) {
@@ -68,7 +83,8 @@ export const getCourseById = async (courseId: string) => {
       .from('courses')
       .select(`
         *,
-        lessons(*)
+        lessons(*),
+        instructor_user:users!courses_instructor_id_fkey(id, name, avatar_url, profile_picture, phone, student_phone, parent_phone)
       `)
       .eq('id', courseId)
       .single();
@@ -76,13 +92,24 @@ export const getCourseById = async (courseId: string) => {
     if (error) throw error;
     
     // تحويل البيانات
+    const instructorName =
+      (data as any)?.instructor_user?.name ||
+      'غير محدد';
+
+    const instructorImage =
+      (data as any)?.instructor_user?.avatar_url ||
+      (data as any)?.instructor_user?.profile_picture ||
+      null;
+
     const transformedCourse = {
       id: data.id,
       _id: data.id,
       title: data.title,
       description: data.description,
-      instructor: data.instructor_name,
+      instructor: instructorName,
+      instructor_name: instructorName,
       instructorId: data.instructor_id,
+      instructor_image: instructorImage,
       price: data.price,
       thumbnail: data.thumbnail,
       category: data.category,

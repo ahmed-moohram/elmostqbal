@@ -1,6 +1,3 @@
-import { jwtDecode } from 'jwt-decode';
-import Cookies from 'js-cookie';
-
 // تعريف نوع المستخدم
 export interface User {
   id: string;
@@ -38,13 +35,92 @@ const cookieOptions = {
   path: '/'
 };
 
+type CookieOptions = {
+  expires?: number;
+  secure?: boolean;
+  sameSite?: 'strict' | 'lax' | 'none';
+  path?: string;
+};
+
+const setCookie = (name: string, value: string, options: CookieOptions = {}): void => {
+  if (typeof document === 'undefined') return;
+
+  let cookie = `${encodeURIComponent(name)}=${encodeURIComponent(value)}`;
+
+  if (typeof options.expires === 'number') {
+    const expiresDate = new Date();
+    expiresDate.setTime(expiresDate.getTime() + options.expires * 24 * 60 * 60 * 1000);
+    cookie += `; Expires=${expiresDate.toUTCString()}`;
+  }
+  if (options.path) cookie += `; Path=${options.path}`;
+  if (options.sameSite) cookie += `; SameSite=${options.sameSite}`;
+  if (options.secure) cookie += '; Secure';
+
+  document.cookie = cookie;
+};
+
+const getCookie = (name: string): string | null => {
+  if (typeof document === 'undefined') return null;
+  const encodedName = encodeURIComponent(name) + '=';
+  const parts = (document.cookie || '').split('; ');
+
+  for (const part of parts) {
+    if (part.startsWith(encodedName)) {
+      return decodeURIComponent(part.substring(encodedName.length));
+    }
+  }
+  return null;
+};
+
+const removeCookie = (name: string, options: CookieOptions = {}): void => {
+  if (typeof document === 'undefined') return;
+  let cookie = `${encodeURIComponent(name)}=; Expires=${new Date(0).toUTCString()}`;
+  if (options.path) cookie += `; Path=${options.path}`;
+  if (options.sameSite) cookie += `; SameSite=${options.sameSite}`;
+  if (options.secure) cookie += '; Secure';
+  document.cookie = cookie;
+};
+
+const base64UrlDecodeToUtf8 = (base64Url: string): string => {
+  const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+  const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
+
+  const atobFn = (globalThis as any)?.atob as ((input: string) => string) | undefined;
+  if (typeof atobFn === 'function') {
+    const binary = atobFn(padded);
+    const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
+    const textDecoder = (globalThis as any)?.TextDecoder as (new () => TextDecoder) | undefined;
+    if (typeof textDecoder === 'function') {
+      return new textDecoder().decode(bytes);
+    }
+
+    let result = '';
+    for (let i = 0; i < bytes.length; i++) result += String.fromCharCode(bytes[i]);
+    return decodeURIComponent(escape(result));
+  }
+
+  const bufferCtor = (globalThis as any)?.Buffer as any;
+  if (bufferCtor) {
+    return bufferCtor.from(padded, 'base64').toString('utf-8');
+  }
+
+  throw new Error('JWT decode not supported in this runtime');
+};
+
+const decodeJwt = <T,>(token: string): T => {
+  const parts = token.split('.');
+  if (parts.length < 2) throw new Error('Invalid token');
+  const json = base64UrlDecodeToUtf8(parts[1]);
+  return JSON.parse(json) as T;
+};
+
 /**
  * تسجيل دخول المستخدم وتخزين الـ token في cookie
  */
 export const login = (token: string): User | null => {
   try {
     // فك تشفير الـ token
-    const decoded = jwtDecode<JwtPayload>(token);
+    const decoded = decodeJwt<JwtPayload>(token);
     
     // التحقق من انتهاء صلاحية الـ token
     if (decoded.exp * 1000 < Date.now()) {
@@ -53,7 +129,7 @@ export const login = (token: string): User | null => {
     }
     
     // تخزين الـ token في cookie بدلاً من localStorage
-    Cookies.set(AUTH_COOKIE_NAME, token, cookieOptions);
+    setCookie(AUTH_COOKIE_NAME, token, cookieOptions);
     
     // إرجاع معلومات المستخدم
     const user: User = {
@@ -75,14 +151,14 @@ export const login = (token: string): User | null => {
  * تسجيل خروج المستخدم وحذف الـ token
  */
 export const logout = (): void => {
-  Cookies.remove(AUTH_COOKIE_NAME);
+  removeCookie(AUTH_COOKIE_NAME, cookieOptions);
 };
 
 /**
  * الحصول على الـ token الحالي
  */
 export const getToken = (): string | null => {
-  return Cookies.get(AUTH_COOKIE_NAME) || null;
+  return getCookie(AUTH_COOKIE_NAME);
 };
 
 /**
@@ -96,7 +172,7 @@ export const getCurrentUser = (): User | null => {
   }
   
   try {
-    const decoded = jwtDecode<JwtPayload>(token);
+    const decoded = decodeJwt<JwtPayload>(token);
     
     // التحقق من انتهاء صلاحية الـ token
     if (decoded.exp * 1000 < Date.now()) {

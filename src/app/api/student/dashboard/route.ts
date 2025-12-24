@@ -41,7 +41,15 @@ export async function GET(request: NextRequest) {
       .from('enrollments')
       .select(`
         *,
-        course:courses(*)
+        course:courses(
+          *,
+          instructor_user:users!courses_instructor_id_fkey(
+            id,
+            name,
+            avatar_url,
+            profile_picture
+          )
+        )
       `)
       .eq('user_id', userId)
       .not('is_active', 'eq', false);
@@ -66,7 +74,15 @@ export async function GET(request: NextRequest) {
           course_id,
           is_active,
           created_at,
-          course:courses(*)
+          course:courses(
+            *,
+            instructor_user:users!courses_instructor_id_fkey(
+              id,
+              name,
+              avatar_url,
+              profile_picture
+            )
+          )
         `)
         .eq('student_id', userId)
         .eq('is_active', true);
@@ -156,7 +172,14 @@ export async function GET(request: NextRequest) {
             // جلب بيانات الكورسات المرتبطة بهذه الطلبات
             const { data: paymentCourses, error: paymentCoursesError } = await supabase
               .from('courses')
-              .select('*')
+              .select(
+                `*, instructor_user:users!courses_instructor_id_fkey(
+                  id,
+                  name,
+                  avatar_url,
+                  profile_picture
+                )`
+              )
               .in('id', courseIdsForPayments as any);
 
             if (paymentCoursesError) {
@@ -241,6 +264,25 @@ export async function GET(request: NextRequest) {
     // حساب عدد الدروس في كل كورس مسجَّل فيه الطالب حتى يمكن للواجهة عرض 0/عدد_الدروس الحقيقي
     let enrichedEnrollments = enrollments || [];
 
+    // إضافة instructor_name مشتق للكورسات حتى تظل الواجهة تعمل بدون عمود courses.instructor_name
+    enrichedEnrollments = (enrichedEnrollments || []).map((enr: any) => {
+      const course = enr?.course || null;
+      if (!course) return enr;
+
+      const derivedInstructorName =
+        course?.instructor_name ||
+        course?.instructor_user?.name ||
+        'غير محدد';
+
+      return {
+        ...enr,
+        course: {
+          ...course,
+          instructor_name: derivedInstructorName,
+        },
+      };
+    });
+
     try {
       const enrolledCourseIdsForLessons = (enrollments || [])
         .map((enrollment: any) => enrollment.course_id)
@@ -256,27 +298,6 @@ export async function GET(request: NextRequest) {
           console.warn('Error fetching lessons for student dashboard (ignored):', lessonsError.message);
         } else if (lessons) {
           const counts = new Map<string, number>();
-          lessons.forEach((l: any) => {
-            const key = String(l.course_id);
-            counts.set(key, (counts.get(key) || 0) + 1);
-          });
-
-          enrichedEnrollments = (enrollments || []).map((enr: any) => {
-            const c = enr.course || {};
-            const key = String(enr.course_id || c.id || '');
-            const lessonsCount = counts.get(key) ?? c.lessons_count ?? c.total_lessons ?? 0;
-
-            return {
-              ...enr,
-              course: c
-                ? {
-                    ...c,
-                    lessons_count: lessonsCount,
-                    total_lessons: lessonsCount,
-                  }
-                : c,
-            };
-          });
         }
       }
     } catch (lessonsAggError) {

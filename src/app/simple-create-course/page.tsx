@@ -20,13 +20,44 @@ export default function SimpleCreateCoursePage() {
     try {
       console.log('🚀 إنشاء كورس جديد:', title);
 
+      // تحديد instructor_id صالح (UUID)
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      let instructorId: string | null = null;
+
+      // نحاول استخدام المستخدم الحالي إن كان مسجلاً في supabase auth
+      try {
+        const { data: authData } = await supabase.auth.getUser();
+        const authUserId = authData?.user?.id || null;
+        if (authUserId && uuidRegex.test(String(authUserId))) {
+          instructorId = String(authUserId);
+        }
+      } catch {
+        // ignore
+      }
+
+      if (!instructorId) {
+        const { data: teacher, error: teacherError } = await supabase
+          .from('users')
+          .select('id')
+          .eq('role', 'teacher')
+          .limit(1)
+          .maybeSingle();
+
+        if (teacherError || !teacher?.id || !uuidRegex.test(String(teacher.id))) {
+          alert('❌ لا يمكن إنشاء الكورس: لم يتم العثور على مدرس (instructor_id) صالح في قاعدة البيانات');
+          return;
+        }
+
+        instructorId = String(teacher.id);
+      }
+
       // إنشاء الكورس مباشرة
       const { data: course, error } = await supabase
         .from('courses')
         .insert({
           title: title,
           description: 'كورس تجريبي',
-          instructor_name: 'مدرس تجريبي',
+          instructor_id: instructorId,
           price: 0,
           duration_hours: 1,
           level: 'beginner',

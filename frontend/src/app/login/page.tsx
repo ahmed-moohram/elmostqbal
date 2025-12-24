@@ -100,7 +100,7 @@ export default function LoginPage() {
         document.cookie = `user-role=${encodeURIComponent(user.role)}; path=/`;
       }
 
-      const redirect = searchParams.get('redirect');
+      const redirect = searchParams?.get('redirect');
       if (redirect && redirect.startsWith('/')) {
         router.replace(redirect);
         return;

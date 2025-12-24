@@ -57,10 +57,35 @@ export default function AdminMyCoursesPage() {
       try {
         setLoadingCourses(true);
 
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        let instructorId: string | null = user.id;
+
+        if (!uuidRegex.test(String(instructorId || '')) && typeof user.phone === 'string' && user.phone) {
+          try {
+            const { data: userRow } = await supabase
+              .from('users')
+              .select('id')
+              .or(`phone.eq.${user.phone},student_phone.eq.${user.phone},parent_phone.eq.${user.phone}`)
+              .maybeSingle();
+
+            if (userRow?.id && uuidRegex.test(String(userRow.id))) {
+              instructorId = String(userRow.id);
+            }
+          } catch (resolveErr) {
+            console.error('Error resolving admin UUID for my courses:', resolveErr);
+          }
+        }
+
+        if (!instructorId || !uuidRegex.test(String(instructorId))) {
+          toast.error('تعذر تحديد حساب الأدمن داخل قاعدة البيانات. برجاء تسجيل الدخول مرة أخرى بعد إنشاء مستخدم أدمن في جدول users.');
+          setCourses([]);
+          return;
+        }
+
         const { data, error } = await supabase
           .from('courses')
           .select('id, title, short_description, thumbnail, students_count, total_lessons, status, created_at')
-          .eq('instructor_id', user.id)
+          .eq('instructor_id', instructorId)
           .order('created_at', { ascending: false });
 
         if (error) {
@@ -81,7 +106,7 @@ export default function AdminMyCoursesPage() {
     };
 
     load();
-  }, [isLoading, isAuthenticated, user, router]);
+  }, [isLoading, isAuthenticated, user, router, displayName]);
 
   return (
     <AdminLayout>

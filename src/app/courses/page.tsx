@@ -113,13 +113,13 @@ const CoursesPage = () => {
               image: course.instructor_image || '/default-instructor.jpg'
             },
             price: course.price || 0,
-            discountPrice: course.discount_price,
+            discountPrice: course.discountPrice ?? course.discount_price,
             rating: course.rating || 0,
-            studentsCount: course.students_count || 0,
+            studentsCount: course.studentsCount ?? course.students_count ?? 0,
             category: course.category || 'عام',
             level: course.level || 'مبتدئ',
             thumbnail,
-            isFeatured: course.is_featured || false,
+            isFeatured: course.isFeatured ?? course.is_featured ?? false,
             // إضافة الحقول المطلوبة
             slug: course.slug || course.title?.toLowerCase().replace(/\s+/g, '-'),
             ratingCount: course.rating_count || 0,

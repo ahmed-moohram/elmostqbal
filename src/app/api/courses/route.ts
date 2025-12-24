@@ -2,12 +2,18 @@ import { NextRequest, NextResponse } from 'next/server';
 import supabase from '@/lib/supabase-client';
 
 export async function GET() {
-  const { data, error } = await supabase.from('courses').select('*').order('created_at', { ascending: false });
+  const { data, error } = await supabase
+    .from('courses')
+    .select('*, instructor_user:users!courses_instructor_id_fkey(id, name, avatar_url, profile_picture)')
+    .order('created_at', { ascending: false });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   const items = (data || []).map((c: any) => ({
     id: c.id,
     title: c.title || '',
     description: c.description || '',
+    instructor: c?.instructor_user?.name || null,
+    instructor_name: c?.instructor_user?.name || null,
+    instructor_image: c?.instructor_user?.avatar_url || c?.instructor_user?.profile_picture || null,
     price: c.price ?? 0,
     discountPrice: c.discount_price ?? null,
     isPublished: c.is_published ?? false,
@@ -58,6 +64,17 @@ export async function POST(request: NextRequest) {
     category: String(form.get('category') || ''),
     level: String(form.get('level') || 'مبتدئ'),
   };
+
+  const role = request.cookies.get('user-role')?.value || null;
+  const cookieUserId = request.cookies.get('user-id')?.value || null;
+
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+  if (!payload.instructor_id && cookieUserId && (role === 'admin' || role === 'teacher')) {
+    if (uuidRegex.test(String(cookieUserId))) {
+      payload.instructor_id = cookieUserId;
+    }
+  }
 
   const { data, error } = await supabase.from('courses').insert(payload).select('*').single();
 

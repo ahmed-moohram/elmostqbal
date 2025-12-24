@@ -54,8 +54,11 @@ export default function CertificateGenerator() {
           *,
           courses:course_id (
             title,
-            instructor_name,
-            price
+            price,
+            instructor_id,
+            instructor_user:users!courses_instructor_id_fkey(
+              name
+            )
           )
         `)
         .eq('student_id', user.id)
@@ -67,7 +70,25 @@ export default function CertificateGenerator() {
         return;
       }
 
-      setCertificates(certs || []);
+      const normalizedCertificates = (certs || []).map((cert: any) => {
+        const derivedInstructorName =
+          cert?.instructor_name ||
+          cert?.courses?.instructor_user?.name ||
+          'غير محدد';
+
+        const derivedCourseName =
+          cert?.course_name ||
+          cert?.courses?.title ||
+          cert?.course_name;
+
+        return {
+          ...cert,
+          course_name: derivedCourseName,
+          instructor_name: derivedInstructorName,
+        };
+      });
+
+      setCertificates(normalizedCertificates);
 
       // جلب بيانات الطالب
       const { data: student } = await supabase
@@ -96,7 +117,15 @@ export default function CertificateGenerator() {
       // التحقق من إتمام الكورس
       const { data: enrollment, error: enrollmentError } = await supabase
         .from('course_enrollments')
-        .select('*, courses:course_id(*)')
+        .select(`
+          *,
+          courses:course_id(
+            *,
+            instructor_user:users!courses_instructor_id_fkey(
+              name
+            )
+          )
+        `)
         .eq('student_id', user.id)
         .eq('course_id', courseId)
         .single();
@@ -115,6 +144,11 @@ export default function CertificateGenerator() {
       const certificateNumber = `CERT-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
       const verificationUrl = `https://platform.edu/verify/${certificateNumber}`;
 
+      const resolvedInstructorName =
+        (enrollment as any)?.courses?.instructor_user?.name ||
+        (enrollment as any)?.courses?.instructor ||
+        'غير محدد';
+
       // حفظ الشهادة في قاعدة البيانات
       const { data: certificate, error: certError } = await supabase
         .from('certificates')
@@ -123,7 +157,7 @@ export default function CertificateGenerator() {
           student_name: studentData?.name || user.email,
           course_id: courseId,
           course_name: enrollment.courses.title,
-          instructor_name: enrollment.courses.instructor_name,
+          instructor_name: resolvedInstructorName,
           certificate_number: certificateNumber,
           completion_percentage: enrollment.progress_percentage,
           grade: calculateGrade(enrollment.progress_percentage),

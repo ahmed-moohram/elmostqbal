@@ -86,7 +86,7 @@ export default function Home() {
         // جلب الكورسات المميزة والمنشورة فقط من المشروع الجديد
         const { data: courses, error } = await supabase
           .from('courses')
-          .select('*')
+          .select('*, instructor_user:users!courses_instructor_id_fkey(id, name, avatar_url, profile_picture)')
           .eq('is_published', true)
           .eq('is_featured', true)
           .limit(3)
@@ -106,7 +106,7 @@ export default function Home() {
             description: course.description,
             price: course.price,
             thumbnail: course.thumbnail || '/placeholder-course.png',
-            instructor: course.instructor_name || 'المدرس',
+            instructor: course?.instructor_user?.name || 'المدرس',
             rating: course.rating ?? 0,
             studentsCount: (course as any).students_count ?? (course as any).enrollment_count ?? 0,
             category: course.category || 'عام',

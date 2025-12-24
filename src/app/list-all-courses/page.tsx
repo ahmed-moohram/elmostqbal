@@ -15,7 +15,7 @@ export default function ListAllCoursesPage() {
       try {
         const { data, error: fetchError } = await supabase
           .from('courses')
-          .select('*')
+          .select('*, instructor_user:users!courses_instructor_id_fkey(id, name, avatar_url, profile_picture)')
           .order('created_at', { ascending: false });
 
         if (fetchError) {
@@ -23,7 +23,11 @@ export default function ListAllCoursesPage() {
           setError('فشل جلب الكورسات: ' + fetchError.message);
         } else {
           console.log(`✅ تم جلب ${data?.length || 0} كورس`);
-          setCourses(data || []);
+          const enriched = (data || []).map((course: any) => ({
+            ...course,
+            instructor_name: course?.instructor_user?.name || course?.instructor_name || null,
+          }));
+          setCourses(enriched);
         }
       } catch (err: any) {
         console.error('❌ خطأ:', err);

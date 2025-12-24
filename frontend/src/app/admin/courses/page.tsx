@@ -46,7 +46,7 @@ export default function AdminCoursesPage() {
       // جلب الدورات من قاعدة البيانات
       const { data: coursesData, error: fetchError } = await supabase
         .from('courses')
-        .select('*')
+        .select('*, instructor_user:users!courses_instructor_id_fkey(id, name, avatar_url, profile_picture)')
         .order('created_at', { ascending: false });
       
       if (fetchError) {
@@ -66,7 +66,7 @@ export default function AdminCoursesPage() {
         image: course.thumbnail || '/course-placeholder.png',
         isPublished: course.is_published || false,
         isFeatured: course.is_featured || false,
-        instructor: course.instructor_name || 'غير محدد',
+        instructor: course?.instructor_user?.name || 'غير محدد',
         category: course.category || 'عام',
         level: course.level || 'مبتدئ',
         duration: course.duration_hours || 0,

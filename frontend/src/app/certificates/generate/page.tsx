@@ -54,7 +54,8 @@ export default function CertificateGenerator() {
           *,
           courses:course_id (
             title,
-            instructor_name,
+            instructor_id,
+            instructor_user:users!courses_instructor_id_fkey(name, avatar_url, profile_picture),
             price
           )
         `)
@@ -67,7 +68,18 @@ export default function CertificateGenerator() {
         return;
       }
 
-      setCertificates(certs || []);
+      const enrichedCerts = (certs || []).map((cert: any) => {
+        const derivedCourseName = cert?.courses?.title || cert?.course_name || '';
+        const derivedInstructorName =
+          cert?.instructor_name || cert?.courses?.instructor_user?.name || 'غير محدد';
+        return {
+          ...cert,
+          course_name: derivedCourseName,
+          instructor_name: derivedInstructorName,
+        };
+      });
+
+      setCertificates(enrichedCerts);
 
       // جلب بيانات الطالب
       const { data: student } = await supabase
@@ -96,7 +108,7 @@ export default function CertificateGenerator() {
       // التحقق من إتمام الكورس
       const { data: enrollment, error: enrollmentError } = await supabase
         .from('course_enrollments')
-        .select('*, courses:course_id(*)')
+        .select('*, courses:course_id(id, title, instructor_id, duration_hours, instructor_user:users!courses_instructor_id_fkey(name))')
         .eq('student_id', user.id)
         .eq('course_id', courseId)
         .single();
@@ -115,6 +127,9 @@ export default function CertificateGenerator() {
       const certificateNumber = `CERT-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
       const verificationUrl = `https://platform.edu/verify/${certificateNumber}`;
 
+      const resolvedInstructorName =
+        enrollment?.courses?.instructor_user?.name || 'غير محدد';
+
       // حفظ الشهادة في قاعدة البيانات
       const { data: certificate, error: certError } = await supabase
         .from('certificates')
@@ -123,7 +138,7 @@ export default function CertificateGenerator() {
           student_name: studentData?.name || user.email,
           course_id: courseId,
           course_name: enrollment.courses.title,
-          instructor_name: enrollment.courses.instructor_name,
+          instructor_name: resolvedInstructorName,
           certificate_number: certificateNumber,
           completion_percentage: enrollment.progress_percentage,
           grade: calculateGrade(enrollment.progress_percentage),

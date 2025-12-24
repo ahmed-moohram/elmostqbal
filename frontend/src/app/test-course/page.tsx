@@ -20,7 +20,6 @@ export default function TestCoursePage() {
       const courseData = {
         title: 'كورس تجريبي ' + new Date().getTime(),
         description: 'هذا كورس تجريبي',
-        instructor_name: 'مدرس تجريبي',
         price: 0,
         duration_hours: 1,
         level: 'beginner',

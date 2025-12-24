@@ -58,7 +58,9 @@ export const signOut = async () => {
 // دوال مساعدة للكورسات
 export const getCourses = async (filters?: any) => {
   try {
-    let query = supabase.from('courses').select('*');
+    let query = supabase
+      .from('courses')
+      .select('*, instructor_user:users!courses_instructor_id_fkey(id, name, avatar_url, profile_picture)');
     
     if (filters?.published !== undefined) {
       query = query.eq('is_published', filters.published);
@@ -75,7 +77,17 @@ export const getCourses = async (filters?: any) => {
     const { data, error } = await query.order('created_at', { ascending: false });
     
     if (error) throw error;
-    return { success: true, data };
+
+    const enriched = (data || []).map((course: any) => ({
+      ...course,
+      instructor_name: course?.instructor_user?.name || course?.instructor_name || null,
+      instructor_image:
+        course?.instructor_user?.avatar_url ||
+        course?.instructor_user?.profile_picture ||
+        null,
+    }));
+
+    return { success: true, data: enriched };
   } catch (error: any) {
     return { success: false, error: error.message };
   }
@@ -85,12 +97,24 @@ export const getCourseById = async (id: string) => {
   try {
     const { data, error } = await supabase
       .from('courses')
-      .select('*')
+      .select('*, instructor_user:users!courses_instructor_id_fkey(id, name, avatar_url, profile_picture)')
       .eq('id', id)
       .single();
     
     if (error) throw error;
-    return { success: true, data };
+
+    const enriched = data
+      ? {
+          ...data,
+          instructor_name: (data as any)?.instructor_user?.name || (data as any)?.instructor_name || null,
+          instructor_image:
+            (data as any)?.instructor_user?.avatar_url ||
+            (data as any)?.instructor_user?.profile_picture ||
+            null,
+        }
+      : data;
+
+    return { success: true, data: enriched };
   } catch (error: any) {
     return { success: false, error: error.message };
   }

@@ -260,7 +260,6 @@ export default function EnhancedNewCoursePage() {
       const courseData = {
         title,
         description,
-        instructor_name: 'المدرب',
         price,
         level,
         category,

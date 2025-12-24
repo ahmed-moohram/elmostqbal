@@ -10,9 +10,26 @@ if (!supabaseUrl || !supabaseServiceKey) {
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
-  const { data, error } = await supabase.from('courses').select('*').eq('id', params.id).single();
+  const { data, error } = await supabase
+    .from('courses')
+    .select('*, instructor_user:users!courses_instructor_id_fkey(id, name, avatar_url, profile_picture)')
+    .eq('id', params.id)
+    .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 404 });
-  return NextResponse.json(data);
+
+  const enriched = data
+    ? {
+        ...data,
+        instructor: (data as any)?.instructor_user?.name || null,
+        instructor_name: (data as any)?.instructor_user?.name || null,
+        instructor_image:
+          (data as any)?.instructor_user?.avatar_url ||
+          (data as any)?.instructor_user?.profile_picture ||
+          null,
+      }
+    : data;
+
+  return NextResponse.json(enriched);
 }
 
 export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
@@ -34,9 +51,27 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     students_count: form.get('studentsCount') != null ? Number(form.get('studentsCount')) : undefined,
   };
   const cleanUpdates = Object.fromEntries(Object.entries(updates).filter(([_, v]) => v !== undefined));
-  const { data, error } = await supabase.from('courses').update(cleanUpdates).eq('id', params.id).select('*').single();
+  const { data, error } = await supabase
+    .from('courses')
+    .update(cleanUpdates)
+    .eq('id', params.id)
+    .select('*, instructor_user:users!courses_instructor_id_fkey(id, name, avatar_url, profile_picture)')
+    .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(data);
+
+  const enriched = data
+    ? {
+        ...data,
+        instructor: (data as any)?.instructor_user?.name || null,
+        instructor_name: (data as any)?.instructor_user?.name || null,
+        instructor_image:
+          (data as any)?.instructor_user?.avatar_url ||
+          (data as any)?.instructor_user?.profile_picture ||
+          null,
+      }
+    : data;
+
+  return NextResponse.json(enriched);
 }
 
 export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {

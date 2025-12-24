@@ -20,7 +20,6 @@ export default function TestCourseDebugPage() {
       const courseData = {
         title: 'كورس تجريبي مع فيديوهات ' + new Date().getTime(),
         description: 'كورس تجريبي لاختبار الفيديوهات',
-        instructor_name: 'مدرس تجريبي',
         price: 200,
         duration_hours: 3,
         level: 'beginner',

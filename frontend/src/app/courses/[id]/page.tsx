@@ -160,7 +160,7 @@ function CoursePage() {
       
       const { data: courseData, error: fetchError } = await supabase
         .from('courses')
-        .select('*')
+        .select('*, instructor_user:users!courses_instructor_id_fkey(id, name, avatar_url, profile_picture, phone)')
         .eq('id', courseId)
         .single();
       
@@ -195,6 +195,21 @@ function CoursePage() {
       }
       
       console.log('✅ تم جلب بيانات الكورس:', courseData);
+      
+      const resolvedInstructorName =
+        courseData?.instructor_user?.name || courseData?.instructor_name || 'المدرس';
+
+      const resolvedInstructorAvatar =
+        courseData?.instructor_user?.avatar_url ||
+        courseData?.instructor_user?.profile_picture ||
+        courseData?.instructor_avatar ||
+        '/default-instructor.svg';
+
+      const resolvedInstructorPhone =
+        courseData?.instructor_user?.phone ||
+        courseData?.instructor_phone ||
+        courseData?.vodafone_cash ||
+        '01012345678';
       
       // جلب الأقسام والدروس عبر section_id فقط
       const { data: sections, error: sectionsError } = await supabase
@@ -255,8 +270,8 @@ function CoursePage() {
         price: courseData.price,
         thumbnail: courseData.thumbnail || '/placeholder-course.png',
         instructor: {
-          name: courseData.instructor_name || 'المدرس',
-          image: '/default-instructor.svg'
+          name: resolvedInstructorName,
+          image: resolvedInstructorAvatar
         },
         // التقييم والعدد يعتمدان فقط على قيم الجدول، وإذا لم توجد = 0
         rating: courseData.rating ?? 0,
@@ -281,18 +296,18 @@ function CoursePage() {
         id: courseData.id,
         title: courseData.title,
         price: courseData.price,
-        instructor_name: courseData.instructor_name || formattedCourse.instructor?.name,
-        instructor_phone: courseData.instructor_phone || courseData.vodafone_cash || '01012345678'
+        instructor_name: resolvedInstructorName,
+        instructor_phone: resolvedInstructorPhone
       };
       localStorage.setItem('currentCourse', JSON.stringify(currentCourseData));
       console.log('💾 تم حفظ بيانات الكورس:', currentCourseData);
       
       // تعيين معلومات المدرس
       setTeacherInfo({
-        id: courseData.teacher_id || '1',
-        name: courseData.instructor_name || formattedCourse.instructor?.name || 'أ. محمد أحمد',
-        avatar: courseData.instructor_avatar || formattedCourse.instructor?.image || '/teacher-avatar.jpg',
-        phone: courseData.instructor_phone || courseData.vodafone_cash || '01012345678' // رقم فودافون كاش
+        id: courseData.teacher_id || courseData.instructor_id || '1',
+        name: resolvedInstructorName,
+        avatar: resolvedInstructorAvatar || '/teacher-avatar.jpg',
+        phone: resolvedInstructorPhone
       });
       
       // حساب التقدم من localStorage

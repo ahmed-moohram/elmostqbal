@@ -134,7 +134,7 @@ export const getAdminCourses = async () => {
   try {
     const { data, error } = await supabase
       .from('courses')
-      .select('*')
+      .select('*, instructor_user:users!courses_instructor_id_fkey(id, name, avatar_url, profile_picture)')
       .order('created_at', { ascending: false });
 
     if (error) throw error;
@@ -145,7 +145,7 @@ export const getAdminCourses = async () => {
       title: course.title,
       description: course.description,
       price: course.price,
-      instructor: course.instructor_name,
+      instructor: course?.instructor_user?.name || 'غير محدد',
       thumbnail: course.thumbnail,
       isPublished: course.is_published,
       enrolledStudents: course.enrollment_count || 0,

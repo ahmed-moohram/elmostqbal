@@ -267,33 +267,38 @@ export default function EnhancedNewCoursePage() {
 
       const storedUserRaw = localStorage.getItem('user');
       const storedUser = storedUserRaw ? JSON.parse(storedUserRaw) : null;
-      const adminName: string = 'مستر معتصم';
       const adminPhone: string | null = storedUser?.phone || null;
 
       let instructorId: string | null = storedUser?.id || null;
 
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
       // لو id المخزّن شكل تجريبي (admin-001) نحاول نجيب الـ UUID الحقيقي من جدول users عبر رقم الهاتف
-      if (adminPhone) {
+      if (!uuidRegex.test(String(instructorId || '')) && adminPhone) {
         try {
           const { data: userRow } = await supabase
             .from('users')
             .select('id')
-            .or(`phone.eq.${adminPhone},student_phone.eq.${adminPhone}`)
+            .or(`phone.eq.${adminPhone},student_phone.eq.${adminPhone},parent_phone.eq.${adminPhone}`)
             .maybeSingle();
 
-          if (userRow?.id) {
+          if (userRow?.id && uuidRegex.test(String(userRow.id))) {
             instructorId = String(userRow.id);
           }
         } catch (resolveErr) {
           console.error('❌ فشل تحديد instructor_id من Supabase:', resolveErr);
         }
       }
+
+      if (!instructorId || !uuidRegex.test(String(instructorId))) {
+        toast.error('تعذر تحديد حساب الأدمن داخل قاعدة البيانات. برجاء تسجيل الدخول مرة أخرى بعد إنشاء مستخدم أدمن في جدول users.');
+        return;
+      }
       
       const courseData = {
         title,
         description,
         instructor_id: instructorId,
-        instructor_name: adminName,
         price: parsedPrice,
         level,
         category,

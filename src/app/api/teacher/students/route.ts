@@ -25,7 +25,8 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = request.nextUrl;
     const courseIdsParam = searchParams.get('courseIds');
-    const teacherId = searchParams.get('teacherId') || undefined;
+    const teacherIdRaw = searchParams.get('teacherId');
+    const teacherId = teacherIdRaw && teacherIdRaw.trim().length > 0 ? teacherIdRaw.trim() : undefined;
 
      const roleCookie = request.cookies.get('user-role')?.value;
      const authCookie =
@@ -40,7 +41,9 @@ export async function GET(request: NextRequest) {
        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
      }
 
-     if (teacherId && String(teacherId) !== String(cookieUserId)) {
+     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+     if (roleCookie === 'teacher' && teacherId && String(teacherId) !== String(cookieUserId)) {
        return NextResponse.json({ error: 'forbidden' }, { status: 403 });
      }
 
@@ -64,6 +67,13 @@ export async function GET(request: NextRequest) {
 
     // في حال لم تُرسل courseIds لكن لدينا teacherId، نجلب كورسات هذا المدرس أولاً
     if (!courseIds.length && effectiveTeacherId) {
+      if (!uuidRegex.test(String(effectiveTeacherId))) {
+        return NextResponse.json(
+          { error: 'Invalid teacherId: expected UUID' },
+          { status: 400 }
+        );
+      }
+
       const { data: teacherCourses, error: teacherCoursesError } = await supabase
         .from('courses')
         .select('id')
@@ -82,6 +92,13 @@ export async function GET(request: NextRequest) {
 
     // إذا أُرسلت courseIds مباشرة، نُقيّدها بكورسات المدرس/الأدمن
     if (courseIds.length && effectiveTeacherId) {
+      if (!uuidRegex.test(String(effectiveTeacherId))) {
+        return NextResponse.json(
+          { error: 'Invalid teacherId: expected UUID' },
+          { status: 400 }
+        );
+      }
+
       const { data: allowedCourses, error: allowedError } = await supabase
         .from('courses')
         .select('id')

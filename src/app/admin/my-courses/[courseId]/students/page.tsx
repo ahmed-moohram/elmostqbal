@@ -64,6 +64,32 @@ export default function AdminMyCourseStudentsPage() {
       try {
         setLoading(true);
 
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        let effectiveTeacherId: string | null = user.id;
+
+        if (!uuidRegex.test(String(effectiveTeacherId || '')) && typeof user.phone === 'string' && user.phone) {
+          try {
+            const { data: userRow } = await supabase
+              .from('users')
+              .select('id')
+              .or(`phone.eq.${user.phone},student_phone.eq.${user.phone},parent_phone.eq.${user.phone}`)
+              .maybeSingle();
+
+            if (userRow?.id && uuidRegex.test(String(userRow.id))) {
+              effectiveTeacherId = String(userRow.id);
+            }
+          } catch (resolveErr) {
+            console.error('Error resolving admin UUID for course students page:', resolveErr);
+          }
+        }
+
+        if (!effectiveTeacherId || !uuidRegex.test(String(effectiveTeacherId))) {
+          toast.error('تعذر تحديد حساب الأدمن داخل قاعدة البيانات. برجاء تسجيل الدخول مرة أخرى بعد إنشاء مستخدم أدمن في جدول users.');
+          setStudents([]);
+          router.replace('/admin/my-courses');
+          return;
+        }
+
         const { data: courseRow, error: courseErr } = await supabase
           .from('courses')
           .select('id, title, instructor_id')
@@ -77,7 +103,7 @@ export default function AdminMyCourseStudentsPage() {
           return;
         }
 
-        if (String(courseRow.instructor_id) !== String(user.id)) {
+        if (effectiveTeacherId && String(courseRow.instructor_id) !== String(effectiveTeacherId)) {
           toast.error('لا يمكنك متابعة طلاب كورس لا تملكه');
           router.replace('/admin/my-courses');
           return;
@@ -87,7 +113,9 @@ export default function AdminMyCourseStudentsPage() {
 
         const qs = new URLSearchParams();
         qs.set('courseIds', String(courseId));
-        qs.set('teacherId', String(teacherId));
+        if (effectiveTeacherId) {
+          qs.set('teacherId', String(effectiveTeacherId));
+        }
 
         const res = await fetch(`/api/teacher/students?${qs.toString()}`);
         const json = await res.json().catch(() => null);
