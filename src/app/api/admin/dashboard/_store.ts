@@ -391,7 +391,17 @@ async function activateEnrollmentForPaymentRequest(paymentRequest: any, requestI
   }
 
   try {
-    await achievementsService.checkAndGrantAchievements(studentId, paymentRequest.course_id);
+    const courseId = paymentRequest.course_id;
+    if (!studentId) {
+      console.warn('Skipping achievements grant: studentId is null/empty (updateTransaction)');
+      return;
+    }
+
+    if (typeof courseId === 'string' && courseId.length > 0) {
+      await achievementsService.checkAndGrantAchievements(studentId, courseId);
+    } else {
+      console.warn('Skipping achievements grant: paymentRequest.course_id is null/empty (updateTransaction)');
+    }
   } catch (achievementsError) {
     console.error('Error granting achievements after enrollment approval (updateTransaction):', achievementsError);
   }
