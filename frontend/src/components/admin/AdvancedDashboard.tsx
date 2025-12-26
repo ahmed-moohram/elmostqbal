@@ -166,13 +166,12 @@ const AdvancedDashboard = () => {
         }
       };
       
-      // طلبات متوازية لكل البيانات المطلوبة
-      const [statsResponse, transactionsResponse, issuesResponse, chartsResponse] = 
+      // طلبات متوازية للإحصائيات والمعاملات والمشكلات فقط
+      const [statsResponse, transactionsResponse, issuesResponse] = 
         await Promise.all([
           fetch(`/api/admin/dashboard/stats?period=${dateRange}`, requestOptions),
           fetch(`/api/admin/dashboard/transactions?period=${dateRange}`, requestOptions),
-          fetch(`/api/admin/dashboard/issues`, requestOptions),
-          fetch(`/api/admin/dashboard/charts?period=${dateRange}`, requestOptions)
+          fetch(`/api/admin/dashboard/issues`, requestOptions)
         ]);
       
       // التحقق من استجابة الإحصائيات
@@ -199,113 +198,7 @@ const AdvancedDashboard = () => {
         setIssues(issuesData.issues || []);
       }
       
-      // التعامل مع بيانات المخططات
-      if (chartsResponse.ok) {
-        const chartsData = await chartsResponse.json();
-        
-        // تحديث بيانات الرسوم البيانية
-        if (chartsData.revenue) {
-          setRevenueData({
-            labels: chartsData.revenue.labels || emptyChartData.labels,
-            datasets: [{
-              label: 'الإيرادات',
-              data: chartsData.revenue.data || [],
-              borderColor: 'rgba(75, 192, 192, 1)',
-              backgroundColor: 'rgba(75, 192, 192, 0.2)',
-              borderWidth: 1,
-              tension: 0.4,
-              fill: false
-            }]
-          });
-        }
-        
-        if (chartsData.enrollment) {
-          setEnrollmentData({
-            labels: chartsData.enrollment.labels || emptyChartData.labels,
-            datasets: [{
-              label: 'عدد المشتركين',
-              data: chartsData.enrollment.data || [],
-              backgroundColor: 'rgba(153, 102, 255, 0.6)',
-              borderWidth: 1
-            }]
-          });
-        }
-        
-        // التعامل مع بيانات طرق الدفع بشكل أكثر أمانًا
-        try {
-          // التحقق من وجود البيانات وصحتها
-          if (chartsData.paymentMethods && 
-              Array.isArray(chartsData.paymentMethods.labels) && 
-              Array.isArray(chartsData.paymentMethods.data) && 
-              chartsData.paymentMethods.labels.length > 0 && 
-              chartsData.paymentMethods.data.length > 0 && 
-              chartsData.paymentMethods.labels.length === chartsData.paymentMethods.data.length) {
-            
-            // تعيين البيانات الصحيحة
-            // ألوان متنوعة لكل طريقة دفع
-            const backgroundColors = [
-              'rgba(255, 99, 132, 0.7)',   // وردي
-              'rgba(54, 162, 235, 0.7)',   // أزرق
-              'rgba(255, 206, 86, 0.7)',   // أصفر
-              'rgba(75, 192, 192, 0.7)',   // أخضر فاتح
-              'rgba(153, 102, 255, 0.7)',  // بنفسجي
-              'rgba(255, 159, 64, 0.7)',   // برتقالي
-              'rgba(201, 203, 207, 0.7)',  // رمادي
-              'rgba(0, 128, 128, 0.7)',    // أزرق مخضر
-              'rgba(128, 0, 128, 0.7)',    // أرجواني
-              'rgba(128, 128, 0, 0.7)',    // زيتوني
-            ];
-            
-            // التأكد من وجود ألوان كافية لجميع العناصر
-            const colorsNeeded = chartsData.paymentMethods.labels.length;
-            
-            // إنشاء مصفوفة من الألوان بنفس طول البيانات
-            const colors = Array.from({ length: colorsNeeded }, (_, i) => {
-              // إذا كان هناك عدد أكبر من العناصر من الألوان المتاحة، أعد تدوير الألوان
-              return backgroundColors[i % backgroundColors.length];
-            });
-            
-            setPaymentMethodsData({
-              labels: chartsData.paymentMethods.labels,
-              datasets: [{
-                label: 'طرق الدفع',
-                data: chartsData.paymentMethods.data,
-                backgroundColor: colors,
-                borderWidth: 1
-              }]
-            });
-            
-            console.log('تم تعيين بيانات طرق الدفع بنجاح:', chartsData.paymentMethods);
-          } else {
-            console.log('بيانات طرق الدفع غير صالحة أو فارغة، تعيين بيانات فارغة');
-            // تعيين بيانات فارغة بشكل صحيح
-            setPaymentMethodsData({
-              labels: [],
-              datasets: [{
-                label: 'طرق الدفع',
-                data: [],
-                backgroundColor: [],
-                borderWidth: 1
-              }]
-            });
-          }
-        } catch (error) {
-          console.error('خطأ أثناء معالجة بيانات طرق الدفع:', error);
-          // تعيين بيانات فارغة في حالة حدوث خطأ
-          setPaymentMethodsData({
-            labels: [],
-            datasets: [{
-              label: 'طرق الدفع',
-              data: [],
-              backgroundColor: [],
-              borderWidth: 1
-            }]
-          });
-          
-          // إظهار رسالة خطأ للمستخدم
-          toast.error('حدث خطأ أثناء معالجة بيانات طرق الدفع');
-        }
-      }
+      // لم نعد نستخدم بيانات المخططات في الواجهة، لذا لا حاجة لمعالجة استجابة charts هنا
       
     } catch (error: any) {
       console.error('خطأ في تحميل بيانات لوحة القيادة:', error);
@@ -577,70 +470,73 @@ const AdvancedDashboard = () => {
           </div>
           
           {/* المخططات والتحليلات */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                {/* مخطط الإيرادات */}
-                <div className="bg-white rounded-xl p-6 shadow-sm">
-                  <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2 mb-4">
-                    <FaChartLine className="text-blue-500" />
-                    تحليل الإيرادات
-                  </h3>
-                  <div className="h-72">
-                    {revenueData.datasets.length > 0 && revenueData.datasets[0].data.length > 0 ? (
-                      <LineChart data={revenueData} />
-                    ) : (
-                      <div className="h-full flex flex-col justify-center items-center text-gray-400 bg-blue-50 rounded-lg animate-pulse-light">
-                        <FaChartLine size={36} className="mb-3 text-blue-400" />
-                        <p className="text-gray-600 font-medium">لا توجد بيانات إيرادات كافية</p>
-                        <p className="text-sm text-gray-500 mt-2">ستظهر البيانات بمجرد توفرها</p>
-                      </div>
-                    )}
+          {false && (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                  {/* مخطط الإيرادات */}
+                  <div className="bg-white rounded-xl p-6 shadow-sm">
+                    <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2 mb-4">
+                      <FaChartLine className="text-blue-500" />
+                      تحليل الإيرادات
+                    </h3>
+                    <div className="h-72">
+                      {revenueData.datasets.length > 0 && revenueData.datasets[0].data.length > 0 ? (
+                        <LineChart data={revenueData} />
+                      ) : (
+                        <div className="h-full flex flex-col justify-center items-center text-gray-400 bg-blue-50 rounded-lg animate-pulse-light">
+                          <FaChartLine size={36} className="mb-3 text-blue-400" />
+                          <p className="text-gray-600 font-medium">لا توجد بيانات إيرادات كافية</p>
+                          <p className="text-sm text-gray-500 mt-2">ستظهر البيانات بمجرد توفرها</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {/* مخطط طرق الدفع */}
+                  <div className="bg-white rounded-xl p-6 shadow-sm">
+                    <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2 mb-4">
+                      <FaCreditCard className="text-purple-500" />
+                      طرق الدفع المفضلة
+                    </h3>
+                    <div className="h-72">
+                      {paymentMethodsData.datasets.length > 0 && paymentMethodsData.datasets[0].data.length > 0 ? (
+                        <PieChart data={paymentMethodsData} />
+                      ) : (
+                        <div className="h-full flex flex-col justify-center items-center text-gray-400 bg-purple-50 rounded-lg animate-pulse-light">
+                          <FaCreditCard size={36} className="mb-3 text-purple-400" />
+                          <p className="text-gray-600 font-medium">لا توجد بيانات طرق دفع متوفرة</p>
+                          <p className="text-sm text-gray-500 mt-2">سيتم عرض الإحصائيات بمجرد إجراء معاملات</p>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
-                
-                {/* مخطط طرق الدفع */}
-                <div className="bg-white rounded-xl p-6 shadow-sm">
-                  <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2 mb-4">
-                    <FaCreditCard className="text-purple-500" />
-                    طرق الدفع المفضلة
+              </div>
+              
+              <div className="bg-white rounded-xl p-6 shadow-sm">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                    <FaCreditCard className="text-primary" />
+                    وسائل الدفع
                   </h3>
-                  <div className="h-72">
-                    {paymentMethodsData.datasets.length > 0 && paymentMethodsData.datasets[0].data.length > 0 ? (
-                      <PieChart data={paymentMethodsData} />
-                    ) : (
-                      <div className="h-full flex flex-col justify-center items-center text-gray-400 bg-purple-50 rounded-lg animate-pulse-light">
-                        <FaCreditCard size={36} className="mb-3 text-purple-400" />
-                        <p className="text-gray-600 font-medium">لا توجد بيانات طرق دفع متوفرة</p>
-                        <p className="text-sm text-gray-500 mt-2">سيتم عرض الإحصائيات بمجرد إجراء معاملات</p>
-                      </div>
-                    )}
-                  </div>
+                </div>
+                <div className="h-72">
+                  {paymentMethodsData.datasets.length > 0 && paymentMethodsData.datasets[0].data.length > 0 ? (
+                    <PieChart data={paymentMethodsData} />
+                  ) : (
+                    <div className="h-full flex flex-col justify-center items-center text-gray-400">
+                      <FaInfoCircle size={40} className="mb-3" />
+                      <p>لا توجد بيانات كافية لعرض الرسم البياني</p>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
-            
-            <div className="bg-white rounded-xl p-6 shadow-sm">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-                  <FaCreditCard className="text-primary" />
-                  وسائل الدفع
-                </h3>
-              </div>
-              <div className="h-72">
-                {paymentMethodsData.datasets.length > 0 && paymentMethodsData.datasets[0].data.length > 0 ? (
-                  <PieChart data={paymentMethodsData} />
-                ) : (
-                  <div className="h-full flex flex-col justify-center items-center text-gray-400">
-                    <FaInfoCircle size={40} className="mb-3" />
-                    <p>لا توجد بيانات كافية لعرض الرسم البياني</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
+          )}
           
           {/* المعاملات والمشكلات */}
+          {false && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="bg-white rounded-xl p-6 shadow-sm">
               <div className="flex justify-between items-center mb-4">
@@ -851,8 +747,10 @@ const AdvancedDashboard = () => {
               </div>
             </div>
           </div>
+          )}
           
           {/* إحصائيات إضافية */}
+          {false && (
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
@@ -892,6 +790,7 @@ const AdvancedDashboard = () => {
               )}
             </div>
           </div>
+          )}
         </>
       )}
     </motion.div>

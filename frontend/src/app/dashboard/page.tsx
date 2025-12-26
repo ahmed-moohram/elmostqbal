@@ -269,6 +269,7 @@ export default function Dashboard() {
               </div>
             </div>
             
+            {false && (
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 transition-all hover:shadow-md">
               <div className="flex items-center">
                 <div className="bg-green-100 dark:bg-green-900/30 p-3 rounded-full">
@@ -280,6 +281,7 @@ export default function Dashboard() {
                 </div>
               </div>
             </div>
+            )}
             
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 transition-all hover:shadow-md">
               <div className="flex items-center">
@@ -364,6 +366,7 @@ export default function Dashboard() {
           </section>
           
           {/* Certificates Section */}
+          {false && (
           <section className="mb-10">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-xl font-bold text-gray-800 dark:text-white">شهاداتك</h2>
@@ -402,6 +405,7 @@ export default function Dashboard() {
               </div>
             )}
           </section>
+          )}
           
           {/* Upcoming Events Section */}
           <section className="mb-10">

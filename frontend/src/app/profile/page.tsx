@@ -271,14 +271,6 @@ export default function ProfilePage() {
                   <p className="text-sm text-gray-700 dark:text-gray-300 text-center font-medium">دورات مكتملة</p>
                 </div>
                 
-                <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 dark:from-yellow-900/20 dark:to-yellow-800/20 rounded-xl p-4 border border-yellow-200 dark:border-yellow-800">
-                  <div className="flex items-center justify-center gap-2 mb-2">
-                    <FaCertificate className="text-yellow-600 dark:text-yellow-400 text-2xl" />
-                    <span className="font-bold text-2xl text-yellow-600 dark:text-yellow-400">{user.certificates}</span>
-                  </div>
-                  <p className="text-sm text-gray-700 dark:text-gray-300 text-center font-medium">شهادات</p>
-                </div>
-                
                 <div className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 rounded-xl p-4 border border-purple-200 dark:border-purple-800">
                   <div className="mb-2">
                     <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 mb-2">
@@ -306,16 +298,18 @@ export default function ProfilePage() {
               >
                 دوراتي
               </button>
-              <button
-                onClick={() => handleTabChange('certificates')}
-                className={`px-4 py-2 font-medium rounded-t-lg ${
-                  activeTab === 'certificates'
-                    ? 'bg-white text-primary border-b-2 border-primary'
-                    : 'bg-gray-100 text-gray-600'
-                }`}
-              >
-                الشهادات
-              </button>
+              {false && (
+                <button
+                  onClick={() => handleTabChange('certificates')}
+                  className={`px-4 py-2 font-medium rounded-t-lg ${
+                    activeTab === 'certificates'
+                      ? 'bg-white text-primary border-b-2 border-primary'
+                      : 'bg-gray-100 text-gray-600'
+                  }`}
+                >
+                  الشهادات
+                </button>
+              )}
               <button
                 onClick={() => handleTabChange('payments')}
                 className={`px-4 py-2 font-medium rounded-t-lg ${
@@ -406,7 +400,7 @@ export default function ProfilePage() {
               </div>
             )}
             
-            {activeTab === 'certificates' && (
+            {false && activeTab === 'certificates' && (
               <div>
                 <h2 className="text-2xl font-bold mb-6">شهاداتي</h2>
                 <div className="text-center py-12">
