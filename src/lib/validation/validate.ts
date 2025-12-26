@@ -5,10 +5,10 @@ import { NextRequest, NextResponse } from 'next/server';
  * Validate request body against a Zod schema
  * Returns validated data or error response
  */
-export async function validateRequest<T>(
+export async function validateRequest<TOutput, TInput = TOutput>(
   request: NextRequest,
-  schema: ZodSchema<T>
-): Promise<{ success: true; data: T } | { success: false; response: NextResponse }> {
+  schema: ZodSchema<TOutput, any, TInput>
+): Promise<{ success: true; data: TOutput } | { success: false; response: NextResponse }> {
   try {
     const body = await request.json();
     const validated = schema.parse(body);
