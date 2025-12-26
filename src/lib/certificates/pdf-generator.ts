@@ -11,6 +11,20 @@ interface CertificateData {
   durationHours?: number;
 }
 
+function drawCenteredText(
+  page: any,
+  text: string,
+  y: number,
+  size: number,
+  font: any,
+  color: ReturnType<typeof rgb>,
+) {
+  const { width } = page.getSize();
+  const textWidth = font.widthOfTextAtSize(text, size);
+  const x = (width - textWidth) / 2;
+  page.drawText(text, { x, y, size, font, color });
+}
+
 /**
  * Generate a PDF certificate with QR code
  */
@@ -42,104 +56,41 @@ export async function generateCertificatePDF(data: CertificateData): Promise<Uin
   });
 
   // Title
-  page.drawText('شهادة إتمام', {
-    x: 400,
-    y: 500,
-    size: 36,
-    font: helveticaBold,
-    color: rgb(0.2, 0.4, 0.8),
-    textAlign: 'center',
-  });
+  drawCenteredText(page, 'شهادة إتمام', 500, 36, helveticaBold, rgb(0.2, 0.4, 0.8));
 
   // Certificate text
   const certificateText = `هذه الشهادة تثبت أن`;
-  page.drawText(certificateText, {
-    x: 400,
-    y: 420,
-    size: 16,
-    font: helveticaFont,
-    color: rgb(0.2, 0.2, 0.2),
-    textAlign: 'center',
-  });
+  drawCenteredText(page, certificateText, 420, 16, helveticaFont, rgb(0.2, 0.2, 0.2));
 
   // Student name
-  page.drawText(data.studentName, {
-    x: 400,
-    y: 380,
-    size: 24,
-    font: helveticaBold,
-    color: rgb(0.1, 0.1, 0.1),
-    textAlign: 'center',
-  });
+  drawCenteredText(page, data.studentName, 380, 24, helveticaBold, rgb(0.1, 0.1, 0.1));
 
   // Course completion text
   const completionText = `قد أكمل بنجاح دورة`;
-  page.drawText(completionText, {
-    x: 400,
-    y: 340,
-    size: 16,
-    font: helveticaFont,
-    color: rgb(0.2, 0.2, 0.2),
-    textAlign: 'center',
-  });
+  drawCenteredText(page, completionText, 340, 16, helveticaFont, rgb(0.2, 0.2, 0.2));
 
   // Course name
-  page.drawText(data.courseName, {
-    x: 400,
-    y: 300,
-    size: 20,
-    font: helveticaBold,
-    color: rgb(0.2, 0.4, 0.8),
-    textAlign: 'center',
-  });
+  drawCenteredText(page, data.courseName, 300, 20, helveticaBold, rgb(0.2, 0.4, 0.8));
 
   // Instructor
   if (data.instructorName) {
     const instructorText = `المدرس: ${data.instructorName}`;
-    page.drawText(instructorText, {
-      x: 400,
-      y: 250,
-      size: 14,
-      font: helveticaFont,
-      color: rgb(0.4, 0.4, 0.4),
-      textAlign: 'center',
-    });
+    drawCenteredText(page, instructorText, 250, 14, helveticaFont, rgb(0.4, 0.4, 0.4));
   }
 
   // Duration
   if (data.durationHours) {
     const durationText = `المدة: ${data.durationHours} ساعة`;
-    page.drawText(durationText, {
-      x: 400,
-      y: 220,
-      size: 12,
-      font: helveticaFont,
-      color: rgb(0.4, 0.4, 0.4),
-      textAlign: 'center',
-    });
+    drawCenteredText(page, durationText, 220, 12, helveticaFont, rgb(0.4, 0.4, 0.4));
   }
 
   // Issue date
   const dateText = `تاريخ الإصدار: ${new Date(data.issueDate).toLocaleDateString('ar-EG')}`;
-  page.drawText(dateText, {
-    x: 400,
-    y: 190,
-    size: 12,
-    font: helveticaFont,
-    color: rgb(0.4, 0.4, 0.4),
-    textAlign: 'center',
-  });
+  drawCenteredText(page, dateText, 190, 12, helveticaFont, rgb(0.4, 0.4, 0.4));
 
   // Certificate number
   const certNumberText = `رقم الشهادة: ${data.certificateNumber}`;
-  page.drawText(certNumberText, {
-    x: 400,
-    y: 160,
-    size: 10,
-    font: helveticaFont,
-    color: rgb(0.5, 0.5, 0.5),
-    textAlign: 'center',
-  });
+  drawCenteredText(page, certNumberText, 160, 10, helveticaFont, rgb(0.5, 0.5, 0.5));
 
   // Generate QR code
   try {
@@ -162,28 +113,14 @@ export async function generateCertificatePDF(data: CertificateData): Promise<Uin
     });
 
     // Verification text
-    page.drawText('للتحقق من صحة الشهادة، امسح رمز QR', {
-      x: 400,
-      y: 60,
-      size: 10,
-      font: helveticaFont,
-      color: rgb(0.5, 0.5, 0.5),
-      textAlign: 'center',
-    });
+    drawCenteredText(page, 'للتحقق من صحة الشهادة، امسح رمز QR', 60, 10, helveticaFont, rgb(0.5, 0.5, 0.5));
   } catch (error) {
     console.error('Error generating QR code:', error);
     // Continue without QR code if generation fails
   }
 
   // Footer
-  page.drawText('© EduFutura Platform - جميع الحقوق محفوظة', {
-    x: 400,
-    y: 30,
-    size: 8,
-    font: helveticaFont,
-    color: rgb(0.6, 0.6, 0.6),
-    textAlign: 'center',
-  });
+  drawCenteredText(page, '© EduFutura Platform - جميع الحقوق محفوظة', 30, 8, helveticaFont, rgb(0.6, 0.6, 0.6));
 
   const pdfBytes = await pdfDoc.save();
   return pdfBytes;
