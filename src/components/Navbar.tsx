@@ -60,24 +60,27 @@ export default function Navbar() {
   };
 
   return (
-    <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-      scrolled ? 'bg-white dark:bg-gray-900 shadow-md' : 'bg-white dark:bg-gray-900'
-    } border-b border-gray-200 dark:border-gray-800`}>
+    <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
+      scrolled 
+        ? 'bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl shadow-lg border-b border-gray-200/50 dark:border-gray-800/50' 
+        : 'bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-200/30 dark:border-gray-800/30'
+    }`}>
       <div className="container mx-auto px-4 py-3">
         <div className="flex justify-between items-center">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-3">
-            <div className="relative w-12 h-12">
+          <Link href="/" className="flex items-center gap-3 group">
+            <div className="relative w-12 h-12 transition-transform duration-300 group-hover:scale-110">
               <Image 
                 src="/logo.png" 
                 alt="شعار المنصة"
                 fill
                 sizes="48px"
-                className="object-contain"
+                className="object-contain drop-shadow-lg"
                 priority
               />
+              <div className="absolute -inset-2 bg-gradient-to-r from-primary/20 to-accent/20 rounded-full blur-md opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
             </div>
-            <span className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+            <span className="text-2xl font-bold bg-gradient-to-r from-primary via-indigo-600 to-purple-700 dark:from-primary-light dark:via-indigo-400 dark:to-purple-500 bg-clip-text text-transparent transition-all duration-300 group-hover:scale-105">
               المستقبل
             </span>
           </Link>
@@ -88,14 +91,17 @@ export default function Navbar() {
               <Link
                 key={link.href}
                 href={link.href}
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all duration-300 relative group ${
                   pathname === link.href
-                    ? 'text-primary dark:text-primary-light font-semibold'
-                    : 'text-gray-700 dark:text-gray-300 hover:text-primary dark:hover:text-primary-light'
+                    ? 'text-primary dark:text-primary-light font-semibold bg-primary/10 dark:bg-primary/20'
+                    : 'text-gray-700 dark:text-gray-300 hover:text-primary dark:hover:text-primary-light hover:bg-gray-100 dark:hover:bg-gray-800'
                 }`}
               >
-                {link.icon && <span className="text-lg">{link.icon}</span>}
-                {link.label}
+                {link.icon && <span className={`text-lg transition-transform duration-300 ${pathname === link.href ? 'scale-110' : 'group-hover:scale-110'}`}>{link.icon}</span>}
+                <span className="relative z-10">{link.label}</span>
+                {pathname === link.href && (
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-primary to-purple-600 rounded-full"></div>
+                )}
               </Link>
             ))}
           </nav>

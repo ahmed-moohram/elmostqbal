@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import jwt from 'jsonwebtoken';
 import { createHash } from 'crypto';
 import { hash } from 'bcryptjs';
+import { resetPasswordSchema, validateRequest } from '@/lib/validation';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -32,31 +33,13 @@ function passwordFingerprint(row: any): string {
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json().catch(() => null);
-    const token = body?.token ? String(body.token) : '';
-    const newPassword = body?.password ? String(body.password) : '';
-
-    if (!token) {
-      return NextResponse.json({ success: false, error: 'Missing token' }, { status: 400 });
+    // Validate request body using Zod
+    const validation = await validateRequest(request, resetPasswordSchema);
+    if (!validation.success) {
+      return validation.response;
     }
 
-    if (!newPassword) {
-      return NextResponse.json({ success: false, error: 'Missing password' }, { status: 400 });
-    }
-
-    if (newPassword.length < 8) {
-      return NextResponse.json(
-        { success: false, error: 'Password must be at least 8 characters' },
-        { status: 400 },
-      );
-    }
-
-    if (!/[A-Z]/.test(newPassword) || !/[a-z]/.test(newPassword) || !/[0-9]/.test(newPassword)) {
-      return NextResponse.json(
-        { success: false, error: 'Password must contain uppercase, lowercase, and a number' },
-        { status: 400 },
-      );
-    }
+    const { token, password: newPassword } = validation.data;
 
     let payload: ResetTokenPayload;
     try {

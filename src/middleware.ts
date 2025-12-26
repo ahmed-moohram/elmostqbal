@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { validateCSRF } from '@/lib/security/csrf';
 
 // Security headers configuration
 const securityHeaders = {
@@ -78,6 +79,39 @@ export async function middleware(request: NextRequest) {
           },
         }
       );
+    }
+
+    // CSRF Protection for state-changing operations
+    const stateChangingMethods = ['POST', 'PUT', 'DELETE', 'PATCH'];
+    const csrfExemptPaths = [
+      '/api/auth/login',
+      '/api/auth/register',
+      '/api/auth/reset-password',
+      '/api/csrf-token',
+    ];
+
+    if (stateChangingMethods.includes(request.method) && !csrfExemptPaths.includes(url.pathname)) {
+      try {
+        const csrfValidation = await validateCSRF(request);
+        if (!csrfValidation.valid) {
+          return new NextResponse(
+            JSON.stringify({
+              success: false,
+              error: 'CSRF validation failed',
+              message: csrfValidation.error || 'طلب غير صحيح'
+            }),
+            {
+              status: 403,
+              headers: {
+                'Content-Type': 'application/json',
+              },
+            }
+          );
+        }
+      } catch (csrfError) {
+        // If CSRF validation fails, log but don't block (for now)
+        console.warn('CSRF validation error:', csrfError);
+      }
     }
   }
 

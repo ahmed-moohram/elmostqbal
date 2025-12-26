@@ -114,6 +114,11 @@ export default function Dashboard() {
         const user = JSON.parse(userData);
         setUser(user);
 
+        if (user?.role === 'student') {
+          router.replace('/student/dashboard');
+          return;
+        }
+
         // استخدام Supabase
         const { getDashboardData } = await import('@/services/supabase-service');
         const result = await getDashboardData(user.id);

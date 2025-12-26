@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { AchievementsService } from '@/services/achievements.service';
+import { paymentRequestSchema, validateRequest } from '@/lib/validation';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -12,10 +13,16 @@ if (!supabaseUrl || !supabaseServiceKey) {
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 const achievementsService = new AchievementsService(supabase);
 
+ const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 // POST - إنشاء طلب دفع جديد
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    // Validate request body using Zod
+    const validation = await validateRequest(request, paymentRequestSchema);
+    if (!validation.success) {
+      return validation.response;
+    }
 
     const {
       studentName,
@@ -26,17 +33,11 @@ export async function POST(request: NextRequest) {
       coursePrice,
       teacherName,
       teacherPhone,
-      paymentPhone,
-      transactionId
-    } = body;
+      price,
+    } = validation.data;
 
-    // التحقق من البيانات المطلوبة
-    if (!studentName || !studentPhone || !courseId || !courseName) {
-      return NextResponse.json(
-        { error: 'Missing required fields' },
-        { status: 400 }
-      );
-    }
+    const paymentPhone = studentPhone;
+    const transactionId = `VF${Date.now()}`;
 
     // إنشاء طلب الدفع
     const { data: paymentRequest, error } = await supabase
@@ -47,14 +48,14 @@ export async function POST(request: NextRequest) {
         student_email: studentEmail,
         // student_id يُترك فارغًا هنا لأن الجدول يشير إلى auth.users(id)
         // وسوف نعتمد على رقم الهاتف لربط الطلب بالطالب عند الموافقة
-        course_id: courseId,
-        course_name: courseName,
-        course_price: coursePrice,
+        course_id: courseId || null,
+        course_name: courseName || null,
+        course_price: coursePrice || price,
         teacher_name: teacherName,
         teacher_phone: teacherPhone,
         payment_phone: paymentPhone || studentPhone,
         transaction_id: transactionId,
-        amount_paid: coursePrice,
+        amount_paid: coursePrice || price,
         status: 'pending'
       })
       .select()
@@ -199,11 +200,15 @@ export async function PATCH(request: NextRequest) {
     }
 
     // جلب بيانات الطلب
-    const { data: paymentRequest } = await supabase
+    const { data: paymentRequest, error: paymentRequestError } = await supabase
       .from('payment_requests')
       .select('*')
       .eq('id', requestId)
-      .single();
+      .maybeSingle();
+
+    if (paymentRequestError) {
+      return NextResponse.json({ error: paymentRequestError.message }, { status: 500 });
+    }
 
     if (!paymentRequest) {
       return NextResponse.json(
@@ -238,31 +243,44 @@ export async function PATCH(request: NextRequest) {
     // إذا تمت الموافقة، قم بتفعيل الاشتراك
     if (status === 'approved') {
       // نحاول أولاً استخدام student_id المخزَّن مع الطلب إن وُجد
-      let studentIdForEnrollment: string | null = paymentRequest.student_id;
+      let studentIdForEnrollment: string | null =
+        typeof paymentRequest.student_id === 'string' ? paymentRequest.student_id.trim() : null;
+
+      if (studentIdForEnrollment && !UUID_REGEX.test(studentIdForEnrollment)) {
+        studentIdForEnrollment = null;
+      }
+
+      const studentPhoneCandidate =
+        (paymentRequest.student_phone as string | null | undefined) ||
+        (paymentRequest.payment_phone as string | null | undefined) ||
+        null;
 
       // في حالة عدم وجود student_id (طلبات قديمة)، نبحث بالهاتف
-      if (!studentIdForEnrollment && paymentRequest.student_phone) {
-        const { data: studentData } = await supabase
-          .from('users')
-          .select('id')
-          .or(
-            `phone.eq.${paymentRequest.student_phone},student_phone.eq.${paymentRequest.student_phone}`
-          )
-          .maybeSingle();
+      if (!studentIdForEnrollment && studentPhoneCandidate) {
+        const normalizedPhone = String(studentPhoneCandidate).trim();
+        if (normalizedPhone) {
+          const { data: studentData } = await supabase
+            .from('users')
+            .select('id')
+            .or(
+              `phone.eq.${normalizedPhone},student_phone.eq.${normalizedPhone},parent_phone.eq.${normalizedPhone},mother_phone.eq.${normalizedPhone}`
+            )
+            .maybeSingle();
 
-        if (studentData) {
-          studentIdForEnrollment = studentData.id;
+          if (studentData?.id && UUID_REGEX.test(String(studentData.id))) {
+            studentIdForEnrollment = String(studentData.id);
+          }
         }
       }
 
-      if (studentIdForEnrollment) {
+      if (studentIdForEnrollment && UUID_REGEX.test(studentIdForEnrollment)) {
         // التحقق من وجود اشتراك سابق في نظام الدفع الجديد (course_enrollments)
         const { data: existingEnrollment } = await supabase
           .from('course_enrollments')
           .select('id')
           .eq('student_id', studentIdForEnrollment)
           .eq('course_id', paymentRequest.course_id)
-          .single();
+          .maybeSingle();
 
         if (!existingEnrollment) {
           // إنشاء اشتراك جديد في نظام الدفع
@@ -294,7 +312,7 @@ export async function PATCH(request: NextRequest) {
             .select('id')
             .eq('user_id', studentIdForEnrollment)
             .eq('course_id', paymentRequest.course_id)
-            .single();
+            .maybeSingle();
 
           if (!existingLegacyEnrollment) {
             await supabase

@@ -211,10 +211,7 @@ export const getAchievements = async () => {
   try {
     const { data, error } = await supabase
       .from('achievements')
-      .select(`
-        *,
-        course:courses(title)
-      `)
+      .select('*')
       .order('points', { ascending: false });
     
     if (error) throw error;

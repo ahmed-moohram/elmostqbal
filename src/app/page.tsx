@@ -294,13 +294,15 @@ export default function Home() {
               <div className="absolute -inset-4 bg-gradient-to-r from-purple-500 to-indigo-500 rounded-full blur-xl opacity-20 animate-pulse-slow -z-10"></div>
             </div>
           </div>
-          <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold tracking-tight mb-8 text-gray-800 dark:text-white">
-            <span className="bg-clip-text text-transparent bg-gradient-to-r from-gray-800 to-gray-900 dark:from-white dark:to-gray-200">منصة</span>{' '}
-            <span className="bg-clip-text text-transparent bg-gradient-to-r from-primary to-violet-700 dark:from-primary-dark dark:to-purple-400 animate-gradient bg-size-200">المستقبل</span>{' '}
+          <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-tight mb-8 text-gray-800 dark:text-white leading-tight">
+            <span className="bg-clip-text text-transparent bg-gradient-to-r from-gray-800 via-gray-700 to-gray-800 dark:from-white dark:via-gray-200 dark:to-white transition-all duration-500">منصة</span>{' '}
+            <span className="bg-clip-text text-transparent bg-gradient-to-r from-primary via-indigo-600 to-purple-700 dark:from-primary-light dark:via-indigo-400 dark:to-purple-500 animate-gradient bg-size-200">المستقبل</span>{' '}
             <span className="bg-clip-text text-transparent bg-gradient-to-r from-gray-800 to-gray-900 dark:from-white dark:to-gray-200">التعليمية</span>
           </h1>
-          <p className="max-w-xl mx-auto text-xl sm:text-2xl md:text-3xl text-gray-700 dark:text-white mb-12 leading-relaxed font-semibold">
-            نحو جيل مبدع ومبتكر، مسلح بالعلم والمعرفة بأحدث التقنيات.
+          <p className="max-w-2xl mx-auto text-lg sm:text-xl md:text-2xl lg:text-3xl text-gray-700 dark:text-gray-200 mb-12 leading-relaxed font-medium px-4">
+            <span className="bg-gradient-to-r from-gray-700 to-gray-900 dark:from-gray-200 dark:to-white bg-clip-text text-transparent">
+              نحو جيل مبدع ومبتكر، مسلح بالعلم والمعرفة بأحدث التقنيات.
+            </span>
           </p>
           <div className="flex flex-col sm:flex-row justify-center gap-6">
             {!isAuthenticated && (
@@ -334,24 +336,26 @@ export default function Home() {
             transition={{ duration: 0.5 }}
             className="text-center"
           >
-            <div className="flex justify-center mb-6">
+            <div className="flex justify-center mb-6 transform transition-transform duration-500 hover:scale-110">
               {features[activeFeature].icon}
             </div>
-            <h3 className="text-2xl font-bold mb-3">
+            <h3 className="text-2xl md:text-3xl font-bold mb-4 text-gray-800 dark:text-gray-100">
               {features[activeFeature].title}
             </h3>
-            <p className="body-text">
+            <p className="body-text max-w-2xl mx-auto px-4">
               {features[activeFeature].description}
             </p>
           </motion.div>
         </AnimatePresence>
 
-        <div className="flex justify-center gap-2 mt-6">
+        <div className="flex justify-center gap-3 mt-8">
           {features.map((_, index) => (
             <button
               key={index}
-              className={`w-3 h-3 rounded-full transition-colors ${
-                index === activeFeature ? 'bg-primary' : 'bg-gray-300'
+              className={`rounded-full transition-all duration-300 ${
+                index === activeFeature 
+                  ? 'w-10 h-3 bg-gradient-to-r from-primary via-indigo-600 to-purple-700 shadow-lg' 
+                  : 'w-3 h-3 bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 dark:hover:bg-gray-500'
               }`}
               onClick={() => setActiveFeature(index)}
             />
@@ -360,11 +364,11 @@ export default function Home() {
       </div>
 
       {/* Featured Teachers Section */}
-      <section className="py-24 bg-white dark:bg-gray-900">
+      <section className="py-24 bg-gradient-to-b from-white via-gray-50/50 to-white dark:from-gray-900 dark:via-gray-900/50 dark:to-gray-900">
         <div className="container-custom">
-          <div className="text-center mb-16">
-            <h2 className="featured-title">المدرسون المتميزون</h2>
-            <p className="body-text max-w-2xl mx-auto">
+          <div className="text-center mb-16 space-y-4">
+            <h2 className="heading-2 text-gray-800 dark:text-gray-100">المدرسون المتميزون</h2>
+            <p className="body-text max-w-2xl mx-auto text-gray-600 dark:text-gray-300">
               تعرّف على نخبة من أفضل المدرسين، واستكشف جميع دوراتهم التعليمية المميزة
             </p>
           </div>
@@ -379,7 +383,7 @@ export default function Home() {
                 <Link
                   key={teacher.id}
                   href={`/teachers/${teacher.id}`}
-                  className="group relative rounded-3xl overflow-hidden bg-gray-900/5 dark:bg-gray-800/40 border border-white/10 shadow-[0_14px_30px_rgba(15,23,42,0.45)] hover:-translate-y-3 hover:scale-[1.05] hover:shadow-[0_30px_70px_rgba(15,23,42,0.75)] transition-all duration-700 ease-out h-96"
+                  className="group relative rounded-3xl overflow-hidden bg-gray-900/5 dark:bg-gray-800/40 border border-gray-200/50 dark:border-gray-700/50 shadow-xl hover:shadow-2xl hover:-translate-y-4 hover:scale-[1.03] transition-all duration-500 ease-out h-96 course-card"
                 >
                   {/* صورة المدرس تغطي الكارت بالكامل */}
                   <Image
@@ -394,37 +398,37 @@ export default function Home() {
                   {/* المحتوى فوق الصورة */}
                   <div className="absolute inset-0 flex flex-col justify-between p-5 text-white opacity-95 transition-opacity duration-700 ease-out group-hover:opacity-85">
                     <div className="flex flex-col items-start gap-2">
-                      <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/80 text-xs font-semibold">
+                      <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-gradient-to-r from-primary/90 via-indigo-600/90 to-purple-700/90 backdrop-blur-sm text-xs font-bold shadow-lg">
                         <FaChalkboardTeacher className="text-white" />
                         <span>مدرس مميز</span>
                       </div>
-                      <h3 className="text-xl sm:text-2xl font-bold mb-1 line-clamp-1">
+                      <h3 className="text-xl sm:text-2xl md:text-3xl font-bold mb-2 line-clamp-1 drop-shadow-lg">
                         {teacher.name}
                       </h3>
-                      <p className="text-sm text-gray-100/90 line-clamp-1">
+                      <p className="text-sm md:text-base text-gray-100/95 line-clamp-1 font-medium">
                         {teacher.specialization}
                       </p>
                     </div>
 
                     <div className="flex flex-col gap-3">
-                      <div className="bg-white/10 backdrop-blur-md rounded-2xl p-3 border border-white/15 shadow-lg transition-colors duration-500 ease-out group-hover:bg-white/16 group-hover:border-white/25">
-                        <div className="flex items-center justify-between text-sm text-gray-100">
+                      <div className="bg-white/15 backdrop-blur-xl rounded-2xl p-4 border border-white/20 shadow-xl transition-all duration-500 ease-out group-hover:bg-white/20 group-hover:border-white/30 group-hover:shadow-2xl">
+                        <div className="flex items-center justify-between text-sm md:text-base text-gray-100">
                           <div className="flex items-center gap-2">
-                            <FaStar className="text-yellow-400" />
-                            <span className="font-semibold">{teacher.rating.toFixed(1)}</span>
-                            <span className="text-xs text-gray-200">تقييم الطلاب</span>
+                            <FaStar className="text-yellow-400 text-lg" />
+                            <span className="font-bold text-lg">{teacher.rating.toFixed(1)}</span>
+                            <span className="text-xs md:text-sm text-gray-200">تقييم الطلاب</span>
                           </div>
                           <div className="flex items-center gap-2">
-                            <FaUsers className="text-primary-light" />
-                            <span className="font-semibold">{teacher.students || 0}</span>
-                            <span className="text-xs text-gray-200">طالب</span>
+                            <FaUsers className="text-indigo-300 text-lg" />
+                            <span className="font-bold text-lg">{teacher.students || 0}</span>
+                            <span className="text-xs md:text-sm text-gray-200">طالب</span>
                           </div>
                         </div>
                       </div>
 
                       <button
                         type="button"
-                        className="w-full inline-flex items-center justify-center gap-2 rounded-2xl bg-primary/95 text-white py-2.5 text-sm font-semibold hover:bg-primary-dark transition-transform duration-300 ease-out shadow-lg shadow-primary/40 hover:-translate-y-0.5"
+                        className="w-full inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-primary via-indigo-600 to-purple-700 text-white py-3 text-sm md:text-base font-bold hover:from-indigo-600 hover:via-purple-600 hover:to-pink-600 transition-all duration-300 ease-out shadow-xl shadow-primary/50 hover:-translate-y-1 hover:shadow-2xl"
                       >
                         عرض كورسات المدرس
                       </button>

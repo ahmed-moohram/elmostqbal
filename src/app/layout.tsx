@@ -6,6 +6,11 @@ import './performance.css'
 import dynamic from 'next/dynamic'
 import { Providers } from '../components/Providers'
 
+// ErrorBoundary must be client component, load dynamically
+const ErrorBoundary = dynamic(() => import('../components/ErrorBoundary'), {
+  ssr: false,
+})
+
 // تحميل المكونات بشكل ديناميكي لتحسين الأداء
 const NightSkyWithMoon = dynamic(() => import('../components/SimpleMoon'), { 
   ssr: false,
@@ -55,18 +60,20 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.googleapis.com" crossOrigin="anonymous" />
       </head>
       <body className={cairo.className} suppressHydrationWarning> 
-        <Providers>
-          <PageLoader />
-          <NavbarWrapper />
-          <ClientPathCheck>
-            <NightSkyWithMoon />
-          </ClientPathCheck>
-          <PageTransition>
-            <main className="min-h-screen" style={{ willChange: 'contents' }}> 
-              {children} 
-            </main>
-          </PageTransition>
-        </Providers>
+        <ErrorBoundary>
+          <Providers>
+            <PageLoader />
+            <NavbarWrapper />
+            <ClientPathCheck>
+              <NightSkyWithMoon />
+            </ClientPathCheck>
+            <PageTransition>
+              <main className="min-h-screen pt-20" style={{ willChange: 'contents' }}> 
+                {children} 
+              </main>
+            </PageTransition>
+          </Providers>
+        </ErrorBoundary>
       </body>
     </html>
   )

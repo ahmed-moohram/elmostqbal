@@ -7,6 +7,8 @@ import { API_BASE_URL } from '@/lib/api';
 import supabase from '@/lib/supabase-client';
 import { verifyPassword } from '@/lib/security/password-utils';
 
+ const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 interface User {
   id: string;
   name: string;
@@ -38,16 +40,96 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
 
+  const resolveUserUuidByPhone = async (phone: string, preferredRole?: string): Promise<string | null> => {
+    const normalizedPhone = String(phone || '').trim();
+    if (!normalizedPhone) return null;
+
+    const tryWithPhoneColumn = async () =>
+      supabase
+        .from('users')
+        .select('id, role')
+        .or(
+          `phone.eq.${normalizedPhone},student_phone.eq.${normalizedPhone},parent_phone.eq.${normalizedPhone},mother_phone.eq.${normalizedPhone}`
+        )
+        .limit(10);
+
+    const tryWithoutPhoneColumn = async () =>
+      supabase
+        .from('users')
+        .select('id, role')
+        .or(
+          `student_phone.eq.${normalizedPhone},parent_phone.eq.${normalizedPhone},mother_phone.eq.${normalizedPhone}`
+        )
+        .limit(10);
+
+    let { data, error } = await tryWithPhoneColumn();
+
+    if (error && typeof error.message === 'string' && error.message.toLowerCase().includes('phone')) {
+      ({ data, error } = await tryWithoutPhoneColumn());
+    }
+
+    if (error) {
+      console.error('Error resolving user UUID:', error);
+      return null;
+    }
+
+    const rows: any[] = Array.isArray(data) ? (data as any[]) : data ? [data as any] : [];
+    const preferred = preferredRole
+      ? rows.find((row) => String((row as any)?.role || '').toLowerCase() === String(preferredRole).toLowerCase())
+      : null;
+    const picked = preferred || rows[0] || null;
+
+    const resolved = picked?.id ? String(picked.id) : null;
+    if (resolved && UUID_REGEX.test(resolved)) return resolved;
+    return null;
+  };
+
   // تحميل بيانات المستخدم عند بدء التطبيق
   useEffect(() => {
-    const loadUser = () => {
+    const loadUser = async () => {
       try {
         const storedToken = localStorage.getItem('token');
         const storedUser = localStorage.getItem('user');
 
         if (storedToken && storedUser) {
+          const parsed = JSON.parse(storedUser);
           setToken(storedToken);
-          setUser(JSON.parse(storedUser));
+          setUser(parsed);
+
+          if (typeof document !== 'undefined' && parsed?.id && parsed?.role) {
+            document.cookie = `auth-token=${encodeURIComponent(storedToken)}; path=/`;
+            document.cookie = `user-role=${encodeURIComponent(parsed.role)}; path=/`;
+            document.cookie = `user-id=${encodeURIComponent(parsed.id)}; path=/`;
+          }
+
+          const parsedPhone =
+            (parsed as any)?.phone ||
+            (parsed as any)?.student_phone ||
+            (parsed as any)?.studentPhone ||
+            (parsed as any)?.parent_phone ||
+            (parsed as any)?.parentPhone ||
+            (parsed as any)?.mother_phone ||
+            (parsed as any)?.motherPhone ||
+            null;
+
+          const parsedId = typeof parsed?.id === 'string' ? String(parsed.id) : '';
+          if (parsedPhone && parsedId && !UUID_REGEX.test(parsedId)) {
+            try {
+              const resolvedId = await resolveUserUuidByPhone(String(parsedPhone), String(parsed?.role || ''));
+
+              if (resolvedId && String(resolvedId) !== String(parsedId)) {
+                const updated = { ...parsed, id: String(resolvedId) };
+                localStorage.setItem('user', JSON.stringify(updated));
+                setUser(updated);
+
+                if (typeof document !== 'undefined') {
+                  document.cookie = `user-id=${encodeURIComponent(updated.id)}; path=/`;
+                }
+              }
+            } catch (resolveErr) {
+              console.error('Error resolving user UUID on load:', resolveErr);
+            }
+          }
         }
       } catch (error) {
         console.error('Error loading user data:', error);
@@ -65,7 +147,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (phone: string, password: string): Promise<{ success: boolean; error?: string }> => {
     try {
       if (phone === '01005209667' && password === 'Ahmed@010052') {
-        const adminUser: User = {
+        let adminUser: User = {
           id: 'admin-001',
           name: 'أحمد - مدير المنصة',
           email: 'admin@platform.com',
@@ -73,6 +155,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           role: 'admin',
           isVerified: true,
         };
+
+        try {
+          const resolvedId = adminUser.phone ? await resolveUserUuidByPhone(adminUser.phone, 'admin') : null;
+          if (resolvedId) {
+            adminUser = { ...adminUser, id: String(resolvedId) };
+          }
+        } catch (resolveErr) {
+          console.error('Error resolving admin UUID on login:', resolveErr);
+        }
 
         const token = 'admin-token-' + Date.now();
 
@@ -170,11 +261,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       // البحث عن المستخدم في جدول users
       console.log('🔍 البحث عن المستخدم برقم:', phone);
-      const { data: user, error } = await supabase
-        .from('users')
-        .select('*')
-        .or(`phone.eq.${phone},email.eq.${phone}`)
-        .single();
+      const tryWithPhoneColumn = async () =>
+        supabase
+          .from('users')
+          .select('*')
+          .or(
+            `phone.eq.${phone},student_phone.eq.${phone},parent_phone.eq.${phone},mother_phone.eq.${phone},email.eq.${phone}`
+          )
+          .single();
+
+      const tryWithoutPhoneColumn = async () =>
+        supabase
+          .from('users')
+          .select('*')
+          .or(`student_phone.eq.${phone},parent_phone.eq.${phone},mother_phone.eq.${phone},email.eq.${phone}`)
+          .single();
+
+      let { data: user, error } = await tryWithPhoneColumn();
+
+      if (error && typeof error.message === 'string' && error.message.toLowerCase().includes('phone')) {
+        ({ data: user, error } = await tryWithoutPhoneColumn());
+      }
       
       console.log('📊 نتيجة البحث:', { user, error });
       
@@ -207,7 +314,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         id: user.id,
         name: user.name,
         email: user.email,
-        phone: user.phone,
+        phone: user.phone || user.student_phone || user.parent_phone || user.mother_phone,
         role: user.role as 'student' | 'teacher' | 'admin',
         isVerified: true
       };

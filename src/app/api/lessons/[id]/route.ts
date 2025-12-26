@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { lessonAccessCodeSchema, validateRequest } from '@/lib/validation';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -87,15 +88,13 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ success: false, error: 'Missing lesson id' }, { status: 400 });
     }
 
-    const body = await req.json().catch(() => null);
-    const { code } = body || {};
-
-    if (code === undefined || code === null) {
-      return NextResponse.json(
-        { success: false, error: 'لم يتم إرسال الكود' },
-        { status: 400 },
-      );
+    // Validate request body using Zod
+    const validation = await validateRequest(req, lessonAccessCodeSchema);
+    if (!validation.success) {
+      return validation.response;
     }
+
+    const { code } = validation.data;
 
     const { data, error } = await supabase
       .from('lessons')

@@ -1,6 +1,6 @@
 'use client';
 
-import AdminLayout from "../../../components/AdminLayout";
+import AdminLayout from '@/components/AdminLayout';
 import AdvancedDashboard from "@/components/admin/AdvancedDashboard";
 
 const AdminDashboard = () => {

@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { hash } from 'bcryptjs';
 import { cookies } from 'next/headers';
 import { createClient } from '@supabase/supabase-js';
+import { userRegisterSchema, validateRequest } from '@/lib/validation';
 
 // Supabase Configuration
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -25,13 +26,17 @@ const TOKEN_EXPIRY = 60 * 60 * 24 * 7;
 // واجهة API للتسجيل
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { 
-      name, 
-      email, 
-      password, 
+    // Validate request body using Zod
+    const validation = await validateRequest(request, userRegisterSchema);
+    if (!validation.success) {
+      return validation.response;
+    }
+
+    const {
+      name,
+      email,
+      password,
       role = 'student',
-      // بيانات إضافية للطلاب
       phone,
       fatherName,
       studentPhone,
@@ -40,33 +45,8 @@ export async function POST(request: NextRequest) {
       schoolName,
       city,
       gradeLevel,
-      guardianJob
-    } = body;
-    
-    // التحقق من وجود البيانات المطلوبة
-    if (!name || !email || !password) {
-      return NextResponse.json(
-        { error: 'يرجى توفير الاسم والبريد الإلكتروني وكلمة المرور' },
-        { status: 400 }
-      );
-    }
-    
-    // التحقق من صحة البريد الإلكتروني
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return NextResponse.json(
-        { error: 'يرجى توفير بريد إلكتروني صحيح' },
-        { status: 400 }
-      );
-    }
-    
-    // التحقق من قوة كلمة المرور
-    if (password.length < 8) {
-      return NextResponse.json(
-        { error: 'يجب أن تكون كلمة المرور 8 أحرف على الأقل' },
-        { status: 400 }
-      );
-    }
+      guardianJob,
+    } = validation.data;
     
     // التحقق من عدم وجود المستخدم بالفعل في Supabase
     const { data: existingUser, error: checkError } = await supabase

@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { FaLock, FaShoppingCart, FaWhatsapp, FaPhone, FaCopy, FaCheckCircle, FaExpand, FaCompress, FaPlus, FaMinus } from 'react-icons/fa';
+import { useState, useEffect, useRef } from 'react';
+import { FaLock, FaShoppingCart, FaWhatsapp, FaPhone, FaCopy, FaCheckCircle, FaExpand, FaCompress, FaPlus, FaMinus, FaPlay, FaPause } from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
 
 interface ProtectedVideoPlayerProps {
@@ -15,6 +15,8 @@ interface ProtectedVideoPlayerProps {
   onEnroll?: () => void;
   lessonId?: string;
   useAccessCode?: boolean;
+  duration?: number; // مدة الفيديو بالدقائق
+  onProgress?: (progress: number, watchedSeconds: number) => void; // callback للتقدم
 }
 
 export default function ProtectedVideoPlayer({
@@ -28,6 +30,8 @@ export default function ProtectedVideoPlayer({
   onEnroll,
   lessonId,
   useAccessCode = false,
+  duration = 0, // مدة الفيديو بالدقائق
+  onProgress, // callback للتقدم
 }: ProtectedVideoPlayerProps) {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [studentName, setStudentName] = useState('');
@@ -45,6 +49,15 @@ export default function ProtectedVideoPlayer({
   const [metaLoaded, setMetaLoaded] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(1);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  
+  // حالة تتبع التقدم
+  const [isVideoPlaying, setIsVideoPlaying] = useState(false);
+  const [watchedSeconds, setWatchedSeconds] = useState(0);
+  const [progressPercent, setProgressPercent] = useState(0);
+  const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
 
   // رقم فودافون كاش للمدرس
   const vodafoneCashNumber = actualTeacherPhone || teacherPhone || '01012345678';
@@ -120,12 +133,228 @@ export default function ProtectedVideoPlayer({
     fetchMeta();
   }, [lessonId, useAccessCode, courseId]);
 
+  // اكتشاف الجوال
+  useEffect(() => {
+    const checkMobile = () => {
+      const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
+      const isMobileDevice = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent.toLowerCase());
+      setIsMobile(isMobileDevice);
+    };
+    checkMobile();
+  }, []);
+
   // إعادة ضبط مستوى الزووم عند الخروج من وضع التكبير المخصص
   useEffect(() => {
     if (!isExpanded) {
       setZoomLevel(1);
+      setIsFullscreen(false);
     }
   }, [isExpanded]);
+
+  // تفعيل ملء الشاشة والدوران التلقائي عند التكبير على الجوال
+  useEffect(() => {
+    if (isExpanded && isMobile) {
+      // طلب ملء الشاشة
+      const requestFullscreen = async () => {
+        try {
+          const element = document.documentElement;
+          if (element.requestFullscreen) {
+            await element.requestFullscreen();
+            setIsFullscreen(true);
+          } else if ((element as any).webkitRequestFullscreen) {
+            await (element as any).webkitRequestFullscreen();
+            setIsFullscreen(true);
+          } else if ((element as any).mozRequestFullScreen) {
+            await (element as any).mozRequestFullScreen();
+            setIsFullscreen(true);
+          } else if ((element as any).msRequestFullscreen) {
+            await (element as any).msRequestFullscreen();
+            setIsFullscreen(true);
+          }
+        } catch (error) {
+          console.log('Fullscreen request failed:', error);
+        }
+      };
+
+      // طلب الدوران التلقائي (Screen Orientation API)
+      const requestOrientation = async () => {
+        try {
+          if ('orientation' in screen && 'lock' in (screen as any).orientation) {
+            await (screen as any).orientation.lock('landscape');
+          } else if ((screen as any).lockOrientation) {
+            (screen as any).lockOrientation('landscape');
+          } else if ((screen as any).mozLockOrientation) {
+            (screen as any).mozLockOrientation('landscape');
+          } else if ((screen as any).msLockOrientation) {
+            (screen as any).msLockOrientation('landscape');
+          }
+        } catch (error) {
+          console.log('Orientation lock failed:', error);
+        }
+      };
+
+      requestFullscreen();
+      requestOrientation();
+    } else if (!isExpanded && isFullscreen) {
+      // الخروج من ملء الشاشة عند التصغير
+      const exitFullscreen = async () => {
+        try {
+          if (document.exitFullscreen) {
+            await document.exitFullscreen();
+          } else if ((document as any).webkitExitFullscreen) {
+            await (document as any).webkitExitFullscreen();
+          } else if ((document as any).mozCancelFullScreen) {
+            await (document as any).mozCancelFullScreen();
+          } else if ((document as any).msExitFullscreen) {
+            await (document as any).msExitFullscreen();
+          }
+          setIsFullscreen(false);
+        } catch (error) {
+          console.log('Exit fullscreen failed:', error);
+        }
+      };
+
+      // إلغاء قفل الدوران
+      const unlockOrientation = async () => {
+        try {
+          if ('orientation' in screen && 'unlock' in (screen as any).orientation) {
+            await (screen as any).orientation.unlock();
+          } else if ((screen as any).unlockOrientation) {
+            (screen as any).unlockOrientation();
+          } else if ((screen as any).mozUnlockOrientation) {
+            (screen as any).mozUnlockOrientation();
+          } else if ((screen as any).msUnlockOrientation) {
+            (screen as any).msUnlockOrientation();
+          }
+        } catch (error) {
+          console.log('Orientation unlock failed:', error);
+        }
+      };
+
+      exitFullscreen();
+      unlockOrientation();
+    }
+  }, [isExpanded, isMobile, isFullscreen]);
+
+  // الاستماع لتغييرات ملء الشاشة
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      const isCurrentlyFullscreen = !!(
+        document.fullscreenElement ||
+        (document as any).webkitFullscreenElement ||
+        (document as any).mozFullScreenElement ||
+        (document as any).msFullscreenElement
+      );
+      setIsFullscreen(isCurrentlyFullscreen);
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+    document.addEventListener('MSFullscreenChange', handleFullscreenChange);
+
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
+    };
+  }, []);
+
+  // تتبع التقدم عند تشغيل الفيديو
+  useEffect(() => {
+    if (!isEnrolled || !duration || duration === 0) return;
+
+    const totalSeconds = duration * 60; // تحويل الدقائق إلى ثواني
+
+    if (isVideoPlaying) {
+      // بدء تتبع التقدم
+      progressIntervalRef.current = setInterval(() => {
+        setWatchedSeconds((prev) => {
+          const newSeconds = prev + 1;
+          const newProgress = Math.min(Math.round((newSeconds / totalSeconds) * 100), 100);
+          setProgressPercent(newProgress);
+          
+          // استدعاء callback إذا كان موجوداً
+          if (onProgress) {
+            onProgress(newProgress, newSeconds);
+          }
+          
+          return newSeconds;
+        });
+      }, 1000);
+    } else {
+      // إيقاف تتبع التقدم
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+        progressIntervalRef.current = null;
+      }
+    }
+
+    return () => {
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+        progressIntervalRef.current = null;
+      }
+    };
+  }, [isVideoPlaying, duration, isEnrolled, onProgress]);
+
+  // حفظ التقدم في قاعدة البيانات
+  useEffect(() => {
+    if (!lessonId || !courseId || !isEnrolled || watchedSeconds === 0 || !isVideoPlaying) return;
+
+    // حفظ التقدم كل 10 ثواني
+    if (watchedSeconds % 10 === 0) {
+      const saveProgress = async () => {
+        try {
+          // الحصول على userId من localStorage
+          const userStr = localStorage.getItem('user');
+          let userId: string | null = null;
+          
+          if (userStr) {
+            try {
+              const user = JSON.parse(userStr);
+              userId = user.id || user.userId || null;
+            } catch (e) {
+              console.error('Error parsing user data:', e);
+            }
+          }
+
+          if (!userId) {
+            console.warn('User ID not found, skipping progress save');
+            return;
+          }
+
+          const response = await fetch('/api/lesson-progress', {
+            method: 'POST',
+            headers: { 
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
+            },
+            body: JSON.stringify({
+              lessonId,
+              courseId,
+              watchedSeconds,
+              progressPercent,
+              duration: duration * 60, // بالثواني
+              userId, // إرسال userId من العميل
+            }),
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            console.error('فشل حفظ التقدم:', errorData);
+          } else {
+            console.log('✅ تم حفظ التقدم بنجاح');
+          }
+        } catch (error) {
+          console.error('خطأ في حفظ التقدم:', error);
+        }
+      };
+
+      saveProgress();
+    }
+  }, [watchedSeconds, lessonId, courseId, isEnrolled, progressPercent, duration, isVideoPlaying]);
 
   const handleVerifyCode = async () => {
     if (!lessonId || !courseId) return;
@@ -307,7 +536,8 @@ export default function ProtectedVideoPlayer({
           }
 
           if (fileId) {
-            return `https://drive.google.com/file/d/${fileId}/preview`;
+            // تعطيل أزرار المشاركة في Google Drive
+            return `https://drive.google.com/file/d/${fileId}/preview?usp=sharing&rm=minimal`;
           }
         } catch (e) {}
       }
@@ -316,21 +546,23 @@ export default function ProtectedVideoPlayer({
         const urlObj = new URL(url);
         const v = urlObj.searchParams.get('v');
         if (v) {
-          return `https://www.youtube.com/embed/${v}?autoplay=0&rel=0&modestbranding=1&controls=1&disablekb=1&iv_load_policy=3&fs=0`;
+          // تعطيل أزرار المشاركة: modestbranding=1, rel=0, disablekb=1, fs=0
+          // إضافة showinfo=0 لإخفاء معلومات الفيديو
+          return `https://www.youtube.com/embed/${v}?autoplay=0&rel=0&modestbranding=1&controls=1&disablekb=1&iv_load_policy=3&fs=0&showinfo=0&playsinline=1`;
         }
       }
 
       if (url.includes('youtu.be/')) {
         const id = url.split('youtu.be/')[1]?.split(/[?&]/)[0];
         if (id) {
-          return `https://www.youtube.com/embed/${id}?autoplay=0&rel=0&modestbranding=1&controls=1&disablekb=1&iv_load_policy=3&fs=0`;
+          return `https://www.youtube.com/embed/${id}?autoplay=0&rel=0&modestbranding=1&controls=1&disablekb=1&iv_load_policy=3&fs=0&showinfo=0&playsinline=1`;
         }
       }
 
       if (url.includes('youtube.com/embed/')) {
         const hasQuery = url.includes('?');
         const base = hasQuery ? url.split('?')[0] : url;
-        return `${base}?autoplay=0&rel=0&modestbranding=1&controls=1&disablekb=1&iv_load_policy=3&fs=0`;
+        return `${base}?autoplay=0&rel=0&modestbranding=1&controls=1&disablekb=1&iv_load_policy=3&fs=0&showinfo=0&playsinline=1`;
       }
 
       return url;
@@ -341,29 +573,100 @@ export default function ProtectedVideoPlayer({
   };
 
   const renderVideoPlayer = () => {
+    const totalSeconds = duration * 60;
+    const watchedMinutes = Math.floor(watchedSeconds / 60);
+    const watchedSecs = watchedSeconds % 60;
+    const totalMinutes = duration;
+
     return (
       <div
         className={
           isExpanded
-            ? 'fixed inset-0 z-50 bg-black/90 flex flex-col items-center justify-start pt-2 px-2'
+            ? 'fixed inset-0 z-50 bg-black flex flex-col items-center justify-center'
             : 'w-full'
         }
+        style={{
+          ...(isExpanded && isMobile ? {
+            width: '100vw',
+            height: '100vh',
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+          } : {}),
+        }}
       >
         <div
-          className="w-full max-w-6xl max-h-[90vh] aspect-video bg-black rounded-xl overflow-hidden relative"
+          className={
+            isExpanded && isMobile
+              ? 'w-full h-full bg-black overflow-hidden relative video-fullscreen-mobile video-container-protected'
+              : 'w-full max-w-6xl max-h-[90vh] aspect-video bg-black rounded-xl overflow-hidden relative video-container-protected'
+          }
           style={{
-            transform: isExpanded ? `scale(${zoomLevel})` : 'scale(1)',
+            transform: isExpanded && !isMobile ? `scale(${zoomLevel})` : 'scale(1)',
             transformOrigin: 'top center',
             transition: 'transform 0.2s ease-out',
+            ...(isExpanded && isMobile ? {
+              width: '100%',
+              height: '100%',
+              maxWidth: 'none',
+              maxHeight: 'none',
+              borderRadius: 0,
+            } : {}),
           }}
         >
           <iframe
+            ref={iframeRef}
             src={getEmbeddedUrl()}
             title="Course Video"
             className="w-full h-full"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
             allowFullScreen
+            style={{
+              pointerEvents: 'auto',
+            }}
+            sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
+            onContextMenu={(e) => e.preventDefault()}
           />
+          {/* طبقة حماية لمنع الوصول لأزرار المشاركة */}
+          <div 
+            className="absolute inset-0 z-30 pointer-events-none"
+            style={{
+              background: 'transparent',
+            }}
+            onContextMenu={(e) => e.preventDefault()}
+          />
+          
+          {/* شريط التقدم */}
+          {isEnrolled && duration > 0 && (
+            <div className="absolute bottom-0 left-0 right-0 bg-black/80 backdrop-blur-sm p-3 z-20">
+              <div className="flex items-center gap-3 mb-2">
+                <button
+                  type="button"
+                  onClick={() => setIsVideoPlaying(!isVideoPlaying)}
+                  className="flex items-center justify-center w-10 h-10 rounded-full bg-white/20 hover:bg-white/30 text-white transition"
+                  title={isVideoPlaying ? 'إيقاف التتبع' : 'بدء التتبع'}
+                >
+                  {isVideoPlaying ? <FaPause className="text-sm" /> : <FaPlay className="text-sm" />}
+                </button>
+                <div className="flex-1">
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-white text-xs font-medium">
+                      {watchedMinutes}:{watchedSecs.toString().padStart(2, '0')} / {totalMinutes}:00
+                    </span>
+                    <span className="text-white text-xs font-medium">{progressPercent}%</span>
+                  </div>
+                  <div className="w-full bg-white/20 rounded-full h-2 overflow-hidden">
+                    <div
+                      className="h-full bg-blue-500 transition-all duration-300"
+                      style={{ width: `${progressPercent}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div
             className="absolute bottom-2 right-2 z-20 px-3 py-1.5 bg-black/90 rounded-full flex items-center gap-1.5 text-white/90 text-xs md:text-sm select-none shadow-lg"

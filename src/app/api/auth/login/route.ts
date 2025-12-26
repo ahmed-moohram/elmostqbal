@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { cookies } from 'next/headers';
 import { compare } from 'bcryptjs';
+import { userLoginSchema, validateRequest } from '@/lib/validation';
 
 // مفتاح التشفير - يجب تخزينه في متغيرات البيئة في الإنتاج
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_key_replace_in_production';
@@ -40,16 +41,13 @@ const USERS = [
 // واجهة API لتسجيل الدخول
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { email, password } = body;
-    
-    // التحقق من وجود البريد الإلكتروني وكلمة المرور
-    if (!email || !password) {
-      return NextResponse.json(
-        { error: 'يرجى توفير البريد الإلكتروني وكلمة المرور' },
-        { status: 400 }
-      );
+    // Validate request body using Zod
+    const validation = await validateRequest(request, userLoginSchema);
+    if (!validation.success) {
+      return validation.response;
     }
+
+    const { email, password } = validation.data;
     
     // البحث عن المستخدم في قاعدة البيانات
     const user = USERS.find(user => user.email === email);

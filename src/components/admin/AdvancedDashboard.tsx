@@ -34,6 +34,9 @@ interface Stats {
   activeStudents: number;
   pendingPayments: number;
   completionRate: number;
+  newTeachersThisMonth?: number;
+  newCoursesThisMonth?: number;
+  revenueIncrease?: number;
 }
 
 interface Transaction {
@@ -547,7 +550,7 @@ const AdvancedDashboard = () => {
             <RevenueWidget 
               title="المدرسين"
               value={stats.totalTeachers}
-              trend={3}
+              trend={stats.newTeachersThisMonth ?? 0}
               trendLabel="مدرس جديد هذا الشهر"
               icon={<FaGraduationCap className="text-green-600" size={18} />}
               color="green"
@@ -557,7 +560,7 @@ const AdvancedDashboard = () => {
             <RevenueWidget 
               title="الدورات"
               value={stats.totalCourses}
-              trend={5}
+              trend={stats.newCoursesThisMonth ?? 0}
               trendLabel="دورة جديدة هذا الشهر"
               icon={<FaBookOpen className="text-purple-600" size={18} />}
               color="purple"
@@ -567,8 +570,8 @@ const AdvancedDashboard = () => {
             <RevenueWidget 
               title="الإيرادات"
               value={stats.totalRevenue}
-              trend={12000}
-              trendLabel="زيادة عن الشهر الماضي"
+              trend={stats.revenueIncrease ?? 0}
+              trendLabel={stats.revenueIncrease && stats.revenueIncrease > 0 ? "زيادة عن الشهر الماضي" : stats.revenueIncrease && stats.revenueIncrease < 0 ? "نقص عن الشهر الماضي" : "لا يوجد تغيير"}
               icon={<FaMoneyBillWave className="text-yellow-600" size={18} />}
               color="yellow"
               footerLabel="إجمالي الإيرادات (ج.م)"

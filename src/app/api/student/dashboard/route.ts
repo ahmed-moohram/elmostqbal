@@ -12,6 +12,9 @@ if (!supabaseUrl || !supabaseServiceKey) {
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const PHONE_REGEX = /^\d{7,15}$/;
+
 function calculateOverallProgress(enrollments: any[]): number {
   if (!enrollments || enrollments.length === 0) return 0;
 
@@ -34,46 +37,42 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    const requestedUserId = String(userId).trim();
+    let effectiveUserId = requestedUserId;
+    let studentPhoneForPayments: string | null = null;
+
+    if (!UUID_REGEX.test(effectiveUserId)) {
+      if (PHONE_REGEX.test(effectiveUserId)) {
+        studentPhoneForPayments = effectiveUserId;
+
+        try {
+          const { data: resolvedUser, error: resolveErr } = await supabase
+            .from('users')
+            .select('id')
+            .or(
+              `phone.eq.${studentPhoneForPayments},student_phone.eq.${studentPhoneForPayments},parent_phone.eq.${studentPhoneForPayments},mother_phone.eq.${studentPhoneForPayments}`
+            )
+            .maybeSingle();
+
+          if (!resolveErr && resolvedUser?.id) {
+            effectiveUserId = String(resolvedUser.id);
+          }
+        } catch {
+          // ignore
+        }
+      }
+    }
+
+    const hasUuid = UUID_REGEX.test(effectiveUserId);
+
     // جلب التسجيلات النشطة للطالب من جدول enrollments
     let enrollments: any[] = [];
 
-    const { data: legacyEnrollments, error: enrollmentsError } = await supabase
-      .from('enrollments')
-      .select(`
-        *,
-        course:courses(
-          *,
-          instructor_user:users!courses_instructor_id_fkey(
-            id,
-            name,
-            avatar_url,
-            profile_picture
-          )
-        )
-      `)
-      .eq('user_id', userId)
-      .not('is_active', 'eq', false);
-
-    if (enrollmentsError) {
-      console.error('Error fetching enrollments in /api/student/dashboard:', enrollmentsError);
-      return NextResponse.json(
-        { error: 'Failed to load enrollments' },
-        { status: 500 }
-      );
-    }
-
-    enrollments = legacyEnrollments || [];
-
-    // دمج التسجيلات من نظام الدفع الجديد course_enrollments في حال عدم وجودها في enrollments
-    try {
-      const { data: paymentEnrollments, error: courseEnrollError } = await supabase
-        .from('course_enrollments')
+    if (hasUuid) {
+      const { data: legacyEnrollments, error: enrollmentsError } = await supabase
+        .from('enrollments')
         .select(`
-          id,
-          student_id,
-          course_id,
-          is_active,
-          created_at,
+          *,
           course:courses(
             *,
             instructor_user:users!courses_instructor_id_fkey(
@@ -84,20 +83,86 @@ export async function GET(request: NextRequest) {
             )
           )
         `)
-        .eq('student_id', userId)
-        .eq('is_active', true);
+        .eq('user_id', effectiveUserId)
+        .not('is_active', 'eq', false);
+
+      if (enrollmentsError) {
+        console.error('Error fetching enrollments in /api/student/dashboard:', enrollmentsError);
+        return NextResponse.json(
+          { error: 'Failed to load enrollments' },
+          { status: 500 }
+        );
+      }
+
+      enrollments = legacyEnrollments || [];
+    }
+
+    // دمج التسجيلات من نظام الدفع الجديد course_enrollments في حال عدم وجودها في enrollments
+    try {
+      const paymentEnrollments = hasUuid
+        ? (
+            await supabase
+              .from('course_enrollments')
+              .select(`
+                id,
+                student_id,
+                course_id,
+                is_active,
+                created_at
+              `)
+              .eq('student_id', effectiveUserId)
+              .eq('is_active', true)
+          )
+        : { data: null, error: null };
+
+      const { data: paymentEnrollmentsData, error: courseEnrollError } = paymentEnrollments as any;
 
       if (courseEnrollError) {
         console.warn(
           'Error fetching course_enrollments for /api/student/dashboard (ignored):',
           courseEnrollError.message
         );
-      } else if (paymentEnrollments && paymentEnrollments.length > 0) {
+      } else if (paymentEnrollmentsData && paymentEnrollmentsData.length > 0) {
+        const courseIdsForEnrollments = Array.from(
+          new Set(
+            (paymentEnrollmentsData || [])
+              .map((ce: any) => ce?.course_id)
+              .filter((cid: any) => !!cid)
+              .map((cid: any) => String(cid))
+          )
+        );
+
+        const courseMap = new Map<string, any>();
+        if (courseIdsForEnrollments.length > 0) {
+          const { data: coursesForEnrollments, error: coursesForEnrollmentsError } = await supabase
+            .from('courses')
+            .select(
+              `*, instructor_user:users!courses_instructor_id_fkey(
+                id,
+                name,
+                avatar_url,
+                profile_picture
+              )`
+            )
+            .in('id', courseIdsForEnrollments as any);
+
+          if (coursesForEnrollmentsError) {
+            console.warn(
+              'Error fetching courses for course_enrollments in /api/student/dashboard (ignored):',
+              coursesForEnrollmentsError.message
+            );
+          } else {
+            (coursesForEnrollments || []).forEach((c: any) => {
+              if (c?.id) courseMap.set(String(c.id), c);
+            });
+          }
+        }
+
         const existingCourseIds = new Set(
           (enrollments || []).map((enr: any) => String(enr.course_id))
         );
 
-        const extraEnrollments = paymentEnrollments
+        const extraEnrollments = paymentEnrollmentsData
           .filter((ce: any) => !existingCourseIds.has(String(ce.course_id)))
           .map((ce: any) => ({
             id: ce.id,
@@ -108,7 +173,7 @@ export async function GET(request: NextRequest) {
             is_active: ce.is_active ?? true,
             enrolled_at: ce.created_at,
             completed_at: null,
-            course: ce.course || null,
+            course: courseMap.get(String(ce.course_id)) || null,
           }));
 
         enrollments = [...enrollments, ...extraEnrollments];
@@ -123,25 +188,26 @@ export async function GET(request: NextRequest) {
     // دمج الكورسات التي تمت الموافقة على طلب الدفع لها مباشرةً من جدول payment_requests
     // هذا يضمن ظهور أي كورس مدفوع حتى لو فشل إنشاء صف في enrollments أو course_enrollments
     try {
-      // الحصول على رقم هاتف الطالب من جدول users
-      const { data: userRow, error: userError } = await supabase
-        .from('users')
-        .select('id, phone, student_phone')
-        .eq('id', userId)
-        .maybeSingle();
+      if (!studentPhoneForPayments && hasUuid) {
+        const { data: userRow, error: userError } = await supabase
+          .from('users')
+          .select('id, phone, student_phone')
+          .eq('id', effectiveUserId)
+          .maybeSingle();
 
-      if (userError) {
-        console.warn('Error fetching user phone for student dashboard (ignored):', userError.message);
+        if (userError) {
+          console.warn('Error fetching user phone for student dashboard (ignored):', userError.message);
+        }
+
+        studentPhoneForPayments = (userRow as any)?.phone || (userRow as any)?.student_phone || null;
       }
 
-      const studentPhone = (userRow as any)?.phone || (userRow as any)?.student_phone || null;
-
-      if (studentPhone) {
+      if (studentPhoneForPayments) {
         // جلب طلبات الدفع المعتمدة لهذا الطالب بناءً على رقم الهاتف
         const { data: approvedPayments, error: paymentsError } = await supabase
           .from('payment_requests')
           .select('id, course_id, status, student_phone, payment_phone, approved_at, created_at')
-          .or(`student_phone.eq.${studentPhone},payment_phone.eq.${studentPhone}`)
+          .or(`student_phone.eq.${studentPhoneForPayments},payment_phone.eq.${studentPhoneForPayments}`)
           .eq('status', 'approved');
 
         if (paymentsError) {
@@ -200,7 +266,7 @@ export async function GET(request: NextRequest) {
 
               return {
                 id: `payment_${pr.id}`,
-                user_id: userId,
+                user_id: effectiveUserId,
                 course_id: pr.course_id,
                 status: 'active',
                 progress: 0,
@@ -223,21 +289,29 @@ export async function GET(request: NextRequest) {
     }
 
     // جلب الشهادات
-    const { data: certificates, error: certificatesError } = await supabase
-      .from('certificates')
-      .select('*')
-      .eq('user_id', userId);
+    const certificatesResp = hasUuid
+      ? await supabase
+          .from('certificates')
+          .select('*')
+          .eq('user_id', effectiveUserId)
+      : { data: [], error: null };
+
+    const { data: certificates, error: certificatesError } = certificatesResp as any;
 
     if (certificatesError) {
       console.warn('Error fetching certificates (ignored):', certificatesError.message);
     }
 
     // جلب النقاط
-    const { data: userPointsData, error: userPointsError } = await supabase
-      .from('user_points')
-      .select('*')
-      .eq('user_id', userId)
-      .limit(1);
+    const userPointsResp = hasUuid
+      ? await supabase
+          .from('user_points')
+          .select('*')
+          .eq('user_id', effectiveUserId)
+          .limit(1)
+      : { data: [], error: null };
+
+    const { data: userPointsData, error: userPointsError } = userPointsResp as any;
 
     if (userPointsError) {
       console.warn('Error fetching user_points (ignored):', userPointsError.message);
@@ -248,14 +322,18 @@ export async function GET(request: NextRequest) {
       : null;
 
     // جلب الإنجازات المكتملة
-    const { data: achievements, error: achievementsError } = await supabase
-      .from('user_achievements')
-      .select(`
-        *,
-        achievement:achievements(*)
-      `)
-      .eq('user_id', userId)
-      .eq('is_completed', true);
+    const achievementsResp = hasUuid
+      ? await supabase
+          .from('user_achievements')
+          .select(`
+            *,
+            achievement:achievements(*)
+          `)
+          .eq('user_id', effectiveUserId)
+          .eq('is_completed', true)
+      : { data: [], error: null };
+
+    const { data: achievements, error: achievementsError } = achievementsResp as any;
 
     if (achievementsError) {
       console.warn('Error fetching user achievements (ignored):', achievementsError.message);
@@ -313,7 +391,6 @@ export async function GET(request: NextRequest) {
       if (!title) return false;
 
       if (course.is_active === false) return false;
-      if (course.is_published === false) return false;
 
       return true;
     });

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { courseMessageCreateSchema, courseMessageGetSchema, validateRequest } from '@/lib/validation';
+import { sanitizeHTML } from '@/lib/security/xss';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -146,12 +148,6 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    if (role === 'admin') {
-      if (String(user.id) !== String(instructorId)) {
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-      }
-    }
-
     if (role === 'student') {
       const enrolled = await isEnrollmentActive(courseId, userId);
       if (!enrolled) {
@@ -185,20 +181,21 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { courseId, userId, content } = body;
+    // Validate request body using Zod
+    const validation = await validateRequest(request, courseMessageCreateSchema);
+    if (!validation.success) {
+      return validation.response;
+    }
+
+    const { courseId, userId, content: rawContent } = validation.data;
+
+    // Sanitize content to prevent XSS
+    const content = sanitizeHTML(rawContent);
 
     const roleCookie = request.cookies.get('user-role')?.value;
     const authCookie =
       request.cookies.get('auth-token')?.value || request.cookies.get('auth_token')?.value;
     const cookieUserId = request.cookies.get('user-id')?.value;
-
-    if (!courseId || !userId || !content) {
-      return NextResponse.json(
-        { error: 'courseId, userId and content are required' },
-        { status: 400 }
-      );
-    }
 
     if (!authCookie || !roleCookie || !cookieUserId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -235,12 +232,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    if (role === 'admin') {
-      if (String(user.id) !== String(instructorId)) {
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-      }
-    }
-
     if (role === 'student') {
       const enrolled = await isEnrollmentActive(courseId, String(userId));
       if (!enrolled) {
@@ -266,7 +257,7 @@ export async function POST(request: NextRequest) {
         sender_id: String(userId),
         sender_name: senderName,
         sender_role: senderRole,
-        content: String(content),
+        content: content, // Already sanitized
       })
       .select()
       .single();

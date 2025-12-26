@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import supabase from '@/lib/supabase-client';
+import { courseCreateSchema, validateFormData } from '@/lib/validation';
+import { sanitizeHTML } from '@/lib/security/xss';
 
 export async function GET() {
   const { data, error } = await supabase
@@ -28,42 +30,102 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const form = await request.formData();
+  try {
+    const form = await request.formData();
 
-  const rawTitle = String(form.get('title') || '').trim();
-  const description = String(form.get('description') || '');
+    // Convert FormData to object for validation
+    const formData: Record<string, any> = {};
+    form.forEach((value, key) => {
+      formData[key] = value;
+    });
 
-  let baseSlug = String(form.get('slug') || rawTitle)
-    .toLowerCase()
-    .replace(/\s+/g, '-')
-    .replace(/[^a-z0-9\-ء-ي]+/g, '');
+    // Validate using Zod schema (with FormData-specific handling)
+    const rawTitle = String(form.get('title') || '').trim();
+    const description = String(form.get('description') || '');
+    const price = Number(form.get('price') || 0);
+    const category = String(form.get('category') || '');
+    const level = String(form.get('level') || 'مبتدئ') as 'مبتدئ' | 'متوسط' | 'متقدم';
 
-  if (!baseSlug) {
-    baseSlug = `course-${Date.now()}`;
-  }
+    // Manual validation (since FormData needs special handling)
+    if (!rawTitle || rawTitle.length < 3) {
+      return NextResponse.json(
+        { error: 'العنوان يجب أن يكون 3 أحرف على الأقل' },
+        { status: 400 }
+      );
+    }
 
-  const slug = `${baseSlug}-${Math.random().toString(36).substring(2, 8)}`;
+    if (!description || description.length < 10) {
+      return NextResponse.json(
+        { error: 'الوصف يجب أن يكون 10 أحرف على الأقل' },
+        { status: 400 }
+      );
+    }
 
-  const shortDescriptionFromForm = form.get('shortDescription');
-  const shortDescription =
-    typeof shortDescriptionFromForm === 'string' && shortDescriptionFromForm.trim().length > 0
-      ? shortDescriptionFromForm
-      : description.slice(0, 200);
+    if (price < 0) {
+      return NextResponse.json(
+        { error: 'السعر يجب أن يكون موجباً' },
+        { status: 400 }
+      );
+    }
 
-  const payload: any = {
-    title: rawTitle,
-    slug,
-    description,
-    short_description: shortDescription,
-    price: Number(form.get('price') || 0),
-    discount_price: form.get('discountPrice') != null ? Number(form.get('discountPrice')) : null,
-    is_published: String(form.get('isPublished') || 'false') === 'true',
-    status: String(form.get('isPublished') || 'false') === 'true' ? 'published' : 'draft',
-    is_active: String(form.get('isPublished') || 'false') === 'true',
-    is_paid: String(form.get('isPaid') || 'true') === 'true',
-    category: String(form.get('category') || ''),
-    level: String(form.get('level') || 'مبتدئ'),
-  };
+    if (!category || category.trim().length === 0) {
+      return NextResponse.json(
+        { error: 'يجب اختيار فئة' },
+        { status: 400 }
+      );
+    }
+
+    if (!['مبتدئ', 'متوسط', 'متقدم'].includes(level)) {
+      return NextResponse.json(
+        { error: 'يجب اختيار مستوى صحيح' },
+        { status: 400 }
+      );
+    }
+
+    let baseSlug = String(form.get('slug') || rawTitle)
+      .toLowerCase()
+      .replace(/\s+/g, '-')
+      .replace(/[^a-z0-9\-ء-ي]+/g, '');
+
+    if (!baseSlug) {
+      baseSlug = `course-${Date.now()}`;
+    }
+
+    const slug = `${baseSlug}-${Math.random().toString(36).substring(2, 8)}`;
+
+    const shortDescriptionFromForm = form.get('shortDescription');
+    const shortDescription =
+      typeof shortDescriptionFromForm === 'string' && shortDescriptionFromForm.trim().length > 0
+        ? shortDescriptionFromForm
+        : description.slice(0, 200);
+
+    const discountPrice = form.get('discountPrice');
+    const discountPriceNum = discountPrice != null ? Number(discountPrice) : null;
+    if (discountPriceNum !== null && discountPriceNum < 0) {
+      return NextResponse.json(
+        { error: 'سعر الخصم يجب أن يكون موجباً' },
+        { status: 400 }
+      );
+    }
+
+    // Sanitize user input to prevent XSS
+    const sanitizedDescription = sanitizeHTML(description);
+    const sanitizedShortDescription = sanitizeHTML(shortDescription);
+
+    const payload: any = {
+      title: rawTitle,
+      slug,
+      description: sanitizedDescription,
+      short_description: sanitizedShortDescription,
+      price,
+      discount_price: discountPriceNum,
+      is_published: String(form.get('isPublished') || 'false') === 'true',
+      status: String(form.get('isPublished') || 'false') === 'true' ? 'published' : 'draft',
+      is_active: String(form.get('isPublished') || 'false') === 'true',
+      is_paid: String(form.get('isPaid') || 'true') === 'true',
+      category,
+      level,
+    };
 
   const role = request.cookies.get('user-role')?.value || null;
   const cookieUserId = request.cookies.get('user-id')?.value || null;
@@ -76,8 +138,19 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const { data, error } = await supabase.from('courses').insert(payload).select('*').single();
+    const { data, error } = await supabase.from('courses').insert(payload).select('*').single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(data, { status: 201 });
+    if (error) {
+      console.error('Error creating course:', error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json(data, { status: 201 });
+  } catch (error: any) {
+    console.error('Unexpected error in POST /api/courses:', error);
+    return NextResponse.json(
+      { error: 'حدث خطأ أثناء إنشاء الكورس' },
+      { status: 500 }
+    );
+  }
 }

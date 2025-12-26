@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
@@ -10,7 +10,6 @@ import { toast } from 'react-hot-toast';
 import AdminLayout from '@/components/AdminLayout';
 import { useAuth } from '@/contexts/AuthContext';
 import supabase from '@/lib/supabase-client';
-import CourseChat from '@/components/CourseChat';
 
 type CourseRow = {
   id: string;
@@ -29,14 +28,6 @@ export default function AdminMyCoursesPage() {
 
   const [courses, setCourses] = useState<CourseRow[]>([]);
   const [loadingCourses, setLoadingCourses] = useState(true);
-
-  const [showChat, setShowChat] = useState(false);
-  const [chatCourseId, setChatCourseId] = useState<string | null>(null);
-
-  const displayName = useMemo(() => {
-    if (user?.role === 'admin') return 'مستر معتصم';
-    return user?.name || 'المدرس';
-  }, [user]);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -60,16 +51,60 @@ export default function AdminMyCoursesPage() {
         const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
         let instructorId: string | null = user.id;
 
-        if (!uuidRegex.test(String(instructorId || '')) && typeof user.phone === 'string' && user.phone) {
-          try {
-            const { data: userRow } = await supabase
-              .from('users')
-              .select('id')
-              .or(`phone.eq.${user.phone},student_phone.eq.${user.phone},parent_phone.eq.${user.phone}`)
-              .maybeSingle();
+        const resolvedPhone: string | null =
+          (user as any)?.phone ||
+          (user as any)?.student_phone ||
+          (user as any)?.parent_phone ||
+          (user as any)?.mother_phone ||
+          (user?.role === 'admin' ? '01005209667' : null);
 
-            if (userRow?.id && uuidRegex.test(String(userRow.id))) {
-              instructorId = String(userRow.id);
+        const resolveUserUuidByPhone = async (phone: string): Promise<string | null> => {
+          const normalizedPhone = String(phone || '').trim();
+          if (!normalizedPhone) return null;
+
+          const tryWithPhoneColumn = async () =>
+            supabase
+              .from('users')
+              .select('id, role')
+              .or(
+                `phone.eq.${normalizedPhone},student_phone.eq.${normalizedPhone},parent_phone.eq.${normalizedPhone},mother_phone.eq.${normalizedPhone}`
+              )
+              .limit(10);
+
+          const tryWithoutPhoneColumn = async () =>
+            supabase
+              .from('users')
+              .select('id, role')
+              .or(
+                `student_phone.eq.${normalizedPhone},parent_phone.eq.${normalizedPhone},mother_phone.eq.${normalizedPhone}`
+              )
+              .limit(10);
+
+          let { data, error } = await tryWithPhoneColumn();
+
+          if (error && typeof error.message === 'string' && error.message.toLowerCase().includes('phone')) {
+            ({ data, error } = await tryWithoutPhoneColumn());
+          }
+
+          if (error) {
+            console.error('Error resolving admin UUID for my courses:', error);
+            return null;
+          }
+
+          const rows: any[] = Array.isArray(data) ? (data as any[]) : data ? [data as any] : [];
+          const preferred = rows.find((row) => String((row as any)?.role || '').toLowerCase() === 'admin');
+          const picked = preferred || rows[0] || null;
+          const resolved = picked?.id ? String(picked.id) : null;
+          if (resolved && uuidRegex.test(resolved)) return resolved;
+          return null;
+        };
+
+        if (!uuidRegex.test(String(instructorId || '')) && resolvedPhone) {
+          try {
+            const resolvedId = await resolveUserUuidByPhone(resolvedPhone);
+
+            if (resolvedId) {
+              instructorId = String(resolvedId);
             }
           } catch (resolveErr) {
             console.error('Error resolving admin UUID for my courses:', resolveErr);
@@ -77,16 +112,19 @@ export default function AdminMyCoursesPage() {
         }
 
         if (!instructorId || !uuidRegex.test(String(instructorId))) {
-          toast.error('تعذر تحديد حساب الأدمن داخل قاعدة البيانات. برجاء تسجيل الدخول مرة أخرى بعد إنشاء مستخدم أدمن في جدول users.');
-          setCourses([]);
-          return;
+          instructorId = null;
         }
 
-        const { data, error } = await supabase
+        let query = supabase
           .from('courses')
           .select('id, title, short_description, thumbnail, students_count, total_lessons, status, created_at')
-          .eq('instructor_id', instructorId)
           .order('created_at', { ascending: false });
+
+        if (instructorId && uuidRegex.test(String(instructorId))) {
+          query = query.eq('instructor_id', instructorId);
+        }
+
+        const { data, error } = await query;
 
         if (error) {
           console.error('Error loading admin-owned courses:', error);
@@ -106,7 +144,7 @@ export default function AdminMyCoursesPage() {
     };
 
     load();
-  }, [isLoading, isAuthenticated, user, router, displayName]);
+  }, [isLoading, isAuthenticated, user, router]);
 
   return (
     <AdminLayout>
@@ -197,11 +235,10 @@ export default function AdminMyCoursesPage() {
                     <button
                       type="button"
                       onClick={() => {
-                        setChatCourseId(course.id);
-                        setShowChat(true);
+                        router.push('/messages');
                       }}
                       className="px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 text-sm font-semibold hover:bg-gray-200 dark:hover:bg-gray-700 transition inline-flex items-center justify-center gap-2"
-                      title="شات الكورس"
+                      title="رسائل الطلاب"
                     >
                       <FaComments />
                       الشات
@@ -222,18 +259,6 @@ export default function AdminMyCoursesPage() {
           </div>
         )}
 
-        {showChat && chatCourseId && user?.id && (
-          <CourseChat
-            courseId={chatCourseId}
-            userId={user.id}
-            userName={displayName}
-            userRole="teacher"
-            teacherId={user.id}
-            teacherName={displayName}
-            isOpen={showChat}
-            onClose={() => setShowChat(false)}
-          />
-        )}
       </div>
     </AdminLayout>
   );

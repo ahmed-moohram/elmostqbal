@@ -10,85 +10,7 @@ import supabase from '@/lib/supabase-client';
 import { hashPassword, validatePasswordStrength } from '@/lib/security/password-utils';
 import { uploadTeacherAvatar } from '@/lib/supabase-upload';
 
-// تم إزالة البيانات الوهمية - سيتم جلب البيانات من Backend
-const ignoredMockTeachers = [
-  {
-    id: 1,
-    name: 'د. أحمد محمود (MOCK)',
-    image: '/teachers/teacher1.jpg',
-    specialty: 'رياضيات',
-    email: 'ahmed.mahmoud@example.com',
-    phone: '01012345678',
-    rating: 4.9,
-    studentsCount: 1240,
-    coursesCount: 5,
-    isActive: true,
-    joinedDate: '2022-01-15',
-  },
-  {
-    id: 2,
-    name: 'د. سارة علي',
-    image: '/teachers/teacher2.jpg',
-    specialty: 'فيزياء',
-    email: 'sara.ali@example.com',
-    phone: '01023456789',
-    rating: 4.8,
-    studentsCount: 980,
-    coursesCount: 3,
-    isActive: true,
-    joinedDate: '2022-03-20',
-  },
-  {
-    id: 3,
-    name: 'د. محمد إبراهيم',
-    image: '/teachers/teacher3.jpg',
-    specialty: 'لغة إنجليزية',
-    email: 'mohamed.ibrahim@example.com',
-    phone: '01034567890',
-    rating: 4.7,
-    studentsCount: 820,
-    coursesCount: 4,
-    isActive: true,
-    joinedDate: '2022-02-10',
-  },
-  {
-    id: 4,
-    name: 'د. فاطمة أحمد',
-    image: '/teachers/teacher4.jpg',
-    specialty: 'كيمياء',
-    email: 'fatma.ahmed@example.com',
-    phone: '01045678901',
-    rating: 4.9,
-    studentsCount: 1050,
-    coursesCount: 5,
-    isActive: true,
-    joinedDate: '2021-11-05',
-  },
-  {
-    id: 5,
-    name: 'د. علي محمد',
-    image: '/teachers/teacher5.jpg',
-    specialty: 'تاريخ',
-    email: 'ali.mohamed@example.com',
-    phone: '01056789012',
-    rating: 4.6,
-    studentsCount: 750,
-    coursesCount: 3,
-    isActive: false,
-    joinedDate: '2022-04-12',
-  },
-  {
-    id: 6,
-    name: 'د. نورا حسن',
-    image: '/teachers/teacher6.jpg',
-    specialty: 'علوم',
-    email: 'noura.hassan@example.com',
-    phone: '01067890123',
-    rating: 5,
-    studentsCount: 1000,
-    joinedDate: '2022-01-30',
-  }
-];
+// تم إزالة البيانات الوهمية - جميع البيانات تُجلب من قاعدة البيانات
 
 export default function AdminTeachersPage() {
   const [teachers, setTeachers] = useState<any[]>([]);
@@ -693,11 +615,39 @@ function AddTeacherModal({ onClose, onAdd }: any) {
       }
 
       // التحقق من عدم وجود مستخدم بنفس الإيميل أو الهاتف
-      const { data: existingUser } = await supabase
-        .from('users')
-        .select('id')
-        .or(`email.eq.${formData.email},phone.eq.${formData.phone}`)
-        .maybeSingle();
+      const tryWithPhoneColumn = async () =>
+        supabase
+          .from('users')
+          .select('id')
+          .or(
+            `email.eq.${formData.email},phone.eq.${formData.phone},student_phone.eq.${formData.phone},parent_phone.eq.${formData.phone},mother_phone.eq.${formData.phone}`
+          )
+          .maybeSingle();
+
+      const tryWithoutPhoneColumn = async () =>
+        supabase
+          .from('users')
+          .select('id')
+          .or(
+            `email.eq.${formData.email},student_phone.eq.${formData.phone},parent_phone.eq.${formData.phone},mother_phone.eq.${formData.phone}`
+          )
+          .maybeSingle();
+
+      let { data: existingUser, error: existingUserError } = await tryWithPhoneColumn();
+
+      if (
+        existingUserError &&
+        typeof existingUserError.message === 'string' &&
+        existingUserError.message.toLowerCase().includes('phone')
+      ) {
+        ({ data: existingUser, error: existingUserError } = await tryWithoutPhoneColumn());
+      }
+
+      if (existingUserError) {
+        setError(existingUserError.message || 'حدث خطأ أثناء التحقق من المستخدم');
+        setIsSubmitting(false);
+        return;
+      }
 
       if (existingUser) {
         setError('هذا البريد الإلكتروني أو رقم الهاتف مسجل مسبقاً');

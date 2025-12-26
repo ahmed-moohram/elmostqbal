@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { examCreateSchema, validateRequest } from '@/lib/validation';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -71,28 +72,28 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    if (!body || !body.id || !body.title || !body.courseId || !Array.isArray(body.questions)) {
-      return NextResponse.json({ error: 'invalid_exam_payload' }, { status: 400 });
+    // Validate request body using Zod
+    const validation = await validateRequest(request, examCreateSchema);
+    if (!validation.success) {
+      return validation.response;
     }
 
+    const validatedData = validation.data;
+
     const insertPayload = {
-      id: String(body.id),
-      course_id: String(body.courseId),
-      section_id: body.sectionId ? String(body.sectionId) : null,
-      order_index:
-        typeof body.orderIndex === 'number'
-          ? body.orderIndex
-          : Number(body.orderIndex || 0) || 0,
-      title: String(body.title),
-      description: body.description ? String(body.description) : null,
-      duration: Number(body.duration || 0),
-      total_marks: Number(body.totalMarks || 0),
-      passing_marks: Number(body.passingMarks || 0),
-      questions: body.questions,
-      start_date: body.startDate || null,
-      end_date: body.endDate || null,
-      is_active: body.isActive ?? true,
+      id: validatedData.course_id + '-' + Date.now(), // Generate ID if not provided
+      course_id: validatedData.course_id,
+      section_id: validatedData.section_id || null,
+      order_index: validatedData.order_index || 0,
+      title: validatedData.title,
+      description: validatedData.description || null,
+      duration: validatedData.duration,
+      total_marks: validatedData.total_marks,
+      passing_marks: validatedData.passing_marks,
+      questions: validatedData.questions,
+      start_date: validatedData.start_date || null,
+      end_date: validatedData.end_date || null,
+      is_active: validatedData.is_active ?? true,
     };
 
     const { data, error } = await supabase

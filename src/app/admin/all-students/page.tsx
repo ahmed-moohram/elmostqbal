@@ -119,32 +119,6 @@ export default function AllStudentsPage() {
     }
   };
 
-  const generateMockStudents = (count: number): Student[] => {
-    const names = [
-      'أحمد محمد', 'فاطمة حسن', 'علي أحمد', 'مريم خالد', 'محمود سعيد',
-      'نور الدين', 'سارة عبدالله', 'يوسف إبراهيم', 'هدى محمد', 'كريم حسين',
-      'ليلى عمر', 'طارق علي', 'رنا سامي', 'عمر فاروق', 'منى أحمد'
-    ];
-
-    return Array.from({ length: count }, (_, i) => {
-      const daysAgo = Math.floor(Math.random() * 365);
-      const joinDate = new Date();
-      joinDate.setDate(joinDate.getDate() - daysAgo);
-
-      return {
-        _id: `student-${i + 1}`,
-        name: names[Math.floor(Math.random() * names.length)] + ' ' + (i + 1),
-        email: `student${i + 1}@example.com`,
-        phone: `0${Math.floor(Math.random() * 900000000) + 100000000}`,
-        parentPhone: `0${Math.floor(Math.random() * 900000000) + 100000000}`,
-        grade: ['الصف الأول', 'الصف الثاني', 'الصف الثالث'][Math.floor(Math.random() * 3)],
-        enrolledCourses: Math.floor(Math.random() * 8) + 1,
-        totalProgress: Math.floor(Math.random() * 100),
-        joinDate: joinDate.toISOString(),
-        lastActive: new Date().toISOString()
-      };
-    });
-  };
 
   const applyFiltersAndSort = () => {
     let filtered = [...students];

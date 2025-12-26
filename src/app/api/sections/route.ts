@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import supabaseClient from '@/lib/supabase-client';
 import { cookies } from 'next/headers';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { sectionCreateSchema, validateRequest } from '@/lib/validation';
 
 function getSupabaseWrite() {
   const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -41,15 +42,18 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    // Validate request body using Zod
+    const validation = await validateRequest(request, sectionCreateSchema);
+    if (!validation.success) {
+      return validation.response;
+    }
+
+    const { courseId, title, description, orderIndex, lessons } = validation.data;
+
     const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (!url || !key) return NextResponse.json({ error: 'Supabase service role key is missing' }, { status: 500 });
     const supabase = createClient(url, key);
-    const body = await request.json();
-    const { courseId, title, description, orderIndex, lessons } = body;
-    if (!courseId || !title) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
-    }
     const { data: section, error: sectionError } = await supabase
       .from('sections')
       .insert({

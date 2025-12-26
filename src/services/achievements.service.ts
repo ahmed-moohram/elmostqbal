@@ -42,9 +42,107 @@ export interface CourseProgress {
 
 export class AchievementsService {
   private supabase: any;
+  private courseProgressCache = new Map<string, { ts: number; data: CourseProgress[] }>();
+  private courseProgressInFlight = new Map<string, Promise<CourseProgress[]>>();
+  private grantInFlight = new Map<string, Promise<Achievement[]>>();
+  private allAchievementsCache: { ts: number; data: Achievement[] } | null = null;
+  private allAchievementsInFlight: Promise<Achievement[]> | null = null;
 
   constructor(client: any = defaultSupabase) {
     this.supabase = client;
+  }
+
+  private async getAllAchievementsCached(): Promise<Achievement[]> {
+    const cached = this.allAchievementsCache;
+    if (cached && Date.now() - cached.ts < 60000) {
+      return cached.data;
+    }
+
+    if (this.allAchievementsInFlight) {
+      return this.allAchievementsInFlight;
+    }
+
+    const promise = (async () => {
+      try {
+        const { data, error } = await this.supabase
+          .from('achievements')
+          .select('*')
+          .order('points', { ascending: true });
+
+        if (error) {
+          console.error('❌ خطأ في جلب الإنجازات المتاحة:', error);
+          return [];
+        }
+
+        return (data || []) as Achievement[];
+      } catch (e) {
+        console.error('❌ خطأ في جلب الإنجازات المتاحة:', e);
+        return [];
+      }
+    })();
+
+    this.allAchievementsInFlight = promise;
+    try {
+      const data = await promise;
+      this.allAchievementsCache = { ts: Date.now(), data };
+      return data;
+    } finally {
+      this.allAchievementsInFlight = null;
+    }
+  }
+
+  private async getEnrollmentsForProgress(userId: string): Promise<any[]> {
+    if (!userId) return [];
+
+    if (typeof window !== 'undefined') {
+      try {
+        const params = new URLSearchParams();
+        params.set('userId', userId);
+        const res = await fetch(`/api/student/dashboard?${params.toString()}`);
+        if (res.ok) {
+          const body = await res.json().catch(() => null);
+          const active = Array.isArray(body?.activeCourses) ? body.activeCourses : [];
+          // فلترة الكورسات التي تحتوي على course object و title
+          const filtered = active.filter((e: any) => {
+            return e.course && e.course.title && e.course.title.trim();
+          });
+          console.log('📊 الكورسات للإنجازات من API:', filtered.length, filtered);
+          if (filtered.length > 0) {
+            return filtered;
+          }
+        }
+      } catch (error) {
+        console.error('❌ خطأ في جلب التسجيلات من API:', error);
+      }
+    }
+
+    try {
+      const supabase = this.supabase;
+      const { data: enrollments, error: enrollError } = await supabase
+        .from('enrollments')
+        .select(`
+          *,
+          course:courses(*)
+        `)
+        .eq('user_id', userId)
+        .eq('is_active', true);
+
+      if (enrollError) {
+        console.error('❌ خطأ في جلب التسجيلات:', enrollError);
+        return [];
+      }
+
+      // فلترة الكورسات التي تحتوي على course object و title
+      const filtered = (enrollments || []).filter((e: any) => {
+        return e.course && e.course.title && e.course.title.trim();
+      });
+
+      console.log('📊 الكورسات للإنجازات من Supabase:', filtered.length, filtered);
+      return filtered;
+    } catch (error) {
+      console.error('❌ خطأ في جلب التسجيلات:', error);
+      return [];
+    }
   }
 
   // جلب إنجازات المستخدم
@@ -85,7 +183,6 @@ export class AchievementsService {
       const { data, error } = await supabase
         .from('achievements')
         .select('*')
-        .or(`course_id.eq.${courseId},course_id.is.null`)
         .order('points', { ascending: true });
 
       if (error) {
@@ -102,24 +199,25 @@ export class AchievementsService {
 
   // جلب تقدم المستخدم في الكورسات مع الإنجازات
   async getUserCourseProgress(userId: string): Promise<CourseProgress[]> {
-    try {
+    const cacheKey = String(userId || '').trim();
+    if (!cacheKey) return [];
+
+    const cached = this.courseProgressCache.get(cacheKey);
+    if (cached && Date.now() - cached.ts < 15000) {
+      return cached.data;
+    }
+
+    const inFlight = this.courseProgressInFlight.get(cacheKey);
+    if (inFlight) {
+      return inFlight;
+    }
+
+    const promise = (async () => {
+      try {
        const supabase = this.supabase;
       console.log('📊 جلب تقدم المستخدم في الكورسات');
       
-      // جلب التسجيلات
-      const { data: enrollments, error: enrollError } = await supabase
-        .from('enrollments')
-        .select(`
-          *,
-          course:courses(*)
-        `)
-        .eq('user_id', userId)
-        .eq('is_active', true);
-
-      if (enrollError) {
-        console.error('❌ خطأ في جلب التسجيلات:', enrollError);
-        return [];
-      }
+      const enrollments = await this.getEnrollmentsForProgress(userId);
 
       if (!enrollments || enrollments.length === 0) {
         return [];
@@ -128,74 +226,124 @@ export class AchievementsService {
       // جلب الإنجازات لكل كورس
       const progressData: CourseProgress[] = [];
 
-      for (const enrollment of enrollments) {
-        // جلب عدد الدروس
-        const { count: totalLessons } = await supabase
+      const courseIds = Array.from(
+        new Set(
+          (enrollments || [])
+            .map((enr: any) => enr?.course_id)
+            .filter((id: any) => !!id)
+            .map((id: any) => String(id))
+        )
+      );
+
+      const lessonsCountByCourse = new Map<string, number>();
+      if (courseIds.length > 0) {
+        const { data: lessonsRows, error: lessonsError } = await supabase
           .from('lessons')
-          .select('*', { count: 'exact', head: true })
-          .eq('course_id', enrollment.course_id);
+          .select('id, course_id')
+          .in('course_id', courseIds as any);
 
-        // جلب الدروس المكتملة
-        const { data: courseLessons } = await supabase
-          .from('lessons')
-          .select('id')
-          .eq('course_id', enrollment.course_id);
-        
-        const lessonIds = courseLessons?.map(l => l.id) || [];
-
-        let completedLessons = 0;
-        if (lessonIds.length > 0) {
-          const { count } = await supabase
-            .from('lesson_progress')
-            .select('*', { count: 'exact', head: true })
-            .eq('user_id', userId)
-            .eq('is_completed', true)
-            .in('lesson_id', lessonIds);
-
-          completedLessons = count || 0;
+        if (lessonsError) {
+          console.error('❌ خطأ في جلب الدروس:', lessonsError);
+        } else {
+          (lessonsRows || []).forEach((row: any) => {
+            const cid = row?.course_id ? String(row.course_id) : '';
+            if (!cid) return;
+            lessonsCountByCourse.set(cid, (lessonsCountByCourse.get(cid) || 0) + 1);
+          });
         }
+      }
 
-        // جلب الإنجازات المحققة في هذا الكورس
-        const { data: achievements } = await supabase
+      const achievementsByCourse = new Map<string, any[]>();
+      if (courseIds.length > 0) {
+        // جلب فقط الإنجازات المكتملة (is_completed = true)
+        const { data: achievementsRows, error: achievementsError } = await supabase
           .from('user_achievements')
           .select(`
             *,
             achievement:achievements(*)
           `)
           .eq('user_id', userId)
-          .eq('course_id', enrollment.course_id);
+          .eq('is_completed', true)
+          .in('course_id', courseIds as any);
+
+        if (achievementsError) {
+          console.error('❌ خطأ في جلب إنجازات المستخدم للكورسات:', achievementsError);
+        } else {
+          (achievementsRows || []).forEach((row: any) => {
+            const cid = row?.course_id ? String(row.course_id) : '';
+            if (!cid) return;
+            const arr = achievementsByCourse.get(cid) || [];
+            arr.push(row);
+            achievementsByCourse.set(cid, arr);
+          });
+        }
+      }
+
+      const allAchievements = await this.getAllAchievementsCached();
+
+      for (const enrollment of enrollments) {
+        // التأكد من وجود course object و title
+        if (!enrollment.course || !enrollment.course.title || !enrollment.course.title.trim()) {
+          console.warn('⚠️ Enrollment without valid course:', enrollment.id, enrollment.course_id);
+          continue;
+        }
+
+        const courseId = enrollment?.course_id ? String(enrollment.course_id) : '';
+        if (!courseId) {
+          console.warn('⚠️ Enrollment without course_id:', enrollment.id);
+          continue;
+        }
+
+        const totalLessons = courseId ? lessonsCountByCourse.get(courseId) || 0 : 0;
+        const progress = typeof enrollment?.progress === 'number' ? enrollment.progress : 0;
+        const completedLessons =
+          totalLessons > 0 ? Math.round((Math.max(0, Math.min(100, progress)) / 100) * totalLessons) : 0;
+
+        const achievements = courseId ? achievementsByCourse.get(courseId) || [] : [];
 
         // حساب النقاط المكتسبة
         const pointsEarned = achievements?.reduce((sum, ua) => 
           sum + (ua.achievement?.points || 0), 0) || 0;
 
-        // البحث عن الإنجاز التالي
-        const { data: nextAchievements } = await supabase
-          .from('achievements')
-          .select('*')
-          .or(`course_id.eq.${enrollment.course_id},course_id.is.null`)
-          .not('id', 'in', `(${achievements?.map(a => a.achievement_id).join(',') || 'null'})`)
-          .order('points', { ascending: true })
-          .limit(1);
+        const earnedAchievementIds = new Set(
+          (achievements || [])
+            .map((a: any) => a?.achievement_id)
+            .filter(Boolean)
+            .map((id: any) => String(id))
+        );
+
+        const nextAchievement = (allAchievements || []).find(
+          (a: any) => a?.id && !earnedAchievementIds.has(String(a.id))
+        );
 
         progressData.push({
           course_id: enrollment.course_id,
-          course_title: enrollment.course?.title || '',
+          course_title: enrollment.course?.title || 'كورس بدون عنوان',
           enrollment_id: enrollment.id,
           progress: enrollment.progress || 0,
           completed_lessons: completedLessons || 0,
           total_lessons: totalLessons || 0,
           achievements_earned: achievements || [],
-          next_achievement: nextAchievements?.[0],
+          next_achievement: nextAchievement,
           points_earned: pointsEarned
         });
       }
 
       console.log(`✅ تم جلب تقدم ${progressData.length} كورس`);
       return progressData;
-    } catch (error) {
-      console.error('❌ خطأ في الخدمة:', error);
-      return [];
+      } catch (error) {
+        console.error('❌ خطأ في الخدمة:', error);
+        return [];
+      }
+    })();
+
+    this.courseProgressInFlight.set(cacheKey, promise);
+    try {
+      const data = await promise;
+      this.courseProgressCache.set(cacheKey, { ts: Date.now(), data });
+      return data;
+    } finally {
+      this.courseProgressInFlight.delete(cacheKey);
     }
   }
 
@@ -221,7 +369,12 @@ export class AchievementsService {
 
   // التحقق من الإنجازات وإضافتها
   async checkAndGrantAchievements(userId: string, courseId?: string): Promise<Achievement[]> {
-    try {
+    const key = `${String(userId || '').trim()}::${String(courseId || '').trim()}`;
+    const inFlight = this.grantInFlight.get(key);
+    if (inFlight) return inFlight;
+
+    const promise = (async () => {
+      try {
        const supabase = this.supabase;
       console.log('🔍 التحقق من الإنجازات الجديدة');
       
@@ -263,11 +416,11 @@ export class AchievementsService {
         }
       }
       
-      // جلب جميع الإنجازات المتاحة
-      const { data: allAchievements } = await supabase
-        .from('achievements')
-        .select('*')
-        .or(courseId ? `course_id.eq.${courseId},course_id.is.null` : 'course_id.is.null');
+      const allAchievements = await this.getAllAchievementsCached();
+
+      if (!allAchievements || allAchievements.length === 0) {
+        return [];
+      }
 
       // جلب الإنجازات المحققة بالفعل
       const { data: userAchievements } = await supabase
@@ -354,13 +507,25 @@ export class AchievementsService {
       }
 
       if (newAchievements.length > 0) {
+        const cacheKey = String(userId || '').trim();
+        if (cacheKey) {
+          this.courseProgressCache.delete(cacheKey);
+        }
         console.log(`🎉 تم منح ${newAchievements.length} إنجاز جديد!`);
       }
 
       return newAchievements;
-    } catch (error) {
-      console.error('❌ خطأ في التحقق من الإنجازات:', error);
-      return [];
+      } catch (error) {
+        console.error('❌ خطأ في التحقق من الإنجازات:', error);
+        return [];
+      }
+    })();
+
+    this.grantInFlight.set(key, promise);
+    try {
+      return await promise;
+    } finally {
+      this.grantInFlight.delete(key);
     }
   }
 
@@ -429,7 +594,7 @@ export class AchievementsService {
         .from('user_points')
         .select('*')
         .eq('user_id', userId)
-        .single();
+        .maybeSingle();
 
       if (userPoints) {
         await supabase
@@ -510,7 +675,7 @@ export class AchievementsService {
         .from('user_points')
         .select('*')
         .eq('user_id', userId)
-        .single();
+        .maybeSingle();
 
       return {
         lessons_completed: lessonsCompleted || 0,
@@ -549,7 +714,7 @@ export class AchievementsService {
         .from('user_points')
         .select('*')
         .eq('user_id', userId)
-        .single();
+        .maybeSingle();
 
       if (userPoints) {
         await supabase

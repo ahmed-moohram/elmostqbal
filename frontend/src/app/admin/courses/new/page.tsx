@@ -211,6 +211,8 @@ export default function EnhancedNewCoursePage() {
   // إرسال البيانات
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (loading) return;
     
     // ✅ استخدام localStorage مباشرة
     const token = localStorage.getItem('token');
@@ -254,12 +256,87 @@ export default function EnhancedNewCoursePage() {
     try {
       // استخدام دالة Supabase المحدثة
       const { createCourseWithLessons } = await import('@/lib/supabase-courses');
+      const { default: supabase } = await import('@/lib/supabase-client');
       
       console.log('🌐 استخدام Supabase لإنشاء الكورس');
+
+      const storedUserRaw = localStorage.getItem('user');
+      const storedUser = storedUserRaw ? JSON.parse(storedUserRaw) : null;
+      const adminPhone: string | null =
+        storedUser?.phone ||
+        storedUser?.student_phone ||
+        storedUser?.parent_phone ||
+        storedUser?.mother_phone ||
+        (storedUser?.role === 'admin' ? '01005209667' : null);
+
+      let instructorId: string | null = storedUser?.id || null;
+
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+      const resolveUserUuidByPhone = async (phone: string): Promise<string | null> => {
+        const normalizedPhone = String(phone || '').trim();
+        if (!normalizedPhone) return null;
+
+        const tryWithPhoneColumn = async () =>
+          supabase
+            .from('users')
+            .select('id, role')
+            .or(
+              `phone.eq.${normalizedPhone},student_phone.eq.${normalizedPhone},parent_phone.eq.${normalizedPhone},mother_phone.eq.${normalizedPhone}`
+            )
+            .limit(10);
+
+        const tryWithoutPhoneColumn = async () =>
+          supabase
+            .from('users')
+            .select('id, role')
+            .or(
+              `student_phone.eq.${normalizedPhone},parent_phone.eq.${normalizedPhone},mother_phone.eq.${normalizedPhone}`
+            )
+            .limit(10);
+
+        let { data, error } = await tryWithPhoneColumn();
+
+        if (error && typeof error.message === 'string' && error.message.toLowerCase().includes('phone')) {
+          ({ data, error } = await tryWithoutPhoneColumn());
+        }
+
+        if (error) {
+          console.error('❌ فشل تحديد instructor_id من Supabase:', error);
+          return null;
+        }
+
+        const rows: any[] = Array.isArray(data) ? (data as any[]) : data ? [data as any] : [];
+        const preferred = rows.find((row) => String((row as any)?.role || '').toLowerCase() === 'admin');
+        const picked = preferred || rows[0] || null;
+
+        const resolved = picked?.id ? String(picked.id) : null;
+        if (resolved && uuidRegex.test(resolved)) return resolved;
+        return null;
+      };
+
+      if (!uuidRegex.test(String(instructorId || '')) && adminPhone) {
+        const resolvedId = await resolveUserUuidByPhone(adminPhone);
+        if (resolvedId) instructorId = resolvedId;
+      }
+
+      if (instructorId && uuidRegex.test(String(instructorId)) && storedUser?.id !== instructorId) {
+        const updatedUser = { ...(storedUser || {}), id: instructorId };
+        localStorage.setItem('user', JSON.stringify(updatedUser));
+      }
+
+      if (!instructorId || !uuidRegex.test(String(instructorId))) {
+        toast.error(
+          'تعذر تحديد حساب الأدمن داخل قاعدة البيانات. برجاء تسجيل الدخول مرة أخرى بعد إنشاء مستخدم أدمن في جدول users.',
+          { id: 'admin-uuid-missing' }
+        );
+        return;
+      }
       
       const courseData = {
         title,
         description,
+        instructor_id: instructorId,
         price,
         level,
         category,

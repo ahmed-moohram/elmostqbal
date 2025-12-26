@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Image from 'next/image';
 import ProtectedVideoPlayer from '@/components/ProtectedVideoPlayer';
-import { FaPlay, FaLock, FaCheck, FaUsers, FaClock, FaBookOpen, FaChartLine, FaComments } from 'react-icons/fa';
+import { FaPlay, FaLock, FaCheck, FaUsers, FaClock, FaBookOpen, FaChartLine, FaComments, FaQuestionCircle } from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
 import VideoProtection from '@/components/VideoProtection';
 import CourseChat from '@/components/CourseChat';
@@ -873,8 +873,15 @@ ${randomMsg}`);
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
-                        onClick={() => setShowChat(true)}
-                        disabled={!studentInfo?.id}
+                        onClick={() => {
+                          if (teacherInfo?.id) {
+                            // توجيه إلى صفحة الرسائل مع معرف المدرس والكورس
+                            router.push(`/messages?user=${teacherInfo.id}&courseId=${courseId}`);
+                          } else {
+                            toast.error('لا يمكن العثور على معلومات المدرس');
+                          }
+                        }}
+                        disabled={!studentInfo?.id || !teacherInfo?.id}
                         className="inline-flex items-center justify-center h-10 w-10 rounded-xl bg-white/10 hover:bg-white/15 disabled:opacity-60 disabled:cursor-not-allowed transition"
                         aria-label="فتح المحادثة"
                         title="المحادثة"
@@ -949,8 +956,15 @@ ${randomMsg}`);
                   {isEnrolled && (
                     <button
                       type="button"
-                      onClick={() => setShowChat(true)}
-                      disabled={!studentInfo?.id}
+                      onClick={() => {
+                        if (teacherInfo?.id) {
+                          // توجيه إلى صفحة الرسائل مع معرف المدرس والكورس
+                          router.push(`/messages?user=${teacherInfo.id}&courseId=${courseId}`);
+                        } else {
+                          toast.error('لا يمكن العثور على معلومات المدرس');
+                        }
+                      }}
+                      disabled={!studentInfo?.id || !teacherInfo?.id}
                       className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-60 disabled:cursor-not-allowed transition"
                       title="اسأل المدرس"
                     >
@@ -972,6 +986,16 @@ ${randomMsg}`);
                       useAccessCode={!isEnrolled}
                       videoUrl={selectedLesson.videoUrl || ''}
                       isEnrolled={isEnrolled || !!selectedLesson.isPreview}
+                      duration={selectedLesson.duration || 0}
+                      onProgress={(progress, watchedSeconds) => {
+                        // تحديث التقدم في الصفحة الرئيسية
+                        if (activeLesson) {
+                          setVideoProgress((prev) => ({
+                            ...prev,
+                            [activeLesson]: watchedSeconds,
+                          }));
+                        }
+                      }}
                     />
                   </div>
 
@@ -1038,63 +1062,119 @@ ${randomMsg}`);
                 </div>
 
                 <div className="space-y-4">
-                  {course.sections?.map((section: any, sIndex: number) => (
-                    <div key={section.id} className="rounded-2xl border border-slate-100 dark:border-gray-800 overflow-hidden">
-                      <div className="bg-slate-50 dark:bg-gray-800/60 px-4 py-3 font-semibold flex items-center justify-between">
-                        <span className="truncate">{section.title}</span>
-                        <span className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center text-sm">
-                          {sIndex + 1}
-                        </span>
-                      </div>
-                      <div className="p-2">
-                        <div className="space-y-2">
-                          {section.lessons?.map((lesson: any, index: number) => {
-                            const lessonId = String(lesson.id);
-                            const isActive = activeLesson === lessonId;
-                            const isCompleted = progress?.completedLessons.includes(lessonId);
-                            const isLocked = !isEnrolled && !lesson.isPreview;
+                  {course.sections?.map((section: any, sIndex: number) => {
+                    const displayItems: any[] =
+                      Array.isArray(section?.items) && section.items.length > 0
+                        ? (section.items as any[])
+                        : Array.isArray(section?.lessons)
+                          ? (section.lessons as any[]).map((lesson: any, index: number) => ({
+                              type: 'lesson' as const,
+                              id: String(lesson.id),
+                              title: lesson.title,
+                              duration: lesson.duration || 0,
+                              isPreview: !!lesson.isPreview,
+                              orderIndex: index + 1,
+                            }))
+                          : [];
 
-                            return (
-                              <button
-                                key={lesson.id}
-                                type="button"
-                                className={`w-full text-right p-3 rounded-xl flex items-center justify-between gap-3 transition border ${
-                                  isActive
-                                    ? 'bg-primary text-white border-primary'
-                                    : 'bg-white dark:bg-gray-900 hover:bg-slate-50 dark:hover:bg-gray-800 border-slate-100 dark:border-gray-800'
-                                }`}
-                                onClick={() => {
-                                  setActiveLesson(lessonId);
-                                  setIsVideoPlaying(false);
-                                }}
-                              >
-                                <div className="min-w-0">
-                                  <div className="font-semibold text-sm truncate">
-                                    {index + 1}. {lesson.title}
-                                  </div>
-                                  <div className={`text-xs flex items-center justify-end gap-2 mt-1 ${isActive ? 'text-white/90' : 'text-gray-500 dark:text-gray-400'}`}>
-                                    <span className="inline-flex items-center gap-1">
-                                      <FaClock className="text-[10px]" /> {lesson.duration} دقيقة
-                                    </span>
-                                    {!isEnrolled && !!lesson.isPreview && (
-                                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 font-semibold ${isActive ? 'bg-white/20 text-white' : 'bg-primary/10 text-primary'}`}>
-                                        معاينة
+                    return (
+                      <div key={section.id} className="rounded-2xl border border-slate-100 dark:border-gray-800 overflow-hidden">
+                        <div className="bg-slate-50 dark:bg-gray-800/60 px-4 py-3 font-semibold flex items-center justify-between">
+                          <span className="truncate">{section.title}</span>
+                          <span className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center text-sm">
+                            {sIndex + 1}
+                          </span>
+                        </div>
+                        <div className="p-2">
+                          <div className="space-y-2">
+                            {displayItems.map((item: any, index: number) => {
+                              const itemType = String(item?.type || 'lesson');
+
+                              if (itemType === 'exam') {
+                                const examId = String(item.id);
+                                const isLocked = !isEnrolled;
+
+                                return (
+                                  <button
+                                    key={`exam-${examId}`}
+                                    type="button"
+                                    className="w-full text-right p-3 rounded-xl flex items-center justify-between gap-3 transition border bg-white dark:bg-gray-900 hover:bg-slate-50 dark:hover:bg-gray-800 border-slate-100 dark:border-gray-800"
+                                    onClick={() => {
+                                      try {
+                                        router.push(`/courses/${courseId}/exams?examId=${encodeURIComponent(examId)}`);
+                                      } catch (err) {
+                                        console.error('Error navigating to exams page:', err);
+                                      }
+                                    }}
+                                  >
+                                    <div className="min-w-0">
+                                      <div className="font-semibold text-sm truncate">
+                                        {index + 1}. {item.title}
+                                      </div>
+                                      <div className="text-xs flex items-center justify-end gap-2 mt-1 text-gray-500 dark:text-gray-400">
+                                        <span className="inline-flex items-center gap-1">
+                                          <FaClock className="text-[10px]" /> {Number(item.duration) || 0} دقيقة
+                                        </span>
+                                        <span className="inline-flex items-center gap-1">
+                                          <FaQuestionCircle className="text-[10px]" /> امتحان
+                                        </span>
+                                      </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-2">
+                                      {isLocked && <FaLock className="text-gray-400" />}
+                                    </div>
+                                  </button>
+                                );
+                              }
+
+                              const lessonId = String(item.id);
+                              const isActive = activeLesson === lessonId;
+                              const isCompleted = progress?.completedLessons.includes(lessonId);
+                              const isLocked = !isEnrolled && !item.isPreview;
+
+                              return (
+                                <button
+                                  key={lessonId}
+                                  type="button"
+                                  className={`w-full text-right p-3 rounded-xl flex items-center justify-between gap-3 transition border ${
+                                    isActive
+                                      ? 'bg-primary text-white border-primary'
+                                      : 'bg-white dark:bg-gray-900 hover:bg-slate-50 dark:hover:bg-gray-800 border-slate-100 dark:border-gray-800'
+                                  }`}
+                                  onClick={() => {
+                                    setActiveLesson(lessonId);
+                                    setIsVideoPlaying(false);
+                                  }}
+                                >
+                                  <div className="min-w-0">
+                                    <div className="font-semibold text-sm truncate">
+                                      {index + 1}. {item.title}
+                                    </div>
+                                    <div className={`text-xs flex items-center justify-end gap-2 mt-1 ${isActive ? 'text-white/90' : 'text-gray-500 dark:text-gray-400'}`}>
+                                      <span className="inline-flex items-center gap-1">
+                                        <FaClock className="text-[10px]" /> {Number(item.duration) || 0} دقيقة
                                       </span>
-                                    )}
+                                      {!isEnrolled && !!item.isPreview && (
+                                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 font-semibold ${isActive ? 'bg-white/20 text-white' : 'bg-primary/10 text-primary'}`}>
+                                          معاينة
+                                        </span>
+                                      )}
+                                    </div>
                                   </div>
-                                </div>
 
-                                <div className="flex items-center gap-2">
-                                  {isLocked && <FaLock className={isActive ? 'text-white/90' : 'text-gray-400'} />}
-                                  {isCompleted && <FaCheck className={isActive ? 'text-white' : 'text-emerald-500'} />}
-                                </div>
-                              </button>
-                            );
-                          })}
+                                  <div className="flex items-center gap-2">
+                                    {isLocked && <FaLock className={isActive ? 'text-white/90' : 'text-gray-400'} />}
+                                    {isCompleted && <FaCheck className={isActive ? 'text-white' : 'text-emerald-500'} />}
+                                  </div>
+                                </button>
+                              );
+                            })}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             </div>

@@ -1,8 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { API_BASE_URL } from '@/lib/api';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 interface User {
   _id: string;
@@ -42,8 +41,17 @@ interface Conversation {
   unreadCount: number;
 }
 
+interface CourseOption {
+  id: string;
+  title: string;
+}
+
 export default function MessagesPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const preselectUserId = searchParams?.get('user');
+  const preselectCourseId = searchParams?.get('courseId') || '';
+
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -51,13 +59,95 @@ export default function MessagesPage() {
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
+  const [courses, setCourses] = useState<CourseOption[]>([]);
+  const [selectedCourseId, setSelectedCourseId] = useState<string>(preselectCourseId);
   const [showNewChat, setShowNewChat] = useState(false);
   const [selectedUser, setSelectedUser] = useState<string>('');
 
   useEffect(() => {
     fetchConversations();
-    fetchUsers();
+    fetchCourses();
   }, []);
+
+  useEffect(() => {
+    fetchUsers();
+  }, [selectedCourseId]);
+
+  // جلب معلومات المستخدم المحدد مباشرة إذا لم يكن موجوداً في القائمة
+  useEffect(() => {
+    if (!preselectUserId) return;
+
+    const existing = conversations.find((c) => String(c.user?._id) === String(preselectUserId)) || null;
+    if (existing) {
+      setSelectedConversation(existing);
+      return;
+    }
+
+    const user = users.find((u) => String(u._id) === String(preselectUserId)) || null;
+    if (user) {
+      const newConversation: Conversation = {
+        _id: `new-${Date.now()}`,
+        user,
+        lastMessage: {
+          content: '',
+          createdAt: new Date().toISOString(),
+          sender: '',
+        },
+        unreadCount: 0,
+      };
+      setSelectedConversation(newConversation);
+      setMessages([]);
+      return;
+    }
+
+    // إذا لم يكن المستخدم في القائمة، جلب معلوماته مباشرة من Supabase
+    const fetchPreselectedUser = async () => {
+      try {
+        const { default: supabase } = await import('@/lib/supabase-client');
+        
+        const { data: userData, error } = await supabase
+          .from('users')
+          .select('id, name, email, avatar_url, profile_picture, role')
+          .eq('id', preselectUserId)
+          .maybeSingle();
+
+        if (!error && userData) {
+          const fetchedUser: User = {
+            _id: String(userData.id ?? preselectUserId),
+            name: userData.name || 'مستخدم',
+            email: userData.email || '',
+            avatar: userData.avatar_url || userData.profile_picture,
+            role: userData.role || 'teacher',
+          };
+
+          const newConversation: Conversation = {
+            _id: `new-${Date.now()}`,
+            user: fetchedUser,
+            lastMessage: {
+              content: '',
+              createdAt: new Date().toISOString(),
+              sender: '',
+            },
+            unreadCount: 0,
+          };
+
+          setSelectedConversation(newConversation);
+          setMessages([]);
+          // إضافة المستخدم إلى القائمة
+          setUsers((prev) => {
+            if (prev.find((u) => u._id === fetchedUser._id)) return prev;
+            return [...prev, fetchedUser];
+          });
+        } else {
+          console.error('Error fetching preselected user:', error);
+        }
+      } catch (error) {
+        console.error('Error fetching preselected user:', error);
+      }
+    };
+
+    fetchPreselectedUser();
+  }, [preselectUserId, conversations, users]);
 
   useEffect(() => {
     if (selectedConversation) {
@@ -65,60 +155,213 @@ export default function MessagesPage() {
     }
   }, [selectedConversation]);
 
+  const toArray = (payload: any): any[] => {
+    if (Array.isArray(payload)) return payload;
+    if (Array.isArray(payload?.data)) return payload.data;
+    if (Array.isArray(payload?.conversations)) return payload.conversations;
+    if (Array.isArray(payload?.items)) return payload.items;
+    if (Array.isArray(payload?.messages)) return payload.messages;
+    return [];
+  };
+
+  const normalizeConversations = (payload: any): Conversation[] => {
+    const list = toArray(payload);
+    return list.map((item: any, idx: number) => {
+      const rawUser = item?.user;
+      const user: User = rawUser
+        ? {
+            _id: String(rawUser._id ?? rawUser.id ?? ''),
+            name: rawUser.name || 'مستخدم',
+            email: rawUser.email || '',
+            avatar: rawUser.avatar || rawUser.avatar_url || rawUser.profile_picture,
+            role: rawUser.role || 'student',
+          }
+        : {
+            _id: String(item?._id ?? item?.id ?? `u-${idx}`),
+            name: item?.name || 'مستخدم',
+            email: item?.email || '',
+            avatar: item?.avatar || item?.avatar_url || item?.profile_picture,
+            role: item?.role || 'student',
+          };
+
+      const lastMessageRaw = item?.lastMessage;
+      const lastMessage =
+        lastMessageRaw && typeof lastMessageRaw === 'object'
+          ? {
+              content: String(lastMessageRaw.content ?? ''),
+              createdAt: String(lastMessageRaw.createdAt ?? lastMessageRaw.created_at ?? new Date().toISOString()),
+              sender: String(lastMessageRaw.sender ?? ''),
+            }
+          : {
+              content: String(item?.lastMessage ?? ''),
+              createdAt: String(item?.updatedAt ?? item?.updated_at ?? item?.createdAt ?? item?.created_at ?? new Date().toISOString()),
+              sender: '',
+            };
+
+      return {
+        _id: String(item?._id ?? item?.id ?? `c-${idx}`),
+        user,
+        lastMessage,
+        unreadCount: Number(item?.unreadCount ?? item?.unread ?? 0) || 0,
+      };
+    });
+  };
+
+  const normalizeUsers = (payload: any): User[] => {
+    const list = toArray(payload);
+    return list
+      .filter(Boolean)
+      .map((u: any, idx: number) => ({
+        _id: String(u?._id ?? u?.id ?? `u-${idx}`),
+        name: u?.name || 'مستخدم',
+        email: u?.email || '',
+        avatar: u?.avatar || u?.avatar_url || u?.profile_picture,
+        role: u?.role || 'student',
+      }));
+  };
+
+  const normalizeMessages = (payload: any): Message[] => {
+    const list = toArray(payload);
+    return list
+      .filter(Boolean)
+      .map((m: any, idx: number) => {
+        const senderRaw = m?.sender;
+        const receiverRaw = m?.receiver;
+
+        return {
+          _id: String(m?._id ?? m?.id ?? `m-${idx}-${m?.createdAt ?? m?.created_at ?? Date.now()}`),
+          sender:
+            senderRaw && typeof senderRaw === 'object'
+              ? {
+                  _id: String(senderRaw?._id ?? senderRaw?.id ?? ''),
+                  name: senderRaw?.name || '',
+                  avatar: senderRaw?.avatar || senderRaw?.avatar_url || senderRaw?.profile_picture,
+                }
+              : {
+                  _id: String(m?.sender ?? ''),
+                  name: '',
+                  avatar: undefined,
+                },
+          receiver:
+            receiverRaw && typeof receiverRaw === 'object'
+              ? {
+                  _id: String(receiverRaw?._id ?? receiverRaw?.id ?? ''),
+                  name: receiverRaw?.name || '',
+                  avatar: receiverRaw?.avatar || receiverRaw?.avatar_url || receiverRaw?.profile_picture,
+                }
+              : {
+                  _id: String(m?.receiver ?? ''),
+                  name: '',
+                  avatar: undefined,
+                },
+          content: String(m?.content ?? ''),
+          messageType: (m?.messageType ?? m?.message_type ?? 'text') as 'text' | 'file' | 'image',
+          fileUrl: m?.fileUrl ?? m?.file_url,
+          isRead: Boolean(m?.isRead ?? m?.is_read ?? false),
+          createdAt: String(m?.createdAt ?? m?.created_at ?? new Date().toISOString()),
+        } as Message;
+      });
+  };
+
   const fetchConversations = async () => {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE_URL}/api/messages/conversations`, {
+      const response = await fetch(`/api/messages/conversations`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
-      
-      if (response.ok) {
-        const data = await response.json();
-        setConversations(data.data);
+
+      if (!response.ok) {
+        setConversations([]);
+        return;
       }
+
+      const data = await response.json().catch(() => null);
+      setConversations(normalizeConversations(data));
     } catch (error) {
       console.error('Error fetching conversations:', error);
+      setConversations([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchCourses = async () => {
+    try {
+      const response = await fetch('/api/courses');
+      if (!response.ok) {
+        setCourses([]);
+        return;
+      }
+
+      const data = await response.json().catch(() => null);
+      const list: any[] = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.courses)
+        ? data.courses
+        : Array.isArray(data?.items)
+        ? data.items
+        : [];
+
+      setCourses(
+        list
+          .filter(Boolean)
+          .map((c: any) => ({
+            id: String(c?.id ?? c?._id ?? ''),
+            title: String(c?.title ?? c?.name ?? 'كورس'),
+          }))
+          .filter((c: CourseOption) => Boolean(c.id)),
+      );
+    } catch (error) {
+      console.error('Error fetching courses:', error);
+      setCourses([]);
     }
   };
 
   const fetchUsers = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE_URL}/api/users`, {
+      const qs = selectedCourseId ? `?courseId=${encodeURIComponent(selectedCourseId)}` : '';
+      const response = await fetch(`/api/users${qs}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
-      
-      if (response.ok) {
-        const data = await response.json();
-        setUsers(data.data);
+
+      if (!response.ok) {
+        setUsers([]);
+        return;
       }
+
+      const data = await response.json().catch(() => null);
+      setUsers(normalizeUsers(data));
     } catch (error) {
       console.error('Error fetching users:', error);
+      setUsers([]);
     }
   };
 
   const fetchMessages = async (userId: string) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE_URL}/api/messages/conversation/${userId}`, {
+      const response = await fetch(`/api/messages/conversation/${userId}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
-      
-      if (response.ok) {
-        const data = await response.json();
-        setMessages(data.data);
+
+      if (!response.ok) {
+        setMessages([]);
+        return;
       }
+
+      const data = await response.json().catch(() => null);
+      setMessages(normalizeMessages(data));
     } catch (error) {
       console.error('Error fetching messages:', error);
+      setMessages([]);
     }
   };
 
@@ -128,7 +371,7 @@ export default function MessagesPage() {
     setSending(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE_URL}/api/messages/send`, {
+      const response = await fetch(`/api/messages/send`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -137,13 +380,20 @@ export default function MessagesPage() {
         body: JSON.stringify({
           receiverId: selectedConversation.user._id,
           content: newMessage,
-          messageType: 'text'
+          messageType: 'text',
+          courseId: preselectCourseId || selectedCourseId || undefined
         })
       });
 
       if (response.ok) {
-        const data = await response.json();
-        setMessages(prev => [...prev, data.data]);
+        const data = await response.json().catch(() => null);
+        const sent = data?.data;
+        if (sent) {
+          const normalizedSent = normalizeMessages([sent])[0];
+          setMessages((prev) => [...prev, normalizedSent || sent]);
+        } else {
+          await fetchMessages(selectedConversation.user._id);
+        }
         setNewMessage('');
         fetchConversations(); // Refresh conversations to update last message
       }
@@ -200,12 +450,12 @@ export default function MessagesPage() {
   const currentUserId = localStorage.getItem('userId');
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900" dir="rtl">
       <div className="max-w-7xl mx-auto px-4 py-8">
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden">
-          <div className="flex h-[600px]">
+          <div className="flex h-[600px] flex-row-reverse">
             {/* Conversations Sidebar */}
-            <div className="w-1/3 border-r border-gray-200 dark:border-gray-700 flex flex-col">
+            <div className="w-1/3 border-l border-gray-200 dark:border-gray-700 flex flex-col">
               {/* Header */}
               <div className="p-4 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-blue-500 to-purple-600 text-white">
                 <div className="flex items-center justify-between">
@@ -225,7 +475,7 @@ export default function MessagesPage() {
                   <div className="flex justify-center items-center h-full">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
                   </div>
-                ) : conversations.length === 0 ? (
+                ) : (conversations || []).length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-full text-gray-500 p-4">
                     <div className="text-4xl mb-2">💬</div>
                     <p className="text-sm text-center">لا توجد محادثات بعد</p>
@@ -237,7 +487,7 @@ export default function MessagesPage() {
                     </button>
                   </div>
                 ) : (
-                  conversations.map((conversation) => (
+                  (conversations || []).map((conversation) => (
                     <div
                       key={conversation._id}
                       onClick={() => setSelectedConversation(conversation)}
@@ -247,7 +497,7 @@ export default function MessagesPage() {
                           : 'hover:bg-gray-50 dark:hover:bg-gray-700'
                       }`}
                     >
-                      <div className="flex items-center space-x-3">
+                      <div className="flex items-center gap-3">
                         <div className="relative">
                           <div className="w-12 h-12 rounded-full bg-gray-200 dark:bg-gray-600 flex items-center justify-center">
                             {conversation.user.avatar ? (
@@ -275,11 +525,11 @@ export default function MessagesPage() {
                               {conversation.user.name}
                             </h4>
                             <span className="text-xs text-gray-500 dark:text-gray-400">
-                              {formatTime(conversation.lastMessage.createdAt)}
+                              {formatTime(conversation.lastMessage?.createdAt || new Date().toISOString())}
                             </span>
                           </div>
                           <p className="text-sm text-gray-600 dark:text-gray-300 truncate mt-1">
-                            {conversation.lastMessage.content || 'لا توجد رسائل'}
+                            {conversation.lastMessage?.content || 'لا توجد رسائل'}
                           </p>
                           <div className="flex items-center mt-1">
                             <span className="text-xs text-gray-400 dark:text-gray-500">
@@ -300,7 +550,7 @@ export default function MessagesPage() {
                 <>
                   {/* Chat Header */}
                   <div className="p-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-                    <div className="flex items-center space-x-3">
+                    <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-600 flex items-center justify-center">
                         {selectedConversation.user.avatar ? (
                           <img 
@@ -327,14 +577,14 @@ export default function MessagesPage() {
 
                   {/* Messages */}
                   <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                    {messages.map((message) => (
+                    {messages.map((message, idx) => (
                       <div
-                        key={message._id}
-                        className={`flex ${message.sender._id === currentUserId ? 'justify-end' : 'justify-start'}`}
+                        key={`${message._id}-${idx}`}
+                        className={`flex ${message.sender?._id === currentUserId ? 'justify-end' : 'justify-start'}`}
                       >
                         <div
                           className={`max-w-xs px-4 py-2 rounded-lg ${
-                            message.sender._id === currentUserId
+                            message.sender?._id === currentUserId
                               ? 'bg-blue-500 text-white'
                               : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-white'
                           }`}
@@ -353,7 +603,7 @@ export default function MessagesPage() {
                           )}
                           <p className="text-sm">{message.content}</p>
                           <p className={`text-xs mt-1 ${
-                            message.sender._id === currentUserId ? 'text-blue-100' : 'text-gray-500 dark:text-gray-400'
+                            message.sender?._id === currentUserId ? 'text-blue-100' : 'text-gray-500 dark:text-gray-400'
                           }`}>
                             {formatTime(message.createdAt)}
                           </p>
@@ -364,7 +614,7 @@ export default function MessagesPage() {
 
                   {/* Message Input */}
                   <div className="p-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-                    <div className="flex items-center space-x-2">
+                    <div className="flex items-center gap-2">
                       <input
                         type="text"
                         value={newMessage}
@@ -403,6 +653,21 @@ export default function MessagesPage() {
           <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-96 max-w-full mx-4">
             <h3 className="text-lg font-semibold mb-4 text-gray-800 dark:text-white">بدء محادثة جديدة</h3>
             <select
+              value={selectedCourseId}
+              onChange={(e) => {
+                setSelectedCourseId(e.target.value);
+                setSelectedUser('');
+              }}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-800 dark:text-white mb-4"
+            >
+              <option value="">كل الكورسات</option>
+              {courses.map((course) => (
+                <option key={course.id} value={course.id}>
+                  {course.title}
+                </option>
+              ))}
+            </select>
+            <select
               value={selectedUser}
               onChange={(e) => setSelectedUser(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-800 dark:text-white mb-4"
@@ -414,7 +679,7 @@ export default function MessagesPage() {
                 </option>
               ))}
             </select>
-            <div className="flex justify-end space-x-2">
+            <div className="flex justify-end gap-2">
               <button
                 onClick={() => setShowNewChat(false)}
                 className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"

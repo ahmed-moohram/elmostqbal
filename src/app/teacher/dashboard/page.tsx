@@ -669,6 +669,7 @@ export default function TeacherDashboard() {
         }
       }
 
+      // جلب جميع نتائج الامتحانات
       const { data: quizData, error: quizError } = await supabase
         .from('quiz_results')
         .select('*')
@@ -689,6 +690,15 @@ export default function TeacherDashboard() {
         : 0;
       const failedQuizzes = Math.max(totalQuizAttempts - passedQuizzes, 0);
 
+      // جلب الامتحانات التي حصل فيها على الدرجة الكاملة (100%)
+      const perfectScoreQuizzes = quizData
+        ? quizData.filter((q: any) => {
+            const score = Number(q.score || 0);
+            const totalQuestions = Number(q.total_questions || 0);
+            return totalQuestions > 0 && score === totalQuestions;
+          })
+        : [];
+
       let averageQuizScore = 0;
       if (quizData && quizData.length > 0) {
         const totalScore = quizData.reduce(
@@ -696,6 +706,27 @@ export default function TeacherDashboard() {
           0
         );
         averageQuizScore = Number((totalScore / quizData.length).toFixed(1));
+      }
+
+      // جلب قائمة المحاضرات التي حضرها الطالب
+      let attendedLessonsList: string[] = [];
+      if (lessonIds.length > 0) {
+        const { data: lessonProgressData, error: progressListError } = await supabase
+          .from('lesson_progress')
+          .select(`
+            *,
+            lesson:lessons(id, title, course_id)
+          `)
+          .eq('user_id', student.userId)
+          .in('lesson_id', lessonIds)
+          .eq('is_completed', true)
+          .order('completed_at', { ascending: false });
+
+        if (!progressListError && lessonProgressData) {
+          attendedLessonsList = lessonProgressData
+            .map((lp: any) => lp.lesson?.title)
+            .filter((title: any) => title && typeof title === 'string' && title.trim().length > 0);
+        }
       }
 
       let achievementsCount = 0;
@@ -714,23 +745,36 @@ export default function TeacherDashboard() {
           totalPoints = Number((pointsRow as any).total_points || 0) || 0;
         }
 
-        const { data: achievementsRows, error: achievementsError } = await supabase
-          .from('user_achievements')
-          .select('course_id, earned_at, achievement:achievements(title)')
-          .eq('user_id', student.userId)
-          .order('earned_at', { ascending: false });
+      // جلب جميع الإنجازات مع التفاصيل الكاملة
+      const { data: achievementsRows, error: achievementsError } = await supabase
+        .from('user_achievements')
+        .select(`
+          *,
+          achievement:achievements(
+            id,
+            title,
+            description,
+            points,
+            icon,
+            category
+          ),
+          course:courses(id, title)
+        `)
+        .eq('user_id', student.userId)
+        .eq('is_completed', true)
+        .order('earned_at', { ascending: false });
 
-        if (!achievementsError && Array.isArray(achievementsRows)) {
-          achievementsCount = achievementsRows.length;
-          const courseRows = achievementsRows.filter(
-            (row: any) => String(row.course_id || '') === String(student.courseId)
-          );
-          courseAchievementsCount = courseRows.length;
-          latestCourseAchievements = courseRows
-            .map((row: any) => row.achievement?.title)
-            .filter((t: any) => typeof t === 'string' && t.trim().length > 0)
-            .slice(0, 3);
-        }
+      if (!achievementsError && Array.isArray(achievementsRows)) {
+        achievementsCount = achievementsRows.length;
+        const courseRows = achievementsRows.filter(
+          (row: any) => String(row.course_id || '') === String(student.courseId)
+        );
+        courseAchievementsCount = courseRows.length;
+        // جلب جميع إنجازات الكورس (ليس فقط 3)
+        latestCourseAchievements = courseRows
+          .map((row: any) => row.achievement?.title)
+          .filter((t: any) => typeof t === 'string' && t.trim().length > 0);
+      }
       } catch (achError) {
         console.error('Error loading achievements for parent report:', achError);
       }
@@ -747,12 +791,51 @@ export default function TeacherDashboard() {
         }
       }
 
-      const latestCourseAchievementsLine =
+      // بناء قائمة الإنجازات الكاملة
+      const allAchievementsLine =
         latestCourseAchievements.length > 0
-          ? `\n- آخر إنجازات في هذا الكورس: ${latestCourseAchievements.join('، ')}`
-          : '';
+          ? `\n\n📋 جميع الإنجازات المحققة في هذا الكورس (${courseAchievementsCount} إنجاز):\n${latestCourseAchievements.map((ach, idx) => `${idx + 1}. ${ach}`).join('\n')}`
+          : '\n\n📋 لا توجد إنجازات محققة في هذا الكورس حتى الآن.';
 
-      const text = `السلام عليكم ورحمة الله وبركاته\n\nولي أمر الطالب/ة ${student.name}\n\nنود إبلاغكم بتقرير مختصر عن أداء ابنكم/ابنتكم في كورس "${student.courseName}" على المنصة.\n\n- نسبة إنجاز الكورس الحالية: ${student.progress}%\n- عدد الدروس المكتملة: ${completedLessons} من ${totalLessons} درس\n- الدروس المتبقية: ${remainingLessons} درس\n- عدد محاولات الاختبارات: ${totalQuizAttempts}\n- عدد مرات النجاح في الامتحان: ${passedQuizzes}\n- عدد مرات الرسوب في الامتحان: ${failedQuizzes}\n- متوسط درجة الاختبارات: ${averageQuizScore}%\n- إجمالي نقاط الطالب على المنصة: ${totalPoints} نقطة\n- عدد الإنجازات المحققة (إجمالي): ${achievementsCount}\n- إنجازات هذا الكورس: ${courseAchievementsCount}${latestCourseAchievementsLine}\n- حالة الحضور هذا الأسبوع: ${weeklyStatus}\n\nنشكركم على متابعتكم، وأي تقصير يتم التنبيه عليه أولاً للطالب ثم التنسيق معكم عند الحاجة.`;
+      // بناء قائمة المحاضرات التي حضرها
+      const attendedLessonsLine =
+        attendedLessonsList.length > 0
+          ? `\n\n📚 المحاضرات التي حضرها الطالب (${attendedLessonsList.length} محاضرة):\n${attendedLessonsList.map((lesson, idx) => `${idx + 1}. ${lesson}`).join('\n')}`
+          : '\n\n📚 لم يحضر الطالب أي محاضرات حتى الآن.';
+
+      // بناء قائمة الامتحانات التي حصل فيها على الدرجة الكاملة
+      const perfectScoreQuizzesLine =
+        perfectScoreQuizzes.length > 0
+          ? `\n\n🎯 الامتحانات التي حصل فيها على الدرجة الكاملة (${perfectScoreQuizzes.length} امتحان):\n${perfectScoreQuizzes.map((q: any, idx: number) => {
+              const quizTitle = q.quiz_title || q.title || `امتحان ${idx + 1}`;
+              const score = Number(q.score || 0);
+              const total = Number(q.total_questions || 0);
+              const date = q.attempted_at ? new Date(q.attempted_at).toLocaleDateString('ar-EG') : '';
+              return `${idx + 1}. ${quizTitle} - ${score}/${total} (${date})`;
+            }).join('\n')}`
+          : '\n\n🎯 لم يحصل الطالب على الدرجة الكاملة في أي امتحان حتى الآن.';
+
+      const text = `السلام عليكم ورحمة الله وبركاته
+
+ولي أمر الطالب/ة ${student.name}
+
+نود إبلاغكم بتقرير تفصيلي عن أداء ابنكم/ابنتكم في كورس "${student.courseName}" على المنصة.
+
+📊 الإحصائيات العامة:
+- نسبة إنجاز الكورس الحالية: ${student.progress}%
+- عدد الدروس المكتملة: ${completedLessons} من ${totalLessons} درس
+- الدروس المتبقية: ${remainingLessons} درس
+- عدد محاولات الاختبارات: ${totalQuizAttempts}
+- عدد مرات النجاح في الامتحان: ${passedQuizzes}
+- عدد مرات الرسوب في الامتحان: ${failedQuizzes}
+- متوسط درجة الاختبارات: ${averageQuizScore}%
+- إجمالي نقاط الطالب على المنصة: ${totalPoints} نقطة
+- عدد الإنجازات المحققة (إجمالي): ${achievementsCount}
+- إنجازات هذا الكورس: ${courseAchievementsCount}${allAchievementsLine}${attendedLessonsLine}${perfectScoreQuizzesLine}
+
+📅 حالة الحضور هذا الأسبوع: ${weeklyStatus}
+
+نشكركم على متابعتكم، وأي تقصير يتم التنبيه عليه أولاً للطالب ثم التنسيق معكم عند الحاجة.`;
 
       const rawPhone = String(student.parentPhone || '').replace(/[^0-9]/g, '');
       if (!rawPhone) {

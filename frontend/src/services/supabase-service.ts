@@ -381,131 +381,31 @@ export const getBooks = async () => {
 
 export const getDashboardData = async (userId: string) => {
   try {
-    // جلب التسجيلات النشطة
-    const { data: enrollments } = await supabase
-      .from('enrollments')
-      .select(`
-        *,
-        course:courses(*, instructor_user:users!courses_instructor_id_fkey(id, name, avatar_url, profile_picture))
-      `)
-      .eq('user_id', userId)
-      .eq('is_active', true);
+    const params = new URLSearchParams();
+    params.set('userId', userId);
 
-    const enrichedEnrollments = (enrollments || []).map((enrollment: any) => {
-      const course = enrollment?.course || null;
-      const instructorName = course?.instructor_user?.name || null;
-      const instructorImage =
-        course?.instructor_user?.avatar_url ||
-        course?.instructor_user?.profile_picture ||
-        null;
+    const res = await fetch(`/api/student/dashboard?${params.toString()}`);
 
-      return {
-        ...enrollment,
-        course: course
-          ? {
-              ...course,
-              instructor_name: instructorName,
-              instructor_image: instructorImage,
-            }
-          : null,
-      };
-    });
-    
-    // جلب الشهادات
-    const { data: certificates } = await supabase
-      .from('certificates')
-      .select('*')
-      .eq('user_id', userId);
-    
-    // جلب النقاط
-    const { data: userPointsData, error: userPointsError } = await supabase
-      .from('user_points')
-      .select('*')
-      .eq('user_id', userId)
-      .limit(1);
-
-    if (userPointsError) {
-      console.warn('Error fetching user_points (سيتم تجاهله واستخدام قيم افتراضية):', userPointsError.message);
-    }
-
-    const userPoints = Array.isArray(userPointsData) && userPointsData.length > 0
-      ? userPointsData[0]
-      : null;
-    
-    // جلب الإنجازات
-    const { data: achievements } = await supabase
-      .from('user_achievements')
-      .select(`
-        *,
-        achievement:achievements(*)
-      `)
-      .eq('user_id', userId)
-      .eq('is_completed', true);
-    
-    // جلب الجلسات والاختبارات القادمة المرتبطة بكورسات الطالب
-    let upcomingEvents: any[] = [];
-    try {
-      const enrolledCourseIds = (enrollments || [])
-        .map((enrollment: any) => enrollment.course_id)
-        .filter((id: string | null | undefined) => !!id);
-
-      if (enrolledCourseIds.length > 0) {
-        const nowIso = new Date().toISOString();
-
-        // الجلسات المباشرة القادمة
-        const { data: liveSessions } = await supabase
-          .from('live_sessions')
-          .select('id, title, scheduled_at, status')
-          .in('course_id', enrolledCourseIds)
-          .gte('scheduled_at', nowIso)
-          .order('scheduled_at', { ascending: true })
-          .limit(10);
-
-        // الواجبات / الاختبارات القادمة
-        const { data: upcomingAssignments } = await supabase
-          .from('assignments')
-          .select('id, title, due_date')
-          .in('course_id', enrolledCourseIds)
-          .gte('due_date', nowIso)
-          .order('due_date', { ascending: true })
-          .limit(10);
-
-        const liveEvents = (liveSessions || []).map((session: any) => ({
-          id: session.id,
-          title: session.title,
-          date: session.scheduled_at,
-          time: null,
-          type: 'live'
-        }));
-
-        const assignmentEvents = (upcomingAssignments || []).map((assignment: any) => ({
-          id: assignment.id,
-          title: assignment.title,
-          date: assignment.due_date,
-          time: null,
-          // نعتبر جميع الواجبات/الاختبارات كأحداث من نوع exam لعرض "عرض التفاصيل" في الواجهة
-          type: 'exam'
-        }));
-
-        upcomingEvents = [...liveEvents, ...assignmentEvents]
-          .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-          .slice(0, 10);
+    if (!res.ok) {
+      let body: any = null;
+      try {
+        body = await res.json();
+      } catch {
+        // ignore json parse error
       }
-    } catch (eventsError) {
-      console.error('Error fetching upcoming events:', eventsError);
+
+      console.error('Error fetching dashboard data via /api/student/dashboard:', res.status, body);
+      return {
+        success: false,
+        error: body?.error || `Request failed with status ${res.status}`,
+      };
     }
+
+    const data = await res.json();
 
     return {
       success: true,
-      data: {
-        activeCourses: enrichedEnrollments,
-        certificates: certificates || [],
-        points: userPoints?.total_points || 0,
-        level: userPoints?.current_level || 1,
-        achievements: achievements || [],
-        overallProgress: calculateOverallProgress(enrichedEnrollments),
-        upcomingEvents
-      }
+      data,
     };
   } catch (error) {
     console.error('Error fetching dashboard data:', error);

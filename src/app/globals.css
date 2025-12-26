@@ -2,6 +2,75 @@
 @tailwind components;
 @tailwind utilities;
 
+/* تحسينات الفيديو للأجهزة المحمولة */
+@layer utilities {
+  /* منع مشاركة الفيديو */
+  iframe[src*="youtube.com"],
+  iframe[src*="drive.google.com"] {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  /* تحسين ملء الشاشة على الجوال */
+  @media (max-width: 768px) {
+    /* ضمان ملء الشاشة الكامل على الجوال */
+    .video-fullscreen-mobile {
+      position: fixed !important;
+      top: 0 !important;
+      left: 0 !important;
+      width: 100vw !important;
+      height: 100vh !important;
+      max-width: 100vw !important;
+      max-height: 100vh !important;
+      z-index: 9999 !important;
+      border-radius: 0 !important;
+    }
+
+    /* تحسين iframe الفيديو على الجوال */
+    .video-fullscreen-mobile iframe {
+      width: 100% !important;
+      height: 100% !important;
+      border: none !important;
+    }
+  }
+
+  /* تحسين الاستجابة لجميع أحجام الشاشات */
+  @media (max-width: 480px) {
+    /* شاشات صغيرة جداً */
+    .aspect-video {
+      aspect-ratio: 16 / 9;
+    }
+  }
+
+  @media (min-width: 481px) and (max-width: 768px) {
+    /* أجهزة لوحية صغيرة */
+    .aspect-video {
+      aspect-ratio: 16 / 9;
+    }
+  }
+
+  @media (min-width: 769px) {
+    /* شاشات كبيرة */
+    .aspect-video {
+      aspect-ratio: 16 / 9;
+    }
+  }
+
+  /* منع قائمة السياق (Context Menu) على الفيديو */
+  .video-container-protected {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  .video-container-protected * {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+}
+
 /* تحسينات توافق الأجهزة المحمولة */
 @layer base {
   html {
@@ -34,6 +103,28 @@
     transition-property: background-color, border-color, color, fill, stroke, opacity, box-shadow, transform;
     transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
     transition-duration: 200ms;
+  }
+
+  /* تحسين الخطوط والطباعة */
+  body {
+    font-family: var(--font-cairo), 'Cairo', sans-serif;
+    letter-spacing: 0.01em;
+    line-height: 1.7;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.3;
+  }
+
+  /* تحسين المسافات */
+  .space-y-section {
+    @apply space-y-16 md:space-y-20 lg:space-y-24;
+  }
+
+  .space-y-content {
+    @apply space-y-8 md:space-y-10 lg:space-y-12;
   }
 }
 @layer base {
@@ -251,63 +342,91 @@
 }
 
 
-/* Modern Glassmorphism */
+/* Modern Glassmorphism - محسّن */
 
 .glass {
-    @apply bg-white/10 backdrop-blur-xl border border-white/15;
-    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+    @apply bg-white/20 dark:bg-gray-900/30 backdrop-blur-2xl border border-white/20 dark:border-gray-700/30;
+    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
 .dark .glass {
-    @apply bg-gray-900/20 backdrop-blur-xl border border-gray-800/30;
-    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+    @apply bg-gray-900/40 backdrop-blur-2xl border border-gray-800/40;
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 .glass-card {
-    @apply glass rounded-2xl p-6;
+    @apply glass rounded-3xl p-8 transition-all duration-500;
+    transform: translateY(0);
+}
+
+.glass-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 40px 0 rgba(31, 38, 135, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.15);
 }
 
 .glass-gold {
-    @apply backdrop-blur-xl border border-secondary/30;
-    box-shadow: 0 8px 32px 0 rgba(250, 204, 21, 0.2);
+    @apply backdrop-blur-2xl border border-secondary/40 bg-gradient-to-br from-yellow-50/20 to-amber-50/10 dark:from-yellow-900/10 dark:to-amber-900/5;
+    box-shadow: 0 8px 32px 0 rgba(250, 204, 21, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
 .dark .glass-gold {
-    @apply backdrop-blur-xl border border-secondary/20;
-    box-shadow: 0 8px 32px 0 rgba(250, 204, 21, 0.1);
+    @apply backdrop-blur-2xl border border-secondary/30;
+    box-shadow: 0 8px 32px 0 rgba(250, 204, 21, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 .glass-royal {
-    @apply backdrop-blur-xl border border-primary/30;
-    box-shadow: 0 8px 32px 0 rgba(109, 40, 217, 0.2);
+    @apply backdrop-blur-2xl border border-primary/40 bg-gradient-to-br from-purple-50/20 to-indigo-50/10 dark:from-purple-900/10 dark:to-indigo-900/5;
+    box-shadow: 0 8px 32px 0 rgba(109, 40, 217, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
 .dark .glass-royal {
-    @apply backdrop-blur-xl border border-primary/20;
-    box-shadow: 0 8px 32px 0 rgba(109, 40, 217, 0.1);
+    @apply backdrop-blur-2xl border border-primary/30;
+    box-shadow: 0 8px 32px 0 rgba(109, 40, 217, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 
-/* Enhanced Animations */
+/* Enhanced Animations - محسّنة */
 
 .hover-glow {
-    @apply transition-all duration-300 hover:translate-y-[-2px];
+    @apply transition-all duration-500 hover:translate-y-[-4px];
+    transform: translateY(0);
 }
 
 .hover-glow:hover {
-    box-shadow: 0 0 25px rgba(109, 40, 217, 0.4);
+    box-shadow: 0 0 30px rgba(109, 40, 217, 0.5), 0 10px 30px -10px rgba(109, 40, 217, 0.3);
 }
 
 .hover-glow-gold {
-    @apply transition-all duration-300 hover:translate-y-[-2px];
+    @apply transition-all duration-500 hover:translate-y-[-4px];
+    transform: translateY(0);
 }
 
 .hover-glow-gold:hover {
-    box-shadow: 0 0 25px rgba(250, 204, 21, 0.4);
+    box-shadow: 0 0 30px rgba(250, 204, 21, 0.5), 0 10px 30px -10px rgba(250, 204, 21, 0.3);
 }
 
 .hover-scale {
-    @apply transition-transform duration-300 hover:scale-105;
+    @apply transition-transform duration-500 hover:scale-105;
+    transform: scale(1);
+}
+
+.hover-scale:hover {
+    transform: scale(1.05) translateY(-2px);
+}
+
+/* تأثيرات إضافية */
+.hover-lift {
+    @apply transition-all duration-500;
+    transform: translateY(0);
+}
+
+.hover-lift:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.2);
+}
+
+.dark .hover-lift:hover {
+    box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.5);
 }
 
 
@@ -445,18 +564,55 @@
 }
 
 
-/* Card Styles */
+/* Card Styles - محسّنة */
 
 .card-modern {
-    @apply rounded-2xl bg-white dark:bg-gray-800 p-6 shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-100 dark:border-gray-700;
+    @apply rounded-3xl bg-white dark:bg-gray-800/90 p-8 shadow-xl hover:shadow-2xl transition-all duration-500 border border-gray-100/50 dark:border-gray-700/50 backdrop-blur-sm;
+    transform: translateY(0);
+}
+
+.card-modern:hover {
+    transform: translateY(-4px);
+    border-color: rgba(109, 40, 217, 0.3);
+}
+
+.dark .card-modern:hover {
+    border-color: rgba(139, 92, 246, 0.4);
 }
 
 .card-premium {
-    @apply rounded-2xl bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 p-6 shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-100/80 dark:border-gray-700/80;
+    @apply rounded-3xl bg-gradient-to-br from-white via-gray-50/50 to-white dark:from-gray-800 dark:via-gray-800/50 dark:to-gray-900 p-8 shadow-2xl transition-all duration-500 border border-gray-200/60 dark:border-gray-700/60 backdrop-blur-md;
+    transform: translateY(0);
+    background-size: 200% 200%;
+    animation: gradientShift 8s ease infinite;
+}
+
+.card-premium:hover {
+    transform: translateY(-6px) scale(1.01);
+    border-color: rgba(250, 204, 21, 0.4);
+    box-shadow: 0 25px 50px -12px rgba(250, 204, 21, 0.25), 0 0 0 1px rgba(250, 204, 21, 0.1);
 }
 
 .card-royal {
-    @apply rounded-2xl bg-gradient-to-br from-white to-purple-50/30 dark:from-gray-800 dark:to-purple-900/10 p-6 shadow-lg hover:shadow-xl transition-all duration-500 border border-purple-100/80 dark:border-purple-900/30;
+    @apply rounded-3xl bg-gradient-to-br from-white via-purple-50/40 to-white dark:from-gray-800 dark:via-purple-900/20 dark:to-gray-900 p-8 shadow-2xl transition-all duration-500 border border-purple-200/60 dark:border-purple-900/40 backdrop-blur-md;
+    transform: translateY(0);
+    background-size: 200% 200%;
+    animation: gradientShift 10s ease infinite;
+}
+
+.card-royal:hover {
+    transform: translateY(-6px) scale(1.01);
+    border-color: rgba(139, 92, 246, 0.5);
+    box-shadow: 0 25px 50px -12px rgba(139, 92, 246, 0.3), 0 0 0 1px rgba(139, 92, 246, 0.1);
+}
+
+@keyframes gradientShift {
+    0%, 100% {
+        background-position: 0% 50%;
+    }
+    50% {
+        background-position: 100% 50%;
+    }
 }
 
 
@@ -478,18 +634,36 @@
 }
 
 
-/* Custom Scrollbar */
+/* Custom Scrollbar - محسّن */
 
 ::-webkit-scrollbar {
-    width: 10px;
+    width: 12px;
+    height: 12px;
 }
 
 ::-webkit-scrollbar-track {
-    @apply bg-transparent;
+    @apply bg-gray-100 dark:bg-gray-900 rounded-full;
 }
 
 ::-webkit-scrollbar-thumb {
-    @apply bg-primary/30 rounded-full hover:bg-primary/50 transition-colors;
+    @apply bg-gradient-to-b from-primary via-indigo-600 to-purple-700 rounded-full;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+    transition: all 0.3s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    @apply from-indigo-600 via-purple-600 to-pink-600;
+    background-clip: padding-box;
+}
+
+.dark ::-webkit-scrollbar-track {
+    @apply bg-gray-800;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+    @apply bg-gradient-to-b from-purple-600 via-indigo-600 to-blue-600;
+    background-clip: padding-box;
 }
 
 
@@ -515,18 +689,42 @@
 }
 
 
-/* Text Styles */
+/* Text Styles - محسّنة */
 
 .heading-1 {
-    @apply text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight;
+    @apply text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold tracking-tight;
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+    background: linear-gradient(135deg, #6d28d9 0%, #8b5cf6 50%, #a855f7 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.dark .heading-1 {
+    background: linear-gradient(135deg, #a78bfa 0%, #c4b5fd 50%, #ddd6fe 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
 }
 
 .heading-2 {
-    @apply text-3xl md:text-4xl font-bold;
+    @apply text-3xl md:text-4xl lg:text-5xl font-bold;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
 }
 
 .body-text {
-    @apply text-base md:text-lg text-gray-600 dark:text-gray-300;
+    @apply text-base md:text-lg lg:text-xl text-gray-700 dark:text-gray-300;
+    line-height: 1.8;
+    letter-spacing: 0.01em;
+}
+
+/* تحسين العناوين الفرعية */
+.heading-3 {
+    @apply text-2xl md:text-3xl font-bold;
+    letter-spacing: -0.01em;
+    line-height: 1.3;
 }
 
 
@@ -564,18 +762,85 @@ body {
 }
 
 
-/* Button Styles */
+/* Button Styles - محسّنة */
 
 .btn-primary {
-    @apply bg-primary text-white font-medium rounded-lg hover:bg-primary/90 transition-colors shadow-md hover:shadow-lg;
+    @apply bg-gradient-to-r from-primary via-indigo-600 to-purple-700 text-white font-semibold rounded-xl px-6 py-3 shadow-lg hover:shadow-xl transition-all duration-300 relative overflow-hidden;
+    transform: translateY(0);
+}
+
+.btn-primary::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transition: left 0.5s;
+}
+
+.btn-primary:hover::before {
+    left: 100%;
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px -5px rgba(109, 40, 217, 0.5);
+}
+
+.btn-primary:active {
+    transform: translateY(0);
 }
 
 .btn-secondary {
-    @apply bg-secondary text-gray-800 font-medium rounded-lg hover:bg-secondary/90 transition-colors shadow-md hover:shadow-lg;
+    @apply bg-gradient-to-r from-secondary via-amber-400 to-orange-500 text-gray-800 font-semibold rounded-xl px-6 py-3 shadow-lg hover:shadow-xl transition-all duration-300 relative overflow-hidden;
+    transform: translateY(0);
+}
+
+.btn-secondary::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+    transition: left 0.5s;
+}
+
+.btn-secondary:hover::before {
+    left: 100%;
+}
+
+.btn-secondary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px -5px rgba(250, 204, 21, 0.4);
 }
 
 .btn-outline {
-    @apply border border-primary text-primary bg-transparent hover:bg-primary hover:text-white transition-colors rounded-lg;
+    @apply border-2 border-primary text-primary bg-transparent hover:bg-primary hover:text-white transition-all duration-300 rounded-xl px-6 py-3 font-semibold relative overflow-hidden;
+    transform: translateY(0);
+}
+
+.btn-outline::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 0;
+    height: 100%;
+    background: linear-gradient(to right, transparent, rgba(109, 40, 217, 0.1), transparent);
+    transition: width 0.3s;
+}
+
+.btn-outline:hover::before {
+    width: 100%;
+}
+
+.btn-outline:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px -5px rgba(109, 40, 217, 0.3);
 }
 
 
@@ -794,22 +1059,34 @@ body {
 }
 
 
-/* Enhanced course cards */
+/* Enhanced course cards - محسّنة */
 
 .course-card {
-    @apply rounded-2xl bg-white dark:bg-gray-800/80 overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-100 dark:border-gray-700 relative;
+    @apply rounded-3xl bg-white dark:bg-gray-800/90 overflow-hidden shadow-xl hover:shadow-2xl transition-all duration-500 border border-gray-100/60 dark:border-gray-700/60 relative backdrop-blur-sm;
+    transform: translateY(0) scale(1);
+}
+
+.course-card:hover {
+    transform: translateY(-8px) scale(1.02);
+    border-color: rgba(109, 40, 217, 0.3);
+}
+
+.dark .course-card:hover {
+    border-color: rgba(139, 92, 246, 0.4);
+    box-shadow: 0 25px 50px -12px rgba(139, 92, 246, 0.2);
 }
 
 .course-card .course-title {
-    @apply text-xl font-bold text-gray-800 dark:text-gray-100;
+    @apply text-xl md:text-2xl font-bold text-gray-800 dark:text-gray-100 leading-tight;
+    letter-spacing: -0.02em;
 }
 
 .course-card .course-instructor {
-    @apply text-sm text-gray-600 dark:text-gray-300;
+    @apply text-sm md:text-base text-gray-600 dark:text-gray-300 font-medium;
 }
 
 .course-card .course-features {
-    @apply text-gray-700 dark:text-gray-300;
+    @apply text-gray-700 dark:text-gray-300 text-sm md:text-base;
 }
 
 
@@ -1045,4 +1322,48 @@ body {
 
 .dark .glow-heading {
     text-shadow: 0 0 10px rgba(255, 255, 255, 0.2), 0 0 20px rgba(255, 255, 255, 0.1);
+}
+
+/* تحسينات إضافية للتناسق */
+.section-padding {
+    @apply py-16 md:py-20 lg:py-24;
+}
+
+.container-spacing {
+    @apply px-4 sm:px-6 lg:px-8;
+}
+
+/* تحسين الظلال */
+.shadow-elegant {
+    box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0, 0, 0, 0.05);
+}
+
+.dark .shadow-elegant {
+    box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+.shadow-elegant-hover:hover {
+    box-shadow: 0 20px 60px -15px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(0, 0, 0, 0.1);
+}
+
+.dark .shadow-elegant-hover:hover {
+    box-shadow: 0 20px 60px -15px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1);
+}
+
+/* تحسين الحدود */
+.border-elegant {
+    @apply border border-gray-200/60 dark:border-gray-700/60;
+}
+
+.border-elegant-hover:hover {
+    @apply border-primary/40 dark:border-primary/50;
+}
+
+/* تحسين التدرجات */
+.gradient-primary-elegant {
+    background: linear-gradient(135deg, #6d28d9 0%, #7c3aed 25%, #8b5cf6 50%, #9f7aea 75%, #a78bfa 100%);
+}
+
+.gradient-secondary-elegant {
+    background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 25%, #fcd34d 50%, #fde047 75%, #fef08a 100%);
 }

@@ -43,11 +43,18 @@ export async function GET(request: NextRequest) {
 
      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-     if (roleCookie === 'teacher' && teacherId && String(teacherId) !== String(cookieUserId)) {
+     const isAdmin = roleCookie === 'admin';
+     const isTeacher = roleCookie === 'teacher';
+
+     if (isTeacher && teacherId && String(teacherId) !== String(cookieUserId)) {
        return NextResponse.json({ error: 'forbidden' }, { status: 403 });
      }
 
-     const effectiveTeacherId = teacherId || cookieUserId;
+     const effectiveTeacherId = isAdmin
+       ? teacherId && uuidRegex.test(String(teacherId))
+         ? teacherId
+         : undefined
+       : (teacherId || cookieUserId);
 
     if (!courseIdsParam && !effectiveTeacherId) {
       return NextResponse.json(

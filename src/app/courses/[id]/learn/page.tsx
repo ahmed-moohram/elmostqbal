@@ -839,14 +839,16 @@ export default function CourseLearnPage() {
                   
                   <div className="flex items-center justify-between pt-4 border-t">
                       <button 
-                      className="flex items-center text-gray-600 hover:text-primary transition"
-                      onClick={() => {
-                        // نسخ رابط الدرس
-                        navigator.clipboard.writeText(window.location.href);
+                      className="flex items-center text-gray-600 opacity-50 cursor-not-allowed transition"
+                      disabled
+                      title="المشاركة معطلة لحماية المحتوى"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
                       }}
                     >
                       <FaShare className="ml-2" />
-                      مشاركة
+                      مشاركة (معطلة)
                       </button>
                     
                     <div className="flex gap-4">

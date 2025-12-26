@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { achievementsService, CourseProgress, Achievement } from '@/services/achievements.service';
 import { FaTrophy, FaMedal, FaStar, FaLock, FaCheckCircle, FaChartLine } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -17,43 +17,65 @@ export default function CourseAchievements({ userId, courseId, hideEmptyMessage 
   const [selectedCourse, setSelectedCourse] = useState<CourseProgress | null>(null);
   const [newAchievements, setNewAchievements] = useState<Achievement[]>([]);
 
+  const fetchInFlightRef = useRef(false);
+  const checkInFlightRef = useRef(false);
+  const mountedRef = useRef(true);
+
   useEffect(() => {
+    mountedRef.current = true;
     fetchData();
     // التحقق من الإنجازات الجديدة كل دقيقة
     const interval = setInterval(checkNewAchievements, 60000);
-    return () => clearInterval(interval);
+    return () => {
+      mountedRef.current = false;
+      clearInterval(interval);
+    };
   }, [userId, courseId]);
 
   const fetchData = async () => {
+    if (!userId) return;
+    if (fetchInFlightRef.current) return;
+    fetchInFlightRef.current = true;
     try {
-      setLoading(true);
+      if (mountedRef.current) setLoading(true);
       const progress = await achievementsService.getUserCourseProgress(userId);
       
       // فلترة حسب الكورس إذا تم تحديده
       if (courseId) {
         const filtered = progress.filter(p => p.course_id === courseId);
+        if (!mountedRef.current) return;
         setCourseProgress(filtered);
         if (filtered.length > 0) {
           setSelectedCourse(filtered[0]);
         }
       } else {
+        if (!mountedRef.current) return;
         setCourseProgress(progress);
       }
     } catch (error) {
       console.error('خطأ في جلب البيانات:', error);
     } finally {
-      setLoading(false);
+      fetchInFlightRef.current = false;
+      if (mountedRef.current) setLoading(false);
     }
   };
 
   const checkNewAchievements = async () => {
-    const newAchs = await achievementsService.checkAndGrantAchievements(userId, courseId);
-    if (newAchs.length > 0) {
-      setNewAchievements(newAchs);
-      // إعادة جلب البيانات لتحديث الإنجازات
-      fetchData();
-      // إخفاء الإشعار بعد 5 ثواني
-      setTimeout(() => setNewAchievements([]), 5000);
+    if (!userId) return;
+    if (checkInFlightRef.current) return;
+    checkInFlightRef.current = true;
+    try {
+      const newAchs = await achievementsService.checkAndGrantAchievements(userId, courseId);
+      if (!mountedRef.current) return;
+      if (newAchs.length > 0) {
+        setNewAchievements(newAchs);
+        fetchData();
+        setTimeout(() => {
+          if (mountedRef.current) setNewAchievements([]);
+        }, 5000);
+      }
+    } finally {
+      checkInFlightRef.current = false;
     }
   };
 

@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Exam, Question } from "../../../../types/exam";
-import { useRouter, useParams } from "next/navigation";
+import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { API_BASE_URL } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { FaClock, FaCheck, FaTimes, FaStar, FaShieldAlt, FaBook, FaPlay, FaArrowLeft, FaArrowRight, FaQuestionCircle } from "react-icons/fa";
@@ -25,7 +25,13 @@ export default function CourseExamsPage() {
   const router = useRouter();
   const params = useParams();
   const courseId = params?.id as string;
+  const searchParams = useSearchParams();
+  const preselectExamId = searchParams?.get('examId');
   const { user } = useAuth();
+
+  const autoStartedExamRef = useRef(false);
+
+  const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
   const [examStatuses, setExamStatuses] = useState<Record<string, {
     attemptCount: number;
@@ -68,6 +74,8 @@ export default function CourseExamsPage() {
   // جلب حالة كل امتحان لهذا الطالب (عدد المحاولات ومحاولات الغش)
   useEffect(() => {
     if (!user?.id || !courseId || exams.length === 0) return;
+    if (String(user?.role || '') !== 'student') return;
+    if (!UUID_REGEX.test(String(user.id))) return;
 
     const loadStatuses = async () => {
       try {
@@ -151,6 +159,16 @@ export default function CourseExamsPage() {
   const startExam = async (exam: Exam) => {
     if (!user?.id) {
       alert('يجب تسجيل الدخول لحل الامتحان.');
+      return;
+    }
+
+    if (String(user?.role || '') !== 'student') {
+      alert('هذه الصفحة مخصصة للطلاب فقط. يرجى تسجيل الدخول بحساب طالب لحل الامتحان.');
+      return;
+    }
+
+    if (!UUID_REGEX.test(String(user.id))) {
+      alert('بيانات حسابك غير مكتملة (معرّف المستخدم غير صالح). برجاء تسجيل الخروج ثم تسجيل الدخول مرة أخرى.');
       return;
     }
 
@@ -241,6 +259,19 @@ export default function CourseExamsPage() {
       });
     }, 1000);
   };
+
+  useEffect(() => {
+    if (!preselectExamId) return;
+    if (autoStartedExamRef.current) return;
+    if (!user?.id || !courseId) return;
+    if (!Array.isArray(exams) || exams.length === 0) return;
+
+    const target = exams.find((e) => String(e.id) === String(preselectExamId)) || null;
+    if (!target) return;
+
+    autoStartedExamRef.current = true;
+    startExam(target);
+  }, [preselectExamId, exams, user?.id, courseId]);
 
   // تسليم الاختبار
   const submitExam = async (cheated: boolean = false) => {

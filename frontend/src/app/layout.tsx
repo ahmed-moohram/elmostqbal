@@ -62,7 +62,7 @@ export default function RootLayout({
             <NightSkyWithMoon />
           </ClientPathCheck>
           <PageTransition>
-            <main className="min-h-screen" style={{ willChange: 'contents' }}> 
+            <main className="min-h-screen pt-20" style={{ willChange: 'contents' }}> 
               {children} 
             </main>
           </PageTransition>

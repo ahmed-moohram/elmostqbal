@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getExam } from '../_store';
 import { AchievementsService } from '@/services/achievements.service';
+import { examSubmitSchema, validateRequest } from '@/lib/validation';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -15,14 +16,17 @@ if (!supabaseUrl || !supabaseServiceKey) {
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 const achievementsService = new AchievementsService(supabase);
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { examId, answers, courseId, userId, cheated } = body || {};
-
-    if (!examId || !courseId || !userId) {
-      return NextResponse.json({ error: 'missing_required_fields' }, { status: 400 });
+    // Validate request body using Zod
+    const validation = await validateRequest(request, examSubmitSchema);
+    if (!validation.success) {
+      return validation.response;
     }
+
+    const { examId, answers, courseId, userId, cheated } = validation.data;
 
     // تأكيد أن الطالب مشترك في هذا الكورس قبل السماح له بدخول/تقديم الامتحان
     let isEnrolled = false;

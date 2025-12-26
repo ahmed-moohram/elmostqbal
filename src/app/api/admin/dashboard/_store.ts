@@ -10,6 +10,9 @@ export type Stats = {
   activeStudents: number;
   pendingPayments: number;
   completionRate: number;
+  newTeachersThisMonth?: number;
+  newCoursesThisMonth?: number;
+  revenueIncrease?: number;
 };
 
 export type Transaction = {
@@ -86,6 +89,9 @@ export async function getStats(): Promise<Stats> {
   try {
     const now = new Date();
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
+    const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59).toISOString();
 
     const [
       studentsRes,
@@ -96,6 +102,9 @@ export async function getStats(): Promise<Stats> {
       activeEnrollmentsRes,
       allEnrollmentsRes,
       approvedPaymentsRes,
+      newTeachersThisMonthRes,
+      newCoursesThisMonthRes,
+      lastMonthRevenueRes,
     ] = await Promise.all([
       supabase
         .from('users')
@@ -126,11 +135,27 @@ export async function getStats(): Promise<Stats> {
         .select('id, progress'),
       supabase
         .from('payment_requests')
-        .select('amount_paid, course_price, status')
+        .select('amount_paid, course_price, status, created_at')
         .eq('status', 'approved'),
+      supabase
+        .from('users')
+        .select('*', { count: 'exact', head: true })
+        .eq('role', 'teacher')
+        .gte('created_at', startOfMonth),
+      supabase
+        .from('courses')
+        .select('*', { count: 'exact', head: true })
+        .gte('created_at', startOfMonth),
+      supabase
+        .from('payment_requests')
+        .select('amount_paid, course_price, status')
+        .eq('status', 'approved')
+        .gte('created_at', startOfLastMonth)
+        .lte('created_at', endOfLastMonth),
     ]);
 
-    const totalStudents = 1980;
+    // استخدام البيانات الحقيقية من قاعدة البيانات
+    const totalStudents = studentsRes.count ?? 0;
     const totalTeachers = teachersRes.count ?? 0;
     const totalCourses = coursesRes.count ?? 0;
     const pendingPayments = pendingPaymentsRes.count ?? 0;
@@ -152,7 +177,18 @@ export async function getStats(): Promise<Stats> {
       return sum + (typeof amount === 'number' ? amount : 0);
     }, 0);
 
-    return {
+    // حساب الإيرادات الشهر الماضي
+    const lastMonthPayments = lastMonthRevenueRes.data as any[] | null | undefined;
+    const lastMonthRevenue = (lastMonthPayments || []).reduce((sum: number, p: any) => {
+      const amount = p.amount_paid ?? p.course_price ?? 0;
+      return sum + (typeof amount === 'number' ? amount : 0);
+    }, 0);
+
+    // حساب الزيادة في الإيرادات
+    const revenueIncrease = totalRevenue - lastMonthRevenue;
+
+    // إضافة البيانات الإضافية للاستخدام في الواجهة
+    const statsWithTrends = {
       totalStudents,
       totalCourses,
       totalTeachers,
@@ -161,7 +197,13 @@ export async function getStats(): Promise<Stats> {
       activeStudents,
       pendingPayments,
       completionRate,
+      // بيانات إضافية للاتجاهات
+      newTeachersThisMonth: newTeachersThisMonthRes.count ?? 0,
+      newCoursesThisMonth: newCoursesThisMonthRes.count ?? 0,
+      revenueIncrease,
     };
+
+    return statsWithTrends;
   } catch (error) {
     console.error('Error fetching admin dashboard stats from Supabase:', error);
     return {

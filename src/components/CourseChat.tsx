@@ -90,7 +90,7 @@ export default function CourseChat({
                 : userName || 'طالب'),
             senderAvatar:
               m.sender_role === 'teacher'
-                ? '/teacher-avatar.jpg'
+                ? '/placeholder-avatar.png'
                 : '/placeholder-avatar.png',
             senderRole: m.sender_role,
             content: m.content,

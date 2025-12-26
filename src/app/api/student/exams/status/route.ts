@@ -14,6 +14,8 @@ if (!supabaseUrl || !supabaseServiceKey) {
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = request.nextUrl;
@@ -24,6 +26,27 @@ export async function GET(request: NextRequest) {
     if (!courseId || !examId || !userId) {
       return NextResponse.json(
         { error: 'courseId, examId and userId are required' },
+        { status: 400 },
+      );
+    }
+
+    if (!UUID_REGEX.test(String(courseId))) {
+      return NextResponse.json(
+        { success: false, error: 'invalid_course_id' },
+        { status: 400 },
+      );
+    }
+
+    if (!UUID_REGEX.test(String(examId))) {
+      return NextResponse.json(
+        { success: false, error: 'invalid_exam_id' },
+        { status: 400 },
+      );
+    }
+
+    if (!UUID_REGEX.test(String(userId))) {
+      return NextResponse.json(
+        { success: false, error: 'invalid_user_id' },
         { status: 400 },
       );
     }
