@@ -114,18 +114,19 @@ export async function POST(request: NextRequest) {
     // but log the access for security monitoring
     if (lesson.video_url) {
       // Log video access for analytics
-      await supabase
+      const { error: logError } = await supabase
         .from('video_access_logs')
         .insert({
           user_id: userId,
           lesson_id: lessonId,
           course_id: courseId,
           accessed_at: new Date().toISOString(),
-        })
-        .catch((err) => {
-          // Don't fail if logging fails
-          console.error('Failed to log video access:', err);
         });
+
+      if (logError) {
+        // Don't fail if logging fails
+        console.error('Failed to log video access:', logError);
+      }
 
       return NextResponse.json({
         success: true,
