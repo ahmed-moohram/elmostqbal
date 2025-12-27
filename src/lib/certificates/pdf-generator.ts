@@ -126,3 +126,4 @@ export async function generateCertificatePDF(data: CertificateData): Promise<Uin
   return pdfBytes;
 }
 
+

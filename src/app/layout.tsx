@@ -41,9 +41,12 @@ const cairo = Cairo({
 })
 
 export const metadata: Metadata = { 
-  title: 'EduFutura - منصة المستقبل التعليمية',
+  title: 'almostaqbal',
   description: 'منصة تعليمية متطورة تقدم دورات تعليمية وكتب رقمية بتجربة فريدة',
   keywords: 'تعليم, دورات أونلاين, كتب رقمية, منصة تعليمية, تعلم عن بعد',
+  icons: {
+    icon: '/logo.png',
+  },
 }
 
 export default function RootLayout({

@@ -127,8 +127,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ students: [] });
     }
 
-    // جلب التسجيلات في هذه الكورسات من جدول enrollments
-    const { data: enrollments, error: enrollmentsError } = await supabase
+    const enrollmentMap = new Map<string, StudentRow>();
+
+    const { data: legacyEnrollments, error: enrollmentsError } = await supabase
       .from('enrollments')
       .select('id, user_id, course_id, enrolled_at, progress, last_accessed')
       .in('course_id', courseIds as any);
@@ -141,7 +142,68 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const safeEnrollments: StudentRow[] = (enrollments || []) as any[];
+    const safeLegacyEnrollments: StudentRow[] = (legacyEnrollments || []) as any[];
+
+    safeLegacyEnrollments.forEach((row) => {
+      const userId = String(row.user_id || '').trim();
+      const cId = String(row.course_id || '').trim();
+      if (!userId || !cId) return;
+      enrollmentMap.set(`${userId}:${cId}`, {
+        id: String(row.id),
+        user_id: userId,
+        course_id: cId,
+        enrolled_at: row.enrolled_at ?? null,
+        progress: row.progress ?? 0,
+        last_accessed: row.last_accessed ?? null,
+      });
+    });
+
+    let courseEnrollments: any[] | null = null;
+    let courseEnrollmentsError: any = null;
+
+    {
+      const res = await supabase
+        .from('course_enrollments')
+        .select('id, student_id, course_id, enrolled_at, progress_percentage, last_accessed')
+        .in('course_id', courseIds as any)
+        .eq('is_active', true);
+      courseEnrollments = res.data as any;
+      courseEnrollmentsError = res.error as any;
+    }
+
+    if (courseEnrollmentsError || (Array.isArray(courseEnrollments) && courseEnrollments.length === 0)) {
+      const retry = await supabase
+        .from('course_enrollments')
+        .select('id, student_id, course_id, enrolled_at, progress_percentage, last_accessed')
+        .in('course_id', courseIds as any);
+      if (!retry.error) {
+        courseEnrollments = retry.data as any;
+        courseEnrollmentsError = null;
+      }
+    }
+
+    if (courseEnrollmentsError) {
+      console.error('Error loading course_enrollments in /api/teacher/students:', courseEnrollmentsError);
+    }
+
+    (courseEnrollments || []).forEach((row: any) => {
+      const userId = String(row.student_id || '').trim();
+      const cId = String(row.course_id || '').trim();
+      if (!userId || !cId) return;
+      const key = `${userId}:${cId}`;
+      if (!enrollmentMap.has(key)) {
+        enrollmentMap.set(key, {
+          id: String(row.id),
+          user_id: userId,
+          course_id: cId,
+          enrolled_at: row.enrolled_at ?? null,
+          progress: Number(row.progress_percentage ?? 0),
+          last_accessed: row.last_accessed ?? null,
+        });
+      }
+    });
+
+    const safeEnrollments: StudentRow[] = Array.from(enrollmentMap.values());
 
     if (!safeEnrollments.length) {
       return NextResponse.json({ students: [] });

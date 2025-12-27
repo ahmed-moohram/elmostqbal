@@ -101,15 +101,25 @@ export default function StudentDashboard() {
           .filter((e: any) => e.course)
           .map((e: any) => {
             const course = e.course || {};
-            const totalLessons =
-              typeof course.total_lessons === 'number'
-                ? course.total_lessons
-                : typeof course.lessons_count === 'number'
-                  ? course.lessons_count
-                  : 0;
+            // استخدام البيانات الحقيقية من API
+            const totalLessons = 
+              typeof e.total_lessons === 'number' ? e.total_lessons :
+              typeof e.lessons_count === 'number' ? e.lessons_count :
+              typeof course.total_lessons === 'number' ? course.total_lessons :
+              typeof course.lessons_count === 'number' ? course.lessons_count :
+              0;
+            
+            // استخدام عدد الدروس المكتملة الحقيقي
+            const completedLessons = 
+              typeof e.completed_lessons === 'number' ? e.completed_lessons :
+              typeof e.completed_lessons_count === 'number' ? e.completed_lessons_count :
+              0;
+            
+            // استخدام التقدم الحقيقي من API
             const progress = typeof e.progress === 'number' ? e.progress : 0;
-            const completedVideos =
-              totalLessons > 0 ? Math.round((progress / 100) * totalLessons) : 0;
+            
+            // التأكد من أن completedVideos لا يتجاوز totalLessons
+            const completedVideos = Math.min(completedLessons, totalLessons);
 
             return {
               id: String(course.id),
@@ -118,7 +128,7 @@ export default function StudentDashboard() {
               progress,
               totalVideos: totalLessons,
               completedVideos,
-              lastWatched: e.updated_at || e.enrolled_at,
+              lastWatched: e.updated_at || e.enrolled_at || e.last_accessed,
               instructor: course.instructor_name || 'مدرس',
             };
           });

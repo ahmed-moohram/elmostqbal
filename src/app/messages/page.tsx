@@ -152,8 +152,32 @@ export default function MessagesPage() {
   useEffect(() => {
     if (selectedConversation) {
       fetchMessages(selectedConversation.user._id);
+      
+      // تحديث تلقائي للرسائل كل 3 ثوانٍ
+      const interval = setInterval(() => {
+        fetchMessages(selectedConversation.user._id);
+      }, 3000);
+
+      return () => clearInterval(interval);
     }
   }, [selectedConversation]);
+
+  // Scroll to bottom when new messages arrive
+  useEffect(() => {
+    const container = document.getElementById('messages-container');
+    if (container) {
+      container.scrollTop = container.scrollHeight;
+    }
+  }, [messages]);
+
+  // تحديث تلقائي للمحادثات كل 5 ثوانٍ
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchConversations();
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   const toArray = (payload: any): any[] => {
     if (Array.isArray(payload)) return payload;
@@ -266,8 +290,40 @@ export default function MessagesPage() {
   const fetchConversations = async () => {
     setLoading(true);
     try {
+      // جلب معرف المستخدم الحالي
+      const userJson = localStorage.getItem('user');
+      let currentUserId: string | null = null;
+      
+      if (userJson) {
+        try {
+          const user = JSON.parse(userJson);
+          currentUserId = user.id || user._id || null;
+        } catch (e) {
+          console.error('Error parsing user data:', e);
+        }
+      }
+
+      if (!currentUserId) {
+        // محاولة جلب من studentInfo
+        const studentInfo = localStorage.getItem('studentInfo');
+        if (studentInfo) {
+          try {
+            const parsed = JSON.parse(studentInfo);
+            currentUserId = parsed.id || parsed._id || null;
+          } catch (e) {
+            console.error('Error parsing studentInfo:', e);
+          }
+        }
+      }
+
+      if (!currentUserId) {
+        console.error('No current user ID found');
+        setConversations([]);
+        return;
+      }
+
       const token = localStorage.getItem('token');
-      const response = await fetch(`/api/messages/conversations`, {
+      const response = await fetch(`/api/messages/conversations?currentUserId=${encodeURIComponent(currentUserId)}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -345,8 +401,39 @@ export default function MessagesPage() {
 
   const fetchMessages = async (userId: string) => {
     try {
+      // جلب معرف المستخدم الحالي
+      const userJson = localStorage.getItem('user');
+      let currentUserId: string | null = null;
+      
+      if (userJson) {
+        try {
+          const user = JSON.parse(userJson);
+          currentUserId = user.id || user._id || null;
+        } catch (e) {
+          console.error('Error parsing user data:', e);
+        }
+      }
+
+      if (!currentUserId) {
+        const studentInfo = localStorage.getItem('studentInfo');
+        if (studentInfo) {
+          try {
+            const parsed = JSON.parse(studentInfo);
+            currentUserId = parsed.id || parsed._id || null;
+          } catch (e) {
+            console.error('Error parsing studentInfo:', e);
+          }
+        }
+      }
+
+      if (!currentUserId) {
+        console.error('No current user ID found');
+        setMessages([]);
+        return;
+      }
+
       const token = localStorage.getItem('token');
-      const response = await fetch(`/api/messages/conversation/${userId}`, {
+      const response = await fetch(`/api/messages/conversation/${userId}?currentUserId=${encodeURIComponent(currentUserId)}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -370,6 +457,36 @@ export default function MessagesPage() {
 
     setSending(true);
     try {
+      // جلب معرف المستخدم الحالي
+      const userJson = localStorage.getItem('user');
+      let currentUserId: string | null = null;
+      
+      if (userJson) {
+        try {
+          const user = JSON.parse(userJson);
+          currentUserId = user.id || user._id || null;
+        } catch (e) {
+          console.error('Error parsing user data:', e);
+        }
+      }
+
+      if (!currentUserId) {
+        const studentInfo = localStorage.getItem('studentInfo');
+        if (studentInfo) {
+          try {
+            const parsed = JSON.parse(studentInfo);
+            currentUserId = parsed.id || parsed._id || null;
+          } catch (e) {
+            console.error('Error parsing studentInfo:', e);
+          }
+        }
+      }
+
+      if (!currentUserId) {
+        console.error('No current user ID found');
+        return;
+      }
+
       const token = localStorage.getItem('token');
       const response = await fetch(`/api/messages/send`, {
         method: 'POST',
@@ -378,6 +495,7 @@ export default function MessagesPage() {
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
+          senderId: currentUserId,
           receiverId: selectedConversation.user._id,
           content: newMessage,
           messageType: 'text',
@@ -447,7 +565,33 @@ export default function MessagesPage() {
     }
   };
 
-  const currentUserId = localStorage.getItem('userId');
+  // جلب معرف المستخدم الحالي
+  const userJson = localStorage.getItem('user');
+  let currentUserId: string | null = null;
+  
+  if (userJson) {
+    try {
+      const user = JSON.parse(userJson);
+      currentUserId = user.id || user._id || localStorage.getItem('userId');
+    } catch (e) {
+      currentUserId = localStorage.getItem('userId');
+    }
+  } else {
+    currentUserId = localStorage.getItem('userId');
+  }
+
+  // محاولة جلب من studentInfo إذا لم يوجد
+  if (!currentUserId) {
+    const studentInfo = localStorage.getItem('studentInfo');
+    if (studentInfo) {
+      try {
+        const parsed = JSON.parse(studentInfo);
+        currentUserId = parsed.id || parsed._id || null;
+      } catch (e) {
+        // ignore
+      }
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900" dir="rtl">
@@ -576,40 +720,82 @@ export default function MessagesPage() {
                   </div>
 
                   {/* Messages */}
-                  <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                    {messages.map((message, idx) => (
-                      <div
-                        key={`${message._id}-${idx}`}
-                        className={`flex ${message.sender?._id === currentUserId ? 'justify-end' : 'justify-start'}`}
-                      >
-                        <div
-                          className={`max-w-xs px-4 py-2 rounded-lg ${
-                            message.sender?._id === currentUserId
-                              ? 'bg-blue-500 text-white'
-                              : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-white'
-                          }`}
-                        >
-                          {message.messageType === 'file' && message.fileUrl && (
-                            <div className="mb-2">
-                              <a
-                                href={message.fileUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-blue-600 hover:underline text-sm"
-                              >
-                                📎 ملف مرفق
-                              </a>
-                            </div>
-                          )}
-                          <p className="text-sm">{message.content}</p>
-                          <p className={`text-xs mt-1 ${
-                            message.sender?._id === currentUserId ? 'text-blue-100' : 'text-gray-500 dark:text-gray-400'
-                          }`}>
-                            {formatTime(message.createdAt)}
-                          </p>
-                        </div>
+                  <div 
+                    id="messages-container"
+                    className="flex-1 overflow-y-auto p-4 space-y-4"
+                    style={{ scrollBehavior: 'smooth' }}
+                  >
+                    {messages.length === 0 ? (
+                      <div className="flex items-center justify-center h-full text-gray-500">
+                        <p>لا توجد رسائل بعد. ابدأ المحادثة!</p>
                       </div>
-                    ))}
+                    ) : (
+                      messages.map((message, idx) => {
+                        const isCurrentUser = message.sender?._id === currentUserId || message.sender?.id === currentUserId;
+                        return (
+                          <div
+                            key={`${message._id}-${idx}`}
+                            className={`flex ${isCurrentUser ? 'justify-end' : 'justify-start'} items-end gap-2`}
+                          >
+                            {!isCurrentUser && (
+                              <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-600 flex items-center justify-center flex-shrink-0">
+                                {selectedConversation.user.avatar ? (
+                                  <img 
+                                    src={selectedConversation.user.avatar} 
+                                    alt={selectedConversation.user.name} 
+                                    className="w-8 h-8 rounded-full object-cover"
+                                  />
+                                ) : (
+                                  <span className="text-xs font-semibold text-gray-600 dark:text-gray-300">
+                                    {selectedConversation.user.name.charAt(0)}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                            <div
+                              className={`max-w-xs px-4 py-2 rounded-2xl ${
+                                isCurrentUser
+                                  ? 'bg-blue-500 text-white rounded-br-sm'
+                                  : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-white rounded-bl-sm'
+                              }`}
+                            >
+                              {message.messageType === 'file' && message.fileUrl && (
+                                <div className="mb-2">
+                                  <a
+                                    href={message.fileUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className={`text-sm ${isCurrentUser ? 'text-blue-100 hover:text-white' : 'text-blue-600 hover:underline'}`}
+                                  >
+                                    📎 ملف مرفق
+                                  </a>
+                                </div>
+                              )}
+                              <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
+                              <div className="flex items-center justify-end gap-1 mt-1">
+                                <p className={`text-xs ${
+                                  isCurrentUser ? 'text-blue-100' : 'text-gray-500 dark:text-gray-400'
+                                }`}>
+                                  {formatTime(message.createdAt || message.created_at)}
+                                </p>
+                                {isCurrentUser && (
+                                  <span className={`text-xs ${message.isRead ? 'text-blue-200' : 'text-blue-100'}`}>
+                                    {message.isRead ? '✓✓' : '✓'}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            {isCurrentUser && (
+                              <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0">
+                                <span className="text-xs font-semibold text-white">
+                                  {currentUserId?.charAt(0).toUpperCase() || 'U'}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })
+                    )}
                   </div>
 
                   {/* Message Input */}

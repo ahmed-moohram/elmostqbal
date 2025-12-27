@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { FaLock, FaShoppingCart, FaWhatsapp, FaPhone, FaCopy, FaCheckCircle, FaExpand, FaCompress, FaPlus, FaMinus, FaPlay, FaPause } from 'react-icons/fa';
+import { FaLock, FaShoppingCart, FaWhatsapp, FaPhone, FaCopy, FaCheckCircle, FaPlay, FaPause } from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
 
 interface ProtectedVideoPlayerProps {
@@ -16,7 +16,9 @@ interface ProtectedVideoPlayerProps {
   lessonId?: string;
   useAccessCode?: boolean;
   duration?: number; // مدة الفيديو بالدقائق
+  initialWatchedSeconds?: number; // استكمال من آخر نقطة (بالثواني)
   onProgress?: (progress: number, watchedSeconds: number) => void; // callback للتقدم
+  onPlayStateChange?: (isPlaying: boolean) => void; // callback لتغيير حالة التشغيل
 }
 
 export default function ProtectedVideoPlayer({
@@ -31,7 +33,9 @@ export default function ProtectedVideoPlayer({
   lessonId,
   useAccessCode = false,
   duration = 0, // مدة الفيديو بالدقائق
+  initialWatchedSeconds = 0,
   onProgress, // callback للتقدم
+  onPlayStateChange, // callback لتغيير حالة التشغيل
 }: ProtectedVideoPlayerProps) {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [studentName, setStudentName] = useState('');
@@ -47,17 +51,17 @@ export default function ProtectedVideoPlayer({
   const [lessonHasCode, setLessonHasCode] = useState(false);
   const [lessonIsFreeOrPreview, setLessonIsFreeOrPreview] = useState(false);
   const [metaLoaded, setMetaLoaded] = useState(false);
-  const [isExpanded, setIsExpanded] = useState(false);
-  const [zoomLevel, setZoomLevel] = useState(1);
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
   
   // حالة تتبع التقدم
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
   const [watchedSeconds, setWatchedSeconds] = useState(0);
   const [progressPercent, setProgressPercent] = useState(0);
+  const [resumeStartSeconds, setResumeStartSeconds] = useState(0);
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
+
+  const onProgressRef = useRef(onProgress);
+  const lastProgressRef = useRef<{ progress: number; seconds: number } | null>(null);
 
   // رقم فودافون كاش للمدرس
   const vodafoneCashNumber = actualTeacherPhone || teacherPhone || '01012345678';
@@ -133,133 +137,33 @@ export default function ProtectedVideoPlayer({
     fetchMeta();
   }, [lessonId, useAccessCode, courseId]);
 
-  // اكتشاف الجوال
   useEffect(() => {
-    const checkMobile = () => {
-      const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
-      const isMobileDevice = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent.toLowerCase());
-      setIsMobile(isMobileDevice);
-    };
-    checkMobile();
-  }, []);
+    onProgressRef.current = onProgress;
+  }, [onProgress]);
 
-  // إعادة ضبط مستوى الزووم عند الخروج من وضع التكبير المخصص
   useEffect(() => {
-    if (!isExpanded) {
-      setZoomLevel(1);
-      setIsFullscreen(false);
+    setIsVideoPlaying(false);
+    setWatchedSeconds(0);
+    setProgressPercent(0);
+    setResumeStartSeconds(0);
+    lastProgressRef.current = null;
+  }, [lessonId]);
+
+  useEffect(() => {
+    if (!isEnrolled || !duration || duration === 0) return;
+    if (isVideoPlaying) return;
+
+    const totalSeconds = duration * 60;
+    const safeSeconds = Math.max(0, Math.floor(Number(initialWatchedSeconds) || 0));
+    if (safeSeconds <= 0) return;
+
+    setWatchedSeconds(safeSeconds);
+    setResumeStartSeconds(safeSeconds);
+    if (totalSeconds > 0) {
+      setProgressPercent(Math.min(Math.round((safeSeconds / totalSeconds) * 100), 100));
     }
-  }, [isExpanded]);
+  }, [initialWatchedSeconds, isEnrolled, duration, isVideoPlaying]);
 
-  // تفعيل ملء الشاشة والدوران التلقائي عند التكبير على الجوال
-  useEffect(() => {
-    if (isExpanded && isMobile) {
-      // طلب ملء الشاشة
-      const requestFullscreen = async () => {
-        try {
-          const element = document.documentElement;
-          if (element.requestFullscreen) {
-            await element.requestFullscreen();
-            setIsFullscreen(true);
-          } else if ((element as any).webkitRequestFullscreen) {
-            await (element as any).webkitRequestFullscreen();
-            setIsFullscreen(true);
-          } else if ((element as any).mozRequestFullScreen) {
-            await (element as any).mozRequestFullScreen();
-            setIsFullscreen(true);
-          } else if ((element as any).msRequestFullscreen) {
-            await (element as any).msRequestFullscreen();
-            setIsFullscreen(true);
-          }
-        } catch (error) {
-          console.log('Fullscreen request failed:', error);
-        }
-      };
-
-      // طلب الدوران التلقائي (Screen Orientation API)
-      const requestOrientation = async () => {
-        try {
-          if ('orientation' in screen && 'lock' in (screen as any).orientation) {
-            await (screen as any).orientation.lock('landscape');
-          } else if ((screen as any).lockOrientation) {
-            (screen as any).lockOrientation('landscape');
-          } else if ((screen as any).mozLockOrientation) {
-            (screen as any).mozLockOrientation('landscape');
-          } else if ((screen as any).msLockOrientation) {
-            (screen as any).msLockOrientation('landscape');
-          }
-        } catch (error) {
-          console.log('Orientation lock failed:', error);
-        }
-      };
-
-      requestFullscreen();
-      requestOrientation();
-    } else if (!isExpanded && isFullscreen) {
-      // الخروج من ملء الشاشة عند التصغير
-      const exitFullscreen = async () => {
-        try {
-          if (document.exitFullscreen) {
-            await document.exitFullscreen();
-          } else if ((document as any).webkitExitFullscreen) {
-            await (document as any).webkitExitFullscreen();
-          } else if ((document as any).mozCancelFullScreen) {
-            await (document as any).mozCancelFullScreen();
-          } else if ((document as any).msExitFullscreen) {
-            await (document as any).msExitFullscreen();
-          }
-          setIsFullscreen(false);
-        } catch (error) {
-          console.log('Exit fullscreen failed:', error);
-        }
-      };
-
-      // إلغاء قفل الدوران
-      const unlockOrientation = async () => {
-        try {
-          if ('orientation' in screen && 'unlock' in (screen as any).orientation) {
-            await (screen as any).orientation.unlock();
-          } else if ((screen as any).unlockOrientation) {
-            (screen as any).unlockOrientation();
-          } else if ((screen as any).mozUnlockOrientation) {
-            (screen as any).mozUnlockOrientation();
-          } else if ((screen as any).msUnlockOrientation) {
-            (screen as any).msUnlockOrientation();
-          }
-        } catch (error) {
-          console.log('Orientation unlock failed:', error);
-        }
-      };
-
-      exitFullscreen();
-      unlockOrientation();
-    }
-  }, [isExpanded, isMobile, isFullscreen]);
-
-  // الاستماع لتغييرات ملء الشاشة
-  useEffect(() => {
-    const handleFullscreenChange = () => {
-      const isCurrentlyFullscreen = !!(
-        document.fullscreenElement ||
-        (document as any).webkitFullscreenElement ||
-        (document as any).mozFullScreenElement ||
-        (document as any).msFullscreenElement
-      );
-      setIsFullscreen(isCurrentlyFullscreen);
-    };
-
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
-    document.addEventListener('mozfullscreenchange', handleFullscreenChange);
-    document.addEventListener('MSFullscreenChange', handleFullscreenChange);
-
-    return () => {
-      document.removeEventListener('fullscreenchange', handleFullscreenChange);
-      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
-      document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
-      document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
-    };
-  }, []);
 
   // تتبع التقدم عند تشغيل الفيديو
   useEffect(() => {
@@ -275,10 +179,7 @@ export default function ProtectedVideoPlayer({
           const newProgress = Math.min(Math.round((newSeconds / totalSeconds) * 100), 100);
           setProgressPercent(newProgress);
           
-          // استدعاء callback إذا كان موجوداً
-          if (onProgress) {
-            onProgress(newProgress, newSeconds);
-          }
+          // لا نستدعي callback هنا مباشرة - سنستخدم useEffect منفصل
           
           return newSeconds;
         });
@@ -298,6 +199,28 @@ export default function ProtectedVideoPlayer({
       }
     };
   }, [isVideoPlaying, duration, isEnrolled, onProgress]);
+
+  useEffect(() => {
+    if (onProgressRef.current && watchedSeconds > 0 && isVideoPlaying) {
+      const totalSeconds = duration * 60;
+      const currentProgress = totalSeconds > 0 
+        ? Math.min(Math.round((watchedSeconds / totalSeconds) * 100), 100)
+        : 0;
+      
+      // نتحقق من أن القيمة تغيرت قبل الاستدعاء
+      if (!lastProgressRef.current || 
+          lastProgressRef.current.progress !== currentProgress || 
+          lastProgressRef.current.seconds !== watchedSeconds) {
+        lastProgressRef.current = { progress: currentProgress, seconds: watchedSeconds };
+        // نستخدم setTimeout لتأجيل الاستدعاء حتى بعد انتهاء render
+        setTimeout(() => {
+          if (onProgressRef.current) {
+            onProgressRef.current(currentProgress, watchedSeconds);
+          }
+        }, 0);
+      }
+    }
+  }, [watchedSeconds, isVideoPlaying, duration]); // إزالة onProgress من dependencies
 
   // حفظ التقدم في قاعدة البيانات
   useEffect(() => {
@@ -325,6 +248,11 @@ export default function ProtectedVideoPlayer({
             return;
           }
 
+          const totalSeconds = duration * 60;
+          const currentProgressPercent = totalSeconds > 0 
+            ? Math.min(Math.round((watchedSeconds / totalSeconds) * 100), 100)
+            : 0;
+
           const response = await fetch('/api/lesson-progress', {
             method: 'POST',
             headers: { 
@@ -334,9 +262,9 @@ export default function ProtectedVideoPlayer({
             body: JSON.stringify({
               lessonId,
               courseId,
-              watchedSeconds,
-              progressPercent,
-              duration: duration * 60, // بالثواني
+              watchedSeconds: watchedSeconds || 0,
+              progressPercent: currentProgressPercent,
+              duration: totalSeconds,
               userId, // إرسال userId من العميل
             }),
           });
@@ -548,27 +476,38 @@ export default function ProtectedVideoPlayer({
         if (v) {
           // تعطيل أزرار المشاركة: modestbranding=1, rel=0, disablekb=1, fs=0
           // إضافة showinfo=0 لإخفاء معلومات الفيديو
-          return `https://www.youtube.com/embed/${v}?autoplay=0&rel=0&modestbranding=1&controls=1&disablekb=1&iv_load_policy=3&fs=0&showinfo=0&playsinline=1`;
+          const start = resumeStartSeconds > 0 ? `&start=${resumeStartSeconds}` : '';
+          return `https://www.youtube.com/embed/${v}?autoplay=0&rel=0&modestbranding=1&controls=1&disablekb=1&iv_load_policy=3&fs=0&showinfo=0&playsinline=1${start}`;
         }
       }
 
       if (url.includes('youtu.be/')) {
         const id = url.split('youtu.be/')[1]?.split(/[?&]/)[0];
         if (id) {
-          return `https://www.youtube.com/embed/${id}?autoplay=0&rel=0&modestbranding=1&controls=1&disablekb=1&iv_load_policy=3&fs=0&showinfo=0&playsinline=1`;
+          const start = resumeStartSeconds > 0 ? `&start=${resumeStartSeconds}` : '';
+          return `https://www.youtube.com/embed/${id}?autoplay=0&rel=0&modestbranding=1&controls=1&disablekb=1&iv_load_policy=3&fs=0&showinfo=0&playsinline=1${start}`;
         }
       }
 
       if (url.includes('youtube.com/embed/')) {
         const hasQuery = url.includes('?');
         const base = hasQuery ? url.split('?')[0] : url;
-        return `${base}?autoplay=0&rel=0&modestbranding=1&controls=1&disablekb=1&iv_load_policy=3&fs=0&showinfo=0&playsinline=1`;
+        const start = resumeStartSeconds > 0 ? `&start=${resumeStartSeconds}` : '';
+        return `${base}?autoplay=0&rel=0&modestbranding=1&controls=1&disablekb=1&iv_load_policy=3&fs=0&showinfo=0&playsinline=1${start}`;
       }
 
       return url;
     } catch (e) {
       console.error('Error parsing video URL in ProtectedVideoPlayer:', e);
       return url;
+    }
+  };
+
+  const handlePlayPause = () => {
+    const newState = !isVideoPlaying;
+    setIsVideoPlaying(newState);
+    if (onPlayStateChange) {
+      onPlayStateChange(newState);
     }
   };
 
@@ -579,42 +518,9 @@ export default function ProtectedVideoPlayer({
     const totalMinutes = duration;
 
     return (
-      <div
-        className={
-          isExpanded
-            ? 'fixed inset-0 z-50 bg-black flex flex-col items-center justify-center'
-            : 'w-full'
-        }
-        style={{
-          ...(isExpanded && isMobile ? {
-            width: '100vw',
-            height: '100vh',
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-          } : {}),
-        }}
-      >
+      <div className="w-full">
         <div
-          className={
-            isExpanded && isMobile
-              ? 'w-full h-full bg-black overflow-hidden relative video-fullscreen-mobile video-container-protected'
-              : 'w-full max-w-6xl max-h-[90vh] aspect-video bg-black rounded-xl overflow-hidden relative video-container-protected'
-          }
-          style={{
-            transform: isExpanded && !isMobile ? `scale(${zoomLevel})` : 'scale(1)',
-            transformOrigin: 'top center',
-            transition: 'transform 0.2s ease-out',
-            ...(isExpanded && isMobile ? {
-              width: '100%',
-              height: '100%',
-              maxWidth: 'none',
-              maxHeight: 'none',
-              borderRadius: 0,
-            } : {}),
-          }}
+          className="w-full max-w-6xl max-h-[90vh] aspect-video bg-black rounded-xl overflow-hidden relative video-container-protected"
         >
           <iframe
             ref={iframeRef}
@@ -626,7 +532,6 @@ export default function ProtectedVideoPlayer({
             style={{
               pointerEvents: 'auto',
             }}
-            sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
             onContextMenu={(e) => e.preventDefault()}
           />
           {/* طبقة حماية لمنع الوصول لأزرار المشاركة */}
@@ -637,99 +542,49 @@ export default function ProtectedVideoPlayer({
             }}
             onContextMenu={(e) => e.preventDefault()}
           />
-          
-          {/* شريط التقدم */}
-          {isEnrolled && duration > 0 && (
-            <div className="absolute bottom-0 left-0 right-0 bg-black/80 backdrop-blur-sm p-3 z-20">
-              <div className="flex items-center gap-3 mb-2">
-                <button
-                  type="button"
-                  onClick={() => setIsVideoPlaying(!isVideoPlaying)}
-                  className="flex items-center justify-center w-10 h-10 rounded-full bg-white/20 hover:bg-white/30 text-white transition"
-                  title={isVideoPlaying ? 'إيقاف التتبع' : 'بدء التتبع'}
-                >
-                  {isVideoPlaying ? <FaPause className="text-sm" /> : <FaPlay className="text-sm" />}
-                </button>
-                <div className="flex-1">
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="text-white text-xs font-medium">
-                      {watchedMinutes}:{watchedSecs.toString().padStart(2, '0')} / {totalMinutes}:00
-                    </span>
-                    <span className="text-white text-xs font-medium">{progressPercent}%</span>
-                  </div>
-                  <div className="w-full bg-white/20 rounded-full h-2 overflow-hidden">
-                    <div
-                      className="h-full bg-blue-500 transition-all duration-300"
-                      style={{ width: `${progressPercent}%` }}
-                    />
-                  </div>
-                </div>
+
+          {/* زر التشغيل/الإيقاف - يظهر فقط عندما يكون الفيديو متوقف */}
+          {isEnrolled && duration > 0 && !isVideoPlaying && (
+            <button
+              onClick={handlePlayPause}
+              className="absolute inset-0 z-40 flex items-center justify-center bg-black/30 hover:bg-black/40 transition-colors cursor-pointer"
+              style={{ pointerEvents: 'auto' }}
+            >
+              <div className="bg-white/90 hover:bg-white rounded-full p-6 md:p-8 shadow-2xl transition-all hover:scale-110">
+                <FaPlay className="text-4xl md:text-5xl text-gray-800 mr-1" />
               </div>
-            </div>
+            </button>
           )}
 
-          <div
-            className="absolute bottom-2 right-2 z-20 px-3 py-1.5 bg-black/90 rounded-full flex items-center gap-1.5 text-white/90 text-xs md:text-sm select-none shadow-lg"
-            style={{ pointerEvents: 'auto' }}
-          >
-            <FaLock className="text-sm md:text-base" />
-            <span>مغلق</span>
-          </div>
+          {/* إخفاء كلمة "مغلق" إذا كان الفيديو من Google Drive */}
+          {!videoUrl?.includes('drive.google.com') && (
+            <div
+              className="absolute bottom-2 right-2 z-20 px-3 py-1.5 bg-black/90 rounded-full flex items-center gap-1.5 text-white/90 text-xs md:text-sm select-none shadow-lg"
+              style={{ pointerEvents: 'auto' }}
+            >
+              <FaLock className="text-sm md:text-base" />
+              <span>مغلق</span>
+            </div>
+          )}
 
           <div className="absolute top-0 left-0 right-0 h-16 bg-black/35 flex items-center justify-between px-4 pointer-events-auto z-10 select-none">
             <div className="flex items-center gap-2 text-white/85 text-sm font-bold">
               <FaLock className="text-lg" />
               <span>محتوى محمي</span>
             </div>
-            <button
-              type="button"
-              onClick={() => setIsExpanded((prev) => !prev)}
-              className="flex items-center gap-2 text-white/90 bg-black/40 hover:bg-black/60 rounded-full px-3 py-1 text-xs font-semibold transition"
-            >
-              {isExpanded ? (
-                <>
-                  <FaCompress className="text-sm" />
-                  <span>تصغير الفيديو</span>
-                </>
-              ) : (
-                <>
-                  <FaExpand className="text-sm" />
-                  <span>تكبير الفيديو</span>
-                </>
-              )}
-            </button>
+            {/* عرض التقدم إذا كان مشترك */}
+            {isEnrolled && duration > 0 && isVideoPlaying && (
+              <div className="flex items-center gap-3 text-white/90 text-sm">
+                <span>{Math.round((watchedSeconds / totalSeconds) * 100)}%</span>
+                <div className="w-24 bg-white/20 rounded-full h-2">
+                  <div
+                    className="bg-white rounded-full h-2 transition-all duration-300"
+                    style={{ width: `${Math.min((watchedSeconds / totalSeconds) * 100, 100)}%` }}
+                  />
+                </div>
+              </div>
+            )}
           </div>
-
-          {/* أزرار الزووم في الأسفل */}
-          {isExpanded && (
-            <div className="absolute bottom-4 right-4 z-10 flex items-center gap-2 bg-black/40 text-white px-3 py-1 rounded-full text-xs pointer-events-auto select-none">
-              <span className="opacity-80">الزووم</span>
-              <button
-                type="button"
-                onClick={() =>
-                  setZoomLevel((prev) =>
-                    Math.max(1, Number((prev - 0.15).toFixed(2))),
-                  )
-                }
-                className="flex items-center justify-center w-7 h-7 rounded-full bg-black/60 hover:bg-black/80 transition disabled:opacity-40"
-                disabled={zoomLevel <= 1}
-              >
-                <FaMinus className="text-xs" />
-              </button>
-              <button
-                type="button"
-                onClick={() =>
-                  setZoomLevel((prev) =>
-                    Math.min(2, Number((prev + 0.15).toFixed(2))),
-                  )
-                }
-                className="flex items-center justify-center w-7 h-7 rounded-full bg-black/60 hover:bg-black/80 transition disabled:opacity-40"
-                disabled={zoomLevel >= 2}
-              >
-                <FaPlus className="text-xs" />
-              </button>
-            </div>
-          )}
         </div>
       </div>
     );

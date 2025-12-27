@@ -235,8 +235,13 @@ export class AchievementsService {
         )
       );
 
+      // جلب عدد الدروس الحقيقي لكل كورس
       const lessonsCountByCourse = new Map<string, number>();
+      // جلب عدد الدروس المكتملة الحقيقي لكل كورس
+      const completedLessonsCountByCourse = new Map<string, number>();
+      
       if (courseIds.length > 0) {
+        // جلب جميع الدروس
         const { data: lessonsRows, error: lessonsError } = await supabase
           .from('lessons')
           .select('id, course_id')
@@ -249,6 +254,24 @@ export class AchievementsService {
             const cid = row?.course_id ? String(row.course_id) : '';
             if (!cid) return;
             lessonsCountByCourse.set(cid, (lessonsCountByCourse.get(cid) || 0) + 1);
+          });
+        }
+
+        // جلب الدروس المكتملة فعلياً من lesson_progress
+        const { data: completedLessonsRows, error: completedLessonsError } = await supabase
+          .from('lesson_progress')
+          .select('lesson_id, course_id')
+          .eq('user_id', userId)
+          .eq('is_completed', true)
+          .in('course_id', courseIds as any);
+
+        if (completedLessonsError) {
+          console.error('❌ خطأ في جلب الدروس المكتملة:', completedLessonsError);
+        } else {
+          (completedLessonsRows || []).forEach((row: any) => {
+            const cid = row?.course_id ? String(row.course_id) : '';
+            if (!cid) return;
+            completedLessonsCountByCourse.set(cid, (completedLessonsCountByCourse.get(cid) || 0) + 1);
           });
         }
       }
@@ -295,9 +318,13 @@ export class AchievementsService {
         }
 
         const totalLessons = courseId ? lessonsCountByCourse.get(courseId) || 0 : 0;
-        const progress = typeof enrollment?.progress === 'number' ? enrollment.progress : 0;
-        const completedLessons =
-          totalLessons > 0 ? Math.round((Math.max(0, Math.min(100, progress)) / 100) * totalLessons) : 0;
+        // استخدام عدد الدروس المكتملة الحقيقي من قاعدة البيانات
+        const completedLessonsReal = courseId ? completedLessonsCountByCourse.get(courseId) || 0 : 0;
+        // حساب التقدم الحقيقي بناءً على الدروس المكتملة
+        const progress = totalLessons > 0 
+          ? Math.round((completedLessonsReal / totalLessons) * 100)
+          : (typeof enrollment?.progress === 'number' ? enrollment.progress : 0);
+        const completedLessons = completedLessonsReal;
 
         const achievements = courseId ? achievementsByCourse.get(courseId) || [] : [];
 

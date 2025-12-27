@@ -84,7 +84,7 @@ export async function GET(request: NextRequest) {
           )
         `)
         .eq('user_id', effectiveUserId)
-        .not('is_active', 'eq', false);
+        .eq('is_active', true);
 
       if (enrollmentsError) {
         console.error('Error fetching enrollments in /api/student/dashboard:', enrollmentsError);
@@ -163,18 +163,34 @@ export async function GET(request: NextRequest) {
         );
 
         const extraEnrollments = paymentEnrollmentsData
-          .filter((ce: any) => !existingCourseIds.has(String(ce.course_id)))
-          .map((ce: any) => ({
-            id: ce.id,
-            user_id: ce.student_id,
-            course_id: ce.course_id,
-            status: 'active',
-            progress: 0,
-            is_active: ce.is_active ?? true,
-            enrolled_at: ce.created_at,
-            completed_at: null,
-            course: courseMap.get(String(ce.course_id)) || null,
-          }));
+          .filter((ce: any) => {
+            const courseId = String(ce.course_id);
+            const exists = existingCourseIds.has(courseId);
+            if (!exists && courseMap.has(courseId)) {
+              console.log(`➕ إضافة كورس من course_enrollments: ${courseId}`);
+            }
+            return !exists;
+          })
+          .map((ce: any) => {
+            const courseId = String(ce.course_id);
+            const course = courseMap.get(courseId);
+            return {
+              id: ce.id,
+              user_id: ce.student_id,
+              course_id: ce.course_id,
+              status: 'active',
+              progress: 0,
+              is_active: ce.is_active ?? true,
+              enrolled_at: ce.created_at || new Date().toISOString(),
+              completed_at: null,
+              course: course || null,
+            };
+          })
+          .filter((e: any) => e.course !== null); // فقط الكورسات التي تم جلب بياناتها بنجاح
+
+        if (extraEnrollments.length > 0) {
+          console.log(`✅ تم إضافة ${extraEnrollments.length} كورس من course_enrollments`);
+        }
 
         enrollments = [...enrollments, ...extraEnrollments];
       }
@@ -288,6 +304,137 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // جلب البيانات الحقيقية لكل كورس (عدد الدروس والامتحانات)
+    const courseIds = Array.from(
+      new Set(
+        enrollments
+          .map((e: any) => e.course_id)
+          .filter((cid: any) => !!cid)
+          .map((cid: any) => String(cid))
+      )
+    );
+
+    // جلب عدد الدروس الحقيقي لكل كورس
+    const lessonsCountMap = new Map<string, number>();
+    if (courseIds.length > 0) {
+      const { data: lessonsData, error: lessonsError } = await supabase
+        .from('lessons')
+        .select('id, course_id')
+        .in('course_id', courseIds as any);
+
+      if (lessonsError) {
+        console.warn('Error fetching lessons count (ignored):', lessonsError.message);
+      } else if (lessonsData) {
+        lessonsData.forEach((lesson: any) => {
+          const cid = String(lesson.course_id);
+          lessonsCountMap.set(cid, (lessonsCountMap.get(cid) || 0) + 1);
+        });
+      }
+    }
+
+    // جلب عدد الامتحانات الحقيقي لكل كورس
+    const quizzesCountMap = new Map<string, number>();
+    if (courseIds.length > 0) {
+      const { data: quizzesData, error: quizzesError } = await supabase
+        .from('quizzes')
+        .select('id, course_id')
+        .in('course_id', courseIds as any);
+
+      if (quizzesError) {
+        console.warn('Error fetching quizzes count (ignored):', quizzesError.message);
+      } else if (quizzesData) {
+        quizzesData.forEach((quiz: any) => {
+          const cid = String(quiz.course_id);
+          quizzesCountMap.set(cid, (quizzesCountMap.get(cid) || 0) + 1);
+        });
+      }
+    }
+
+    // جلب تقدم الدروس وعدد الدروس المكتملة لكل كورس
+    const completedLessonsCountMap = new Map<string, number>();
+    const lessonProgressPercentMap = new Map<string, number>();
+    if (courseIds.length > 0 && hasUuid) {
+      try {
+        const { data: lessonProgressData, error: lessonProgressError } = await supabase
+          .from('lesson_progress')
+          .select('lesson_id, course_id, progress, is_completed')
+          .eq('user_id', effectiveUserId)
+          .in('course_id', courseIds as any);
+
+        if (lessonProgressError) {
+          console.warn('Error fetching lesson_progress (ignored):', lessonProgressError.message);
+        } else if (lessonProgressData) {
+          const sumProgressByCourse = new Map<string, number>();
+          const countByCourse = new Map<string, number>();
+
+          lessonProgressData.forEach((lp: any) => {
+            const cid = lp?.course_id ? String(lp.course_id) : '';
+            if (!cid) return;
+
+            // عدد الدروس المكتملة (is_completed = true)
+            if (lp.is_completed) {
+              completedLessonsCountMap.set(cid, (completedLessonsCountMap.get(cid) || 0) + 1);
+            }
+
+            // تجميع نسبة التقدم لكل درس
+            const p = typeof lp.progress === 'number' ? lp.progress : 0;
+            sumProgressByCourse.set(cid, (sumProgressByCourse.get(cid) || 0) + p);
+            countByCourse.set(cid, (countByCourse.get(cid) || 0) + 1);
+          });
+
+          // حساب متوسط التقدم لكل كورس بناءً على تقدم الدروس
+          courseIds.forEach((cid) => {
+            const totalLessons = lessonsCountMap.get(cid) || 0;
+            const sum = sumProgressByCourse.get(cid) || 0;
+            const count = totalLessons > 0 ? totalLessons : (countByCourse.get(cid) || 0);
+
+            if (count > 0) {
+              const avg = Math.round(sum / count);
+              lessonProgressPercentMap.set(cid, avg);
+            }
+          });
+        }
+      } catch (completedLessonsError: any) {
+        console.warn('Error processing lesson_progress for dashboard (ignored):', completedLessonsError?.message || completedLessonsError);
+      }
+    }
+
+    // إضافة البيانات الحقيقية لكل enrollment
+    enrollments = enrollments.map((enrollment: any) => {
+      const courseId = String(enrollment.course_id);
+      const totalLessons = lessonsCountMap.get(courseId) || 0;
+      const totalQuizzes = quizzesCountMap.get(courseId) || 0;
+      const completedLessons = completedLessonsCountMap.get(courseId) || 0;
+
+      // محاولة استخدام متوسط تقدم الدروس إن وجد، وإلا نستخدم نسبة الدروس المكتملة
+      const lessonProgressPercent = lessonProgressPercentMap.has(courseId)
+        ? (lessonProgressPercentMap.get(courseId) || 0)
+        : null;
+
+      const fallbackProgress = totalLessons > 0
+        ? Math.round((completedLessons / totalLessons) * 100)
+        : (typeof enrollment.progress === 'number' ? enrollment.progress : 0);
+
+      const realProgress = lessonProgressPercent !== null ? lessonProgressPercent : fallbackProgress;
+
+      return {
+        ...enrollment,
+        total_lessons: totalLessons,
+        lessons_count: totalLessons,
+        total_quizzes: totalQuizzes,
+        completed_lessons: completedLessons,
+        progress: realProgress,
+        course: enrollment.course
+          ? {
+              ...enrollment.course,
+              total_lessons: totalLessons,
+              lessons_count: totalLessons,
+              total_quizzes: totalQuizzes,
+            }
+          : enrollment.course,
+      };
+    });
+
     // جلب الشهادات
     const certificatesResp = hasUuid
       ? await supabase
@@ -339,11 +486,8 @@ export async function GET(request: NextRequest) {
       console.warn('Error fetching user achievements (ignored):', achievementsError.message);
     }
 
-    // حساب عدد الدروس في كل كورس مسجَّل فيه الطالب حتى يمكن للواجهة عرض 0/عدد_الدروس الحقيقي
-    let enrichedEnrollments = enrollments || [];
-
     // إضافة instructor_name مشتق للكورسات حتى تظل الواجهة تعمل بدون عمود courses.instructor_name
-    enrichedEnrollments = (enrichedEnrollments || []).map((enr: any) => {
+    let enrichedEnrollments = (enrollments || []).map((enr: any) => {
       const course = enr?.course || null;
       if (!course) return enr;
 
@@ -360,27 +504,6 @@ export async function GET(request: NextRequest) {
         },
       };
     });
-
-    try {
-      const enrolledCourseIdsForLessons = (enrollments || [])
-        .map((enrollment: any) => enrollment.course_id)
-        .filter((id: string | null | undefined) => !!id);
-
-      if (enrolledCourseIdsForLessons.length > 0) {
-        const { data: lessons, error: lessonsError } = await supabase
-          .from('lessons')
-          .select('id, course_id')
-          .in('course_id', enrolledCourseIdsForLessons as any);
-
-        if (lessonsError) {
-          console.warn('Error fetching lessons for student dashboard (ignored):', lessonsError.message);
-        } else if (lessons) {
-          const counts = new Map<string, number>();
-        }
-      }
-    } catch (lessonsAggError) {
-      console.error('Error aggregating lessons for student dashboard (ignored):', lessonsAggError);
-    }
 
     // إخفاء الكورسات المحذوفة أو غير النشطة أو التي لا تحتوي على عنوان من قائمة الكورسات النشطة
     enrichedEnrollments = (enrichedEnrollments || []).filter((enr: any) => {

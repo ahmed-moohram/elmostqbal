@@ -123,6 +123,8 @@ export default function TeacherCourseLessonsPage() {
   const [generatingCodeLessonId, setGeneratingCodeLessonId] = useState<string | null>(null);
   const [generatingBatchLessonId, setGeneratingBatchLessonId] = useState<string | null>(null);
   const [batchCodeCounts, setBatchCodeCounts] = useState<Record<string, string>>({});
+  const [courseCodeCount, setCourseCodeCount] = useState<string>('');
+  const [isGeneratingCourseCodes, setIsGeneratingCourseCodes] = useState(false);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -513,6 +515,70 @@ export default function TeacherCourseLessonsPage() {
       toast.error('حدث خطأ أثناء إنشاء الأكواد');
     } finally {
       setGeneratingBatchLessonId(null);
+    }
+  };
+
+  const handleGenerateCourseCodes = async () => {
+    if (!courseId) {
+      toast.error('معرّف الكورس غير موجود');
+      return;
+    }
+
+    if (!user?.id) {
+      toast.error('يجب تسجيل الدخول كمدرس لإنشاء أكواد');
+      return;
+    }
+
+    let count = Number(courseCodeCount || '0');
+    if (!Number.isFinite(count) || count <= 0) {
+      toast.error('يرجى إدخال عدد أكواد الكورس (مثلاً 5 أو 10 أو 20)');
+      return;
+    }
+
+    if (count > 200) {
+      count = 200;
+    }
+
+    try {
+      setIsGeneratingCourseCodes(true);
+
+      const res = await fetch(
+        `/api/teacher/courses/${courseId}/codes?teacherId=${user.id}&count=${count}`,
+        {
+          method: 'POST',
+        },
+      );
+
+      const json = await res.json().catch(() => null);
+
+      if (!res.ok || !json?.codes || !Array.isArray(json.codes)) {
+        console.error('Error generating course access codes:', json);
+        toast.error(json?.error || 'فشل إنشاء أكواد الكورس، حاول مرة أخرى');
+        return;
+      }
+
+      const codes: string[] = json.codes.map((c: any) => String(c));
+
+      if (!codes.length) {
+        toast.error('لم يتم إنشاء أي أكواد للكورس');
+        return;
+      }
+
+      const textToCopy = codes.join('\n');
+
+      try {
+        await navigator.clipboard.writeText(textToCopy);
+        toast.success(`تم إنشاء ${codes.length} كود للكورس ونسخهم إلى الحافظة`);
+      } catch (clipboardError) {
+        console.warn('Failed to copy course codes to clipboard:', clipboardError);
+        toast.success(`تم إنشاء ${codes.length} كود للكورس. يمكنك نسخهم من النافذة التالية.`);
+        alert(textToCopy);
+      }
+    } catch (error) {
+      console.error('Unexpected error while generating course access codes:', error);
+      toast.error('حدث خطأ أثناء إنشاء أكواد الكورس');
+    } finally {
+      setIsGeneratingCourseCodes(false);
     }
   };
 
@@ -1116,9 +1182,29 @@ export default function TeacherCourseLessonsPage() {
                 <FaVideo />
                 محتوى الدورة
               </h2>
-              <div className="flex items-center gap-4 text-xs text-gray-600">
-                <span>الأقسام: {totalSections}</span>
-                <span>الدروس: {totalLessons}</span>
+              <div className="flex flex-col items-end gap-1 text-xs text-gray-600">
+                <div className="flex items-center gap-4">
+                  <span>الأقسام: {totalSections}</span>
+                  <span>الدروس: {totalLessons}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <input
+                    type="number"
+                    min={1}
+                    placeholder="عدد أكواد الكورس"
+                    value={courseCodeCount}
+                    onChange={(e) => setCourseCodeCount(e.target.value)}
+                    className="w-24 px-1 py-0.5 border rounded text-[11px] text-right"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleGenerateCourseCodes}
+                    disabled={isGeneratingCourseCodes}
+                    className="px-2 py-1 rounded bg-emerald-100 text-[11px] text-emerald-800 hover:bg-emerald-200 disabled:opacity-50"
+                  >
+                    {isGeneratingCourseCodes ? 'جاري إنشاء' : 'أكواد الكورس'}
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -1351,6 +1437,30 @@ export default function TeacherCourseLessonsPage() {
                           </div>
                         </div>
                         <div className="flex flex-col gap-1 items-end">
+                          <div className="w-full flex flex-col gap-1 mb-1">
+                            <div className="text-[11px] text-gray-600 text-right">
+                              أكواد الكورس (تفتح الكورس بالكامل):
+                            </div>
+                            <div className="flex items-center gap-1 justify-end">
+                              <input
+                                type="number"
+                                min={1}
+                                placeholder="عدد أكواد الكورس"
+                                value={courseCodeCount}
+                                onChange={(e) => setCourseCodeCount(e.target.value)}
+                                className="w-24 px-1 py-0.5 border rounded text-[11px] text-right"
+                              />
+                              <button
+                                type="button"
+                                onClick={handleGenerateCourseCodes}
+                                disabled={isGeneratingCourseCodes}
+                                className="px-2 py-1 rounded bg-emerald-100 text-[11px] text-emerald-800 hover:bg-emerald-200 disabled:opacity-50"
+                              >
+                                {isGeneratingCourseCodes ? 'جاري إنشاء' : 'أكواد الكورس'}
+                              </button>
+                            </div>
+                          </div>
+
                           <button
                             type="button"
                             onClick={() => handleGenerateLessonCode(lesson)}

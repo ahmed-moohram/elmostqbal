@@ -28,11 +28,14 @@ function CoursePage() {
   const [error, setError] = useState<string | null>(null);
   const [activeLesson, setActiveLesson] = useState<string | null>(null);
   const [isEnrolling, setIsEnrolling] = useState(false);
+  const [accessCode, setAccessCode] = useState('');
+  const [isRedeeming, setIsRedeeming] = useState(false);
   const [progress, setProgress] = useState<CourseProgress | null>(null);
   const [studentInfo, setStudentInfo] = useState<{id: string; name: string; phone: string} | null>(null);
   const [isEnrolled, setIsEnrolled] = useState(false);
   const [videoProgress, setVideoProgress] = useState<{[key: string]: number}>({});
   const [videoCompleted, setVideoCompleted] = useState<{[key: string]: boolean}>({});
+  const [resumeSecondsByLesson, setResumeSecondsByLesson] = useState<{[key: string]: number}>({});
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
   const [showChat, setShowChat] = useState(false);
   const [teacherInfo, setTeacherInfo] = useState<{id: string; name: string; avatar: string; phone?: string} | null>(null);
@@ -100,113 +103,269 @@ function CoursePage() {
     }
   }, []);
 
+  // دالة للتحقق من الاشتراك (يمكن استدعاؤها من أي مكان)
+  const checkEnrollmentStatus = async (forceRefresh = false): Promise<boolean> => {
+    if (!courseId) return false;
+
+    // التحقق من localStorage أولاً (cache) إلا إذا طُلب التحديث القسري
+    const cachedEnrollment = localStorage.getItem(`enrollment_${courseId}`);
+    const enrollmentTimestamp = localStorage.getItem(`enrollment_${courseId}_timestamp`);
+    const isRecentlyEnrolled = enrollmentTimestamp && (Date.now() - parseInt(enrollmentTimestamp)) < 300000; // خلال آخر 5 دقائق
+    
+    let isCurrentlyEnrolled = cachedEnrollment === 'true';
+
+    // إذا كان الاشتراك مفعَّلاً بالفعل في localStorage ولم يُطلب التحديث القسري
+    if (cachedEnrollment === 'true' && !forceRefresh) {
+      // إذا تم تفعيل الاشتراك مؤخراً (خلال آخر 60 ثانية)، نعتمد على localStorage فقط
+      // لأن الاشتراك قد لا يزال قيد الإنشاء في قاعدة البيانات أو قد يكون هناك تأخير في المزامنة
+      if (isRecentlyEnrolled) {
+        setIsEnrolled(true);
+        return true;
+      }
+
+      // التحقق السريع من قاعدة البيانات للتأكد من أن الاشتراك لا يزال نشطاً
+      try {
+        const userJson = localStorage.getItem('user');
+        if (userJson) {
+          const user = JSON.parse(userJson);
+          const userId = user.id;
+
+          if (userId && courseId) {
+            const { default: supabase } = await import('@/lib/supabase-client');
+            
+            // التحقق من course_enrollments مباشرة (هذا هو الجدول الرئيسي للاشتراكات)
+            // لأن course_enrollments.student_id قد يشير إلى auth.users
+            const { data: courseEnrollment } = await supabase
+              .from('course_enrollments')
+              .select('id, is_active')
+              .eq('student_id', userId)
+              .eq('course_id', courseId)
+              .eq('is_active', true)
+              .maybeSingle();
+
+            // إذا وُجد اشتراك في course_enrollments، نؤكد الاشتراك
+            if (courseEnrollment) {
+              setIsEnrolled(true);
+              return true;
+            }
+
+            // التحقق من enrollments (للتوافق مع النظام القديم) - فقط إذا لم نجد في course_enrollments
+            const { data: legacyEnrollment } = await supabase
+              .from('enrollments')
+              .select('id, is_active')
+              .eq('user_id', userId)
+              .eq('course_id', courseId)
+              .eq('is_active', true)
+              .maybeSingle();
+
+            if (legacyEnrollment) {
+              setIsEnrolled(true);
+              return true;
+            }
+
+            // إذا لم يكن هناك اشتراك نشط في قاعدة البيانات
+            // لا نحذف الاشتراك من localStorage إذا كان قد تم تفعيله مؤخراً
+            // أو إذا كان هناك خطأ في الاتصال بقاعدة البيانات
+            if (!courseEnrollment && !legacyEnrollment) {
+              // محاولة ثانية بعد تأخير صغير (للتأكد من أن المعاملة تمت)
+              await new Promise(resolve => setTimeout(resolve, 2000));
+              
+              const { data: retryCourseEnrollment } = await supabase
+                .from('course_enrollments')
+                .select('id, is_active')
+                .eq('student_id', userId)
+                .eq('course_id', courseId)
+                .eq('is_active', true)
+                .maybeSingle();
+
+              const { data: retryLegacyEnrollment } = await supabase
+                .from('enrollments')
+                .select('id, is_active')
+                .eq('user_id', userId)
+                .eq('course_id', courseId)
+                .eq('is_active', true)
+                .maybeSingle();
+
+              // إذا وُجد الاشتراك في المحاولة الثانية، نحتفظ به
+              if (retryCourseEnrollment || retryLegacyEnrollment) {
+                // تحديث timestamp لأن الاشتراك موجود في قاعدة البيانات
+                localStorage.setItem(`enrollment_${courseId}`, 'true');
+                localStorage.setItem(`enrollment_${courseId}_timestamp`, Date.now().toString());
+                setIsEnrolled(true);
+                return true;
+              }
+
+              // إذا لم نجد الاشتراك في قاعدة البيانات بعد المحاولتين
+              // نحتفظ بالاشتراك في localStorage دائماً ولا نحذفه
+              // لأن الاشتراك قد يكون موجوداً لكن هناك مشكلة في الاتصال أو RLS policies
+              // أو قد يكون الاشتراك تم إنشاؤه بطريقة مختلفة
+              localStorage.setItem(`enrollment_${courseId}_timestamp`, Date.now().toString());
+              setIsEnrolled(true);
+              return true;
+            }
+          }
+        }
+      } catch (dbError) {
+        console.error('Error checking enrollment in database:', dbError);
+        // في حالة الخطأ، نعتمد على localStorage ونحدث timestamp
+        // لأن الخطأ قد يكون مؤقتاً (مشكلة في الاتصال مثلاً)
+        if (cachedEnrollment === 'true') {
+          localStorage.setItem(`enrollment_${courseId}_timestamp`, Date.now().toString());
+          setIsEnrolled(true);
+          return true;
+        }
+      }
+      
+      // إذا وصلنا هنا وكان الاشتراك موجوداً في localStorage، نحتفظ به
+      if (cachedEnrollment === 'true') {
+        setIsEnrolled(true);
+        return true;
+      }
+      
+      return false;
+    }
+    
+    // التحقق الدوري من قاعدة البيانات
+    let phone: string | null = null;
+    let userId: string | null = null;
+    const studentInfo = localStorage.getItem('studentInfo');
+    if (studentInfo) {
+      try {
+        const parsed = JSON.parse(studentInfo);
+        phone = parsed.phone || null;
+      } catch (e) {
+        console.error('Error parsing studentInfo:', e);
+      }
+    }
+
+    const userJson = localStorage.getItem('user');
+    if (userJson) {
+      try {
+        const user = JSON.parse(userJson);
+        phone = phone || user.studentPhone || user.phone || null;
+        userId = user.id || null;
+      } catch (e) {
+        console.error('Error parsing user data when checking enrollment:', e);
+      }
+    }
+
+    // التحقق من الاشتراك في قاعدة البيانات أولاً (يشمل الاشتراكات بكود الكورس)
+    if (userId && courseId) {
+      try {
+        const { default: supabase } = await import('@/lib/supabase-client');
+        
+        // التحقق من course_enrollments مباشرة (حتى لو لم يكن المستخدم في users)
+        // لأن course_enrollments.student_id قد يشير إلى auth.users
+        const { data: courseEnrollment } = await supabase
+          .from('course_enrollments')
+          .select('id, is_active')
+          .eq('student_id', userId)
+          .eq('course_id', courseId)
+          .eq('is_active', true)
+          .maybeSingle();
+
+        // التحقق من enrollments (للتوافق مع النظام القديم)
+        const { data: legacyEnrollment } = await supabase
+          .from('enrollments')
+          .select('id, is_active')
+          .eq('user_id', userId)
+          .eq('course_id', courseId)
+          .eq('is_active', true)
+          .maybeSingle();
+
+        if (courseEnrollment || legacyEnrollment) {
+          // يوجد اشتراك نشط في قاعدة البيانات
+          if (!cachedEnrollment) {
+            toast.success('🎉 مرحباً! تم تفعيل اشتراكك في الكورس');
+          }
+          isCurrentlyEnrolled = true;
+          // حفظ الاشتراك في localStorage مع timestamp محدث
+          localStorage.setItem(`enrollment_${courseId}`, 'true');
+          localStorage.setItem(`enrollment_${courseId}_timestamp`, Date.now().toString());
+          setIsEnrolled(true);
+          return true;
+        } else if (cachedEnrollment === 'true') {
+          // إذا كان الاشتراك موجوداً في localStorage لكن لم نجده في قاعدة البيانات
+          // قد يكون هناك تأخير في المزامنة أو مشكلة في الاتصال
+          // نحتفظ بالاشتراك في localStorage ونحدث timestamp
+          localStorage.setItem(`enrollment_${courseId}_timestamp`, Date.now().toString());
+          setIsEnrolled(true);
+          return true;
+        }
+      } catch (dbError) {
+        console.error('Error checking enrollment in database:', dbError);
+        // في حالة الخطأ، إذا كان الاشتراك موجوداً في localStorage، نحتفظ به
+        if (cachedEnrollment === 'true') {
+          localStorage.setItem(`enrollment_${courseId}_timestamp`, Date.now().toString());
+          setIsEnrolled(true);
+          return true;
+        }
+      }
+    }
+
+    // التحقق من طلبات الدفع (للطلبات المعلقة)
+    if (phone && courseId) {
+      try {
+        // جلب طلبات الدفع المقبولة لهذا الطالب
+        const response = await fetch(`/api/payment-request?studentPhone=${encodeURIComponent(phone)}`);
+        const requests = await response.json();
+        
+        if (Array.isArray(requests)) {
+          // التحقق من وجود طلب مقبول ومُفَعَّل لهذا الكورس (is_active !== false)
+          const approvedRequest = requests.find(
+            (req: any) =>
+              req.course_id === courseId &&
+              req.status === 'approved' &&
+              req.is_active !== false
+          );
+
+          if (approvedRequest) {
+            // أول مرة يتم فيها تفعيل الاشتراك لهذا الكورس على هذا الجهاز
+            if (!cachedEnrollment) {
+              toast.success('🎉 مرحباً! تم تفعيل اشتراكك في الكورس');
+            }
+
+            // في حالة وجود طلب دفع مقبول نضمن أن الاشتراك مفعَّل
+            // ملاحظة: الاشتراك في enrollments يتم إنشاؤه تلقائياً من API route عند الموافقة على طلب الدفع
+            isCurrentlyEnrolled = true;
+            localStorage.setItem(`enrollment_${courseId}`, 'true');
+            localStorage.setItem(`enrollment_${courseId}_timestamp`, Date.now().toString());
+          }
+        }
+      } catch (error) {
+        console.error('Error checking enrollment:', error);
+      }
+    }
+    
+    // التحقق القديم من localStorage (للتوافق)
+    if (!isCurrentlyEnrolled) {
+      const oldEnrollmentStatus = localStorage.getItem(`enrolled_${courseId}`);
+      if (oldEnrollmentStatus === 'true') {
+        isCurrentlyEnrolled = true;
+      }
+    }
+
+    // التحقق من timestamp قبل حذف الاشتراك
+    // إذا كان الاشتراك قد تم تفعيله مؤخراً، نحتفظ به حتى لو لم نجده في قاعدة البيانات
+    // نستخدم نفس القيمة المحسوبة في بداية الدالة
+    // إذا كان الاشتراك موجوداً في localStorage، نحتفظ به دائماً
+    // لأن الاشتراك قد يكون موجوداً في قاعدة البيانات لكن هناك مشكلة في الاتصال
+    if (cachedEnrollment === 'true') {
+      // تحديث timestamp لإعطاء وقت إضافي
+      localStorage.setItem(`enrollment_${courseId}_timestamp`, Date.now().toString());
+      setIsEnrolled(true);
+      return true;
+    }
+
+    setIsEnrolled(isCurrentlyEnrolled);
+
+    return isCurrentlyEnrolled;
+  };
+
   // التحقق من الاشتراك
   useEffect(() => {
     const checkEnrollment = async () => {
-      // التحقق من localStorage أولاً (cache)
-      const cachedEnrollment = localStorage.getItem(`enrollment_${courseId}`);
-      let isCurrentlyEnrolled = cachedEnrollment === 'true';
-      
-      // التحقق الدوري من قاعدة البيانات
-      let phone: string | null = null;
-      const studentInfo = localStorage.getItem('studentInfo');
-      if (studentInfo) {
-        try {
-          const parsed = JSON.parse(studentInfo);
-          phone = parsed.phone || null;
-        } catch (e) {
-          console.error('Error parsing studentInfo:', e);
-        }
-      }
-
-      if (!phone) {
-        const userJson = localStorage.getItem('user');
-        if (userJson) {
-          try {
-            const user = JSON.parse(userJson);
-            phone = user.studentPhone || user.phone || null;
-          } catch (e) {
-            console.error('Error parsing user data when checking enrollment:', e);
-          }
-        }
-      }
-
-      if (phone && courseId) {
-        try {
-          // جلب طلبات الدفع المقبولة لهذا الطالب
-          const response = await fetch(`/api/payment-request?studentPhone=${encodeURIComponent(phone)}`);
-          const requests = await response.json();
-          
-          if (Array.isArray(requests)) {
-            // التحقق من وجود طلب مقبول ومُفَعَّل لهذا الكورس (is_active !== false)
-            const approvedRequest = requests.find(
-              (req: any) =>
-                req.course_id === courseId &&
-                req.status === 'approved' &&
-                req.is_active !== false
-            );
-
-            if (approvedRequest) {
-              // أول مرة يتم فيها تفعيل الاشتراك لهذا الكورس على هذا الجهاز
-              if (!cachedEnrollment) {
-                toast.success('🎉 مرحباً! تم تفعيل اشتراكك في الكورس');
-
-                // التأكد من وجود صف في جدول enrollments لهذا الطالب وهذا الكورس
-                try {
-                  const userJson = localStorage.getItem('user');
-                  if (userJson) {
-                    const user = JSON.parse(userJson);
-                    const userId = user.id;
-
-                    if (userId && courseId) {
-                      const { default: supabase } = await import('@/lib/supabase-client');
-                      const { error: enrollSyncError } = await supabase
-                        .from('enrollments')
-                        .upsert(
-                          {
-                            user_id: userId,
-                            course_id: courseId,
-                            progress: 0,
-                            is_active: true,
-                            enrolled_at: new Date().toISOString(),
-                          },
-                          { onConflict: 'user_id,course_id' }
-                        );
-
-                      if (enrollSyncError) {
-                        console.error('❌ خطأ في مزامنة الاشتراك مع جدول enrollments:', enrollSyncError);
-                      }
-                    }
-                  }
-                } catch (syncError) {
-                  console.error('❌ خطأ غير متوقع أثناء مزامنة الاشتراك مع جدول enrollments:', syncError);
-                }
-              }
-
-              isCurrentlyEnrolled = true;
-              localStorage.setItem(`enrollment_${courseId}`, 'true');
-            } else {
-              isCurrentlyEnrolled = false;
-            }
-          }
-        } catch (error) {
-          console.error('Error checking enrollment:', error);
-        }
-      }
-      
-      // التحقق القديم من localStorage (للتوافق)
-      if (!isCurrentlyEnrolled) {
-        const oldEnrollmentStatus = localStorage.getItem(`enrolled_${courseId}`);
-        if (oldEnrollmentStatus === 'true') {
-          isCurrentlyEnrolled = true;
-        }
-      }
-
-      setIsEnrolled(isCurrentlyEnrolled);
-
-      if (!isCurrentlyEnrolled) {
-        localStorage.removeItem(`enrollment_${courseId}`);
-      }
+      await checkEnrollmentStatus(false);
     };
 
     checkEnrollment();
@@ -538,6 +697,62 @@ function CoursePage() {
     }
   }, [courseId]);
 
+  useEffect(() => {
+    if (!courseId || !activeLesson) return;
+    if (!isEnrolled) return;
+
+    const loadResume = async () => {
+      try {
+        const userJson = localStorage.getItem('user');
+        let userId: string | null = null;
+        if (userJson) {
+          try {
+            const user = JSON.parse(userJson);
+            userId = user.id || null;
+          } catch (e) {
+            console.error('Error parsing user data for resume:', e);
+          }
+        }
+        if (!userId) return;
+
+        const params = new URLSearchParams();
+        params.set('userId', String(userId));
+        params.set('lessonId', String(activeLesson));
+        params.set('courseId', String(courseId));
+
+        const res = await fetch(`/api/lesson-progress?${params.toString()}`);
+        const body = await res.json().catch(() => null);
+        if (!res.ok || !body?.success) return;
+
+        const p = body?.progress;
+        const watchedSeconds = p?.watchedSeconds ? Number(p.watchedSeconds) : 0;
+        const isCompleted = !!p?.isCompleted;
+
+        if (watchedSeconds > 0) {
+          setVideoProgress((prev) => ({
+            ...prev,
+            [String(activeLesson)]: watchedSeconds,
+          }));
+          setResumeSecondsByLesson((prev) => ({
+            ...prev,
+            [String(activeLesson)]: watchedSeconds,
+          }));
+        }
+
+        if (isCompleted) {
+          setVideoCompleted((prev) => ({
+            ...prev,
+            [String(activeLesson)]: true,
+          }));
+        }
+      } catch (e) {
+        console.error('Error loading resume progress:', e);
+      }
+    };
+
+    loadResume();
+  }, [courseId, activeLesson, isEnrolled]);
+
   const handleEnrollment = async () => {
     if (!courseId) {
       toast.error('معرّف الكورس غير معروف، حدّث الصفحة وحاول مرة أخرى');
@@ -555,6 +770,108 @@ function CoursePage() {
       }
     } finally {
       setIsEnrolling(false);
+    }
+  };
+
+  const handleRedeemCode = async () => {
+    if (!courseId) {
+      toast.error('معرّف الكورس غير معروف، حدّث الصفحة وحاول مرة أخرى');
+      return;
+    }
+
+    const trimmedCode = accessCode.trim();
+    if (!trimmedCode) {
+      toast.error('من فضلك أدخل كود الاشتراك');
+      return;
+    }
+
+    try {
+      const userJson = typeof window !== 'undefined' ? localStorage.getItem('user') : null;
+      if (!userJson) {
+        toast.error('يجب تسجيل الدخول أولاً لاستخدام الكود');
+        router.push('/login');
+        return;
+      }
+
+      const user = JSON.parse(userJson);
+      const studentId = user.id as string | undefined;
+      const studentPhoneForCode =
+        (studentInfo?.phone as string | undefined) ||
+        (user.studentPhone as string | undefined) ||
+        (user.phone as string | undefined) ||
+        undefined;
+
+      if (!studentId && !studentPhoneForCode) {
+        toast.error('لا يمكن تحديد حساب الطالب، حاول تسجيل الخروج ثم تسجيل الدخول مرة أخرى');
+        return;
+      }
+
+      setIsRedeeming(true);
+
+      const response = await fetch('/api/course-access-code', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          code: trimmedCode,
+          courseId,
+          // نرسل المعرف والرقم معاً، والـ API ستختار الطريقة الأنسب لتحديد الطالب
+          studentId,
+          studentPhone: studentPhoneForCode,
+        }),
+      });
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok || !data?.success) {
+        const message = data?.message || data?.error || 'الكود غير صحيح أو تم استخدامه من قبل';
+        toast.error(message);
+        return;
+      }
+
+      toast.success(data.message || '🎉 تم تفعيل اشتراكك في الكورس باستخدام الكود');
+
+      // حفظ حالة الاشتراك في localStorage مع timestamp
+      try {
+        localStorage.setItem(`enrollment_${courseId}`, 'true');
+        localStorage.setItem(`enrollment_${courseId}_timestamp`, Date.now().toString());
+      } catch (e) {
+        console.warn('تعذر حفظ حالة الاشتراك في localStorage بعد تفعيل الكود:', e);
+      }
+
+      // تحديث حالة الاشتراك فوراً
+      setIsEnrolled(true);
+
+      // إعادة التحقق من الاشتراك من قاعدة البيانات بعد تأخير كافٍ
+      // للتأكد من أن المعاملة تمت وأن الاشتراك موجود فعلياً
+      setTimeout(async () => {
+        try {
+          const isEnrolled = await checkEnrollmentStatus(true);
+          if (isEnrolled) {
+            // التأكد من أن الاشتراك محفوظ في localStorage مع تحديث timestamp
+            localStorage.setItem(`enrollment_${courseId}`, 'true');
+            localStorage.setItem(`enrollment_${courseId}_timestamp`, Date.now().toString());
+            setIsEnrolled(true);
+          } else {
+            // إذا لم يُوجد الاشتراك بعد 5 ثوانٍ، نعطي المستخدم رسالة واضحة
+            // لكننا لا نحذف الاشتراك من localStorage لأن API route قد يكون أنشأه بالفعل
+            console.warn('⚠️ لم يتم العثور على الاشتراك في قاعدة البيانات بعد تفعيل الكود');
+            // نحدث timestamp مرة أخرى لإعطاء وقت إضافي
+            localStorage.setItem(`enrollment_${courseId}_timestamp`, Date.now().toString());
+            // لا نعرض رسالة خطأ للمستخدم لأن الاشتراك قد يكون موجوداً بالفعل
+          }
+        } catch (error) {
+          console.error('Error rechecking enrollment:', error);
+          // في حالة الخطأ، نحتفظ بالاشتراك في localStorage
+          localStorage.setItem(`enrollment_${courseId}_timestamp`, Date.now().toString());
+        }
+      }, 5000); // تأخير 5 ثوانٍ للسماح للمعاملة بالاكتمال
+    } catch (error) {
+      console.error('Error redeeming course access code:', error);
+      toast.error('حدث خطأ أثناء تفعيل الكود، حاول مرة أخرى');
+    } finally {
+      setIsRedeeming(false);
     }
   };
 
@@ -609,59 +926,59 @@ ${randomMsg}`);
         const userId = user.id;
 
         if (userId) {
-          // استخدام Supabase لتسجيل التقدم في جدول lesson_progress
-          const { default: supabase } = await import('@/lib/supabase-client');
+          // استخدام API route لحفظ التقدم (لتجنب مشاكل RLS)
+          try {
+            const progressResponse = await fetch('/api/lesson-progress', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                userId,
+                lessonId,
+                courseId,
+                watchedSeconds: 0,
+                progressPercent: 100,
+                isCompleted: true,
+              }),
+            });
 
-          const { error: progressError } = await supabase
-            .from('lesson_progress')
-            .upsert(
-              {
-                user_id: userId,
-                course_id: courseId,
-                lesson_id: lessonId,
-                is_completed: true,
-                completed_at: new Date().toISOString(),
-              },
-              { onConflict: 'user_id,lesson_id' }
-            );
+            if (!progressResponse.ok) {
+              const errorData = await progressResponse.json().catch(() => ({}));
+              console.error('❌ خطأ في حفظ تقدم الدرس:', errorData.error || 'Unknown error');
+            } else {
+              // منح النقاط عند إكمال الدرس
+              try {
+                const pointsResponse = await fetch('/api/points/award', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    userId,
+                    points: 10, // 10 نقاط لكل درس مكتمل
+                    action: 'lesson_completion',
+                    description: `إكمال الدرس: ${selectedLesson?.title || ''}`,
+                    referenceId: lessonId,
+                  }),
+                });
 
-          if (progressError) {
-            console.error('❌ خطأ في حفظ تقدم الدرس في Supabase:', progressError);
-          } else {
-            // بعد حفظ التقدم، التحقق من الإنجازات ومنح الجديدة إن وجدت
-            try {
-              const newAchievements = await achievementsService.checkAndGrantAchievements(userId, courseId);
-              if (newAchievements && newAchievements.length > 0) {
-                const titles = newAchievements.map(a => a.title).join('، ');
-                toast.success(`🏆 مبروك! حصلت على إنجازات جديدة في هذا الكورس: ${titles}`);
+                if (pointsResponse.ok) {
+                  toast.success('🎉 حصلت على 10 نقاط لإكمال الدرس!');
+                }
+              } catch (pointsError) {
+                console.error('❌ خطأ في منح النقاط:', pointsError);
               }
-            } catch (achError) {
-              console.error('❌ خطأ في تفعيل نظام الإنجازات:', achError);
-            }
 
-            // تحديث أو إنشاء صف في جدول enrollments لهذا الطالب وهذا الكورس
-            // حتى تظهر نسبة التقدم والإنجازات في لوحة الطالب بشكل صحيح
-            try {
-              const { error: enrollmentError } = await supabase
-                .from('enrollments')
-                .upsert(
-                  {
-                    user_id: userId,
-                    course_id: courseId,
-                    progress: percentComplete,
-                    last_accessed: new Date().toISOString(),
-                    completed_at: percentComplete === 100 ? new Date().toISOString() : null,
-                    is_active: true,
-                  },
-                  { onConflict: 'user_id,course_id' }
-                );
-
-              if (enrollmentError) {
-                console.error('❌ خطأ في حفظ/تحديث تقدم الكورس في enrollments:', enrollmentError);
+              // بعد حفظ التقدم، التحقق من الإنجازات ومنح الجديدة إن وجدت
+              try {
+                const newAchievements = await achievementsService.checkAndGrantAchievements(userId, courseId);
+                if (newAchievements && newAchievements.length > 0) {
+                  const titles = newAchievements.map(a => a.title).join('، ');
+                  toast.success(`🏆 مبروك! حصلت على إنجازات جديدة في هذا الكورس: ${titles}`);
+                }
+              } catch (achError) {
+                console.error('❌ خطأ في تفعيل نظام الإنجازات:', achError);
               }
-            } catch (enrollErr) {
-              console.error('❌ خطأ غير متوقع أثناء حفظ/تحديث جدول enrollments:', enrollErr);
             }
+          } catch (progressError) {
+            console.error('❌ خطأ في حفظ تقدم الدرس:', progressError);
           }
         }
       }
@@ -711,7 +1028,7 @@ ${randomMsg}`);
     (!!videoCompleted[activeLesson] ||
       !!(progress && progress.completedLessons.includes(activeLesson)));
 
-  // تتبع تقدّم مشاهدة الدرس الحالي بشكل تقريبي (كل ثانية طالما الصفحة نشطة وبعد بدء التتبع)
+  // عداد الوقت - يبدأ فقط عند الضغط على زر play
   useEffect(() => {
     if (!activeLesson || !isEnrolled || !selectedLessonForProgress || !isVideoPlaying) return;
 
@@ -719,29 +1036,81 @@ ${randomMsg}`);
     const durationMinutes = selectedLessonForProgress.duration || 0;
     if (!durationMinutes) return;
 
-    const requiredSeconds = durationMinutes * 60 * 0.8;
+    // الوقت المطلوب بالثواني (100% من المدة)
+    const requiredSeconds = durationMinutes * 60;
+
+    // التحقق من أن الدرس لم يكتمل بعد
+    if (videoCompleted[lessonId] || (progress && progress.completedLessons.includes(lessonId))) {
+      return;
+    }
+
+    // عداد التقدم - يحفظ التقدم عند الوصول لنسب معينة
+    const milestonePercentages = [25, 50, 75, 100];
+    const milestoneReached = new Set<number>();
 
     const intervalId = window.setInterval(() => {
-      // إيقاف العدّ عندما تكون التبويبة غير ظاهرة لتقليل التزييف قدر الإمكان
+      // إيقاف العدّ عندما تكون التبويبة غير ظاهرة
       if (typeof document !== 'undefined' && document.hidden) return;
 
       setVideoProgress((prev) => {
         const prevSeconds = prev[lessonId] || 0;
 
-        // لو وصلنا فعلاً للحد المطلوب لا نزيد الوقت أكثر
+        // لو وصلنا للوقت المطلوب (100%) نكمل الدرس
         if (prevSeconds >= requiredSeconds) {
-          return prev;
-        }
-
-        const nextSeconds = prevSeconds + 1;
-
-        // عند الوصول للحد المطلوب نعلّم الدرس كمكتمل (محلياً)
-        if (nextSeconds >= requiredSeconds) {
+          // إكمال الدرس
           setVideoCompleted((prevCompleted) => {
             if (prevCompleted[lessonId]) return prevCompleted;
             return { ...prevCompleted, [lessonId]: true };
           });
+          return prev;
         }
+
+        const nextSeconds = prevSeconds + 1;
+        const currentPercent = Math.round((nextSeconds / requiredSeconds) * 100);
+
+        // حفظ التقدم عند الوصول لمعالم معينة (25%, 50%, 75%, 100%)
+        milestonePercentages.forEach((milestone) => {
+          if (currentPercent >= milestone && !milestoneReached.has(milestone)) {
+            milestoneReached.add(milestone);
+            // حفظ التقدم في قاعدة البيانات
+            const saveProgress = async () => {
+              try {
+                const userJson = localStorage.getItem('user');
+                let userId: string | null = null;
+                
+                if (userJson) {
+                  try {
+                    const user = JSON.parse(userJson);
+                    userId = user.id || null;
+                  } catch (e) {
+                    console.error('Error parsing user data:', e);
+                  }
+                }
+
+                if (!userId || !courseId || !lessonId) return;
+
+                await fetch('/api/lesson-progress', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    userId,
+                    lessonId,
+                    courseId,
+                    watchedSeconds: nextSeconds,
+                    progressPercent: currentPercent,
+                    isCompleted: currentPercent >= 100,
+                  }),
+                });
+
+                console.log(`✅ تم حفظ التقدم: ${currentPercent}%`);
+              } catch (error) {
+                console.error('❌ خطأ في حفظ التقدم:', error);
+              }
+            };
+            
+            saveProgress();
+          }
+        });
 
         return {
           ...prev,
@@ -753,7 +1122,7 @@ ${randomMsg}`);
     return () => {
       window.clearInterval(intervalId);
     };
-  }, [activeLesson, isEnrolled, selectedLessonForProgress, isVideoPlaying]);
+  }, [activeLesson, isEnrolled, selectedLessonForProgress, videoCompleted, progress, isVideoPlaying, courseId]);
 
   // عند اكتمال مشاهدة الدرس (محلياً) نستدعي منطق إكمال الدرس مرة واحدة فقط
   useEffect(() => {
@@ -894,14 +1263,40 @@ ${randomMsg}`);
 
                 <div className="mt-4">
                   {!isEnrolled ? (
-                    <button
-                      type="button"
-                      onClick={handleEnrollment}
-                      disabled={isEnrolling}
-                      className="w-full px-5 py-3 rounded-xl bg-yellow-400 hover:bg-yellow-300 text-primary font-bold shadow-md text-sm md:text-base disabled:opacity-70 disabled:cursor-not-allowed transition"
-                    >
-                      {isEnrolling ? 'جاري تحويلك للدفع...' : 'اشترك الآن في الكورس'}
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        onClick={handleEnrollment}
+                        disabled={isEnrolling}
+                        className="w-full px-5 py-3 rounded-xl bg-yellow-400 hover:bg-yellow-300 text-primary font-bold shadow-md text-sm md:text-base disabled:opacity-70 disabled:cursor-not-allowed transition"
+                      >
+                        {isEnrolling ? 'جاري تحويلك للدفع...' : 'اشترك الآن في الكورس'}
+                      </button>
+
+                      <div className="flex flex-col gap-2">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            dir="ltr"
+                            value={accessCode}
+                            onChange={(e) => setAccessCode(e.target.value)}
+                            placeholder="أدخل كود الاشتراك"
+                            className="flex-1 rounded-lg border border-white/30 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60 focus:outline-none focus:ring-2 focus:ring-yellow-300"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleRedeemCode}
+                            disabled={isRedeeming || !accessCode.trim()}
+                            className="px-3 py-2 rounded-lg bg-emerald-400 hover:bg-emerald-300 text-primary text-sm font-bold disabled:opacity-70 disabled:cursor-not-allowed transition"
+                          >
+                            {isRedeeming ? 'جاري التفعيل...' : 'تفعيل بالكود'}
+                          </button>
+                        </div>
+                        <p className="text-[11px] text-white/80 text-right">
+                          إذا كان لديك كود اشتراك من المدرس يمكنك إدخاله هنا بدلاً من الدفع.
+                        </p>
+                      </div>
+                    </>
                   ) : (
                     <div className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-400/20 text-white text-sm font-semibold">
                       <FaCheck className="text-emerald-200" />
@@ -987,6 +1382,11 @@ ${randomMsg}`);
                       videoUrl={selectedLesson.videoUrl || ''}
                       isEnrolled={isEnrolled || !!selectedLesson.isPreview}
                       duration={selectedLesson.duration || 0}
+                      initialWatchedSeconds={
+                        activeLesson
+                          ? (resumeSecondsByLesson[String(activeLesson)] || videoProgress[String(activeLesson)] || 0)
+                          : 0
+                      }
                       onProgress={(progress, watchedSeconds) => {
                         // تحديث التقدم في الصفحة الرئيسية
                         if (activeLesson) {
@@ -996,53 +1396,12 @@ ${randomMsg}`);
                           }));
                         }
                       }}
+                      onPlayStateChange={(isPlaying) => {
+                        setIsVideoPlaying(isPlaying);
+                      }}
                     />
                   </div>
 
-                  {isEnrolled && selectedLessonForProgress && (
-                    <div className="mt-5 rounded-2xl bg-slate-50 dark:bg-gray-800/50 border border-slate-100 dark:border-gray-800 p-4 space-y-3">
-                      <div className="flex justify-end">
-                        <button
-                          type="button"
-                          onClick={() => setIsVideoPlaying((prev) => !prev)}
-                          className="px-3 py-1.5 rounded-full text-xs font-semibold border border-primary text-primary hover:bg-primary/5 transition"
-                        >
-                          {isVideoPlaying ? 'إيقاف احتساب التقدم' : 'ابدأ احتساب التقدم'}
-                        </button>
-                      </div>
-
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">
-                          {isLessonWatchCompleted
-                            ? '✅ تم إكمال هذا الدرس'
-                            : `تقدم المشاهدة: ${watchProgressPercent}%`}
-                        </span>
-                        <span className="text-xs text-gray-500 dark:text-gray-400">
-                          {Math.floor(watchedSeconds / 60)}:
-                          {(watchedSeconds % 60).toString().padStart(2, '0')} /{' '}
-                          {lessonDurationMinutes}:00 دقيقة
-                        </span>
-                      </div>
-
-                      <div className="w-full bg-slate-200 dark:bg-gray-700 rounded-full h-3 overflow-hidden">
-                        <div
-                          className={`h-full transition-all duration-500 ${
-                            isLessonWatchCompleted
-                              ? 'bg-green-500'
-                              : watchProgressPercent >= 80
-                                ? 'bg-blue-600'
-                                : 'bg-primary'
-                          }`}
-                          style={{ width: `${isLessonWatchCompleted ? 100 : watchProgressPercent}%` }}
-                        />
-                      </div>
-
-                      <div className="flex justify-end items-center">
-                        <span className="text-sm text-gray-600 dark:text-gray-300 mr-1">تقدم الكورس:</span>
-                        <span className="font-bold text-primary">{progress?.percentComplete || 0}%</span>
-                      </div>
-                    </div>
-                  )}
                 </div>
               </div>
             )}

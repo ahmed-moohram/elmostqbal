@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import { FaEdit, FaTrash, FaPlusCircle, FaClipboardList, FaBook } from "react-icons/fa";
+import { FaEdit, FaTrash, FaPlusCircle, FaClipboardList, FaBook, FaKey, FaUsers } from "react-icons/fa";
 import Link from "next/link";
 import AdminLayout from "@/components/AdminLayout";
 import { toast } from "react-hot-toast";
@@ -34,6 +34,8 @@ export default function AdminCoursesPage() {
   const [editDescription, setEditDescription] = useState("");
   const [editPrice, setEditPrice] = useState<number>(0);
   const [editImage, setEditImage] = useState<string>("");
+  const [generatingCodesFor, setGeneratingCodesFor] = useState<string | null>(null);
+  const [codeCount, setCodeCount] = useState<string>("10");
 
   useEffect(() => {
     fetchCourses();
@@ -174,6 +176,54 @@ export default function AdminCoursesPage() {
     setEditImage(course.image || "");
   };
 
+  const handleGenerateCodes = async (courseId: string) => {
+    const count = parseInt(codeCount) || 10;
+    if (count <= 0 || count > 500) {
+      toast.error('يرجى إدخال عدد بين 1 و 500');
+      return;
+    }
+
+    if (!window.confirm(`هل تريد إنشاء ${count} كود للكورس؟`)) {
+      return;
+    }
+
+    try {
+      setGeneratingCodesFor(courseId);
+      const response = await fetch(`/api/admin/courses/${courseId}/generate-codes`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          count,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'فشل إنشاء الأكواد');
+      }
+
+      // نسخ الأكواد إلى الحافظة
+      const codesText = data.codes.map((c: any) => c.code).join('\n');
+      try {
+        await navigator.clipboard.writeText(codesText);
+        toast.success(`✅ تم إنشاء ${data.count} كود ونسخهم إلى الحافظة`);
+      } catch (clipboardError) {
+        // عرض الأكواد في نافذة منبثقة
+        const codesDisplay = data.codes.map((c: any) => c.code).join('\n');
+        alert(`تم إنشاء ${data.count} كود:\n\n${codesDisplay}`);
+        toast.success(`✅ تم إنشاء ${data.count} كود`);
+      }
+    } catch (error: any) {
+      console.error('Error generating codes:', error);
+      toast.error(error.message || 'حدث خطأ أثناء إنشاء الأكواد');
+    } finally {
+      setGeneratingCodesFor(null);
+    }
+  };
+
   const handleSave = async () => {
     if (!editId) return;
 
@@ -219,7 +269,20 @@ export default function AdminCoursesPage() {
             <FaBook className="text-primary" />
             إدارة الدورات
           </h1>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-gray-700 font-medium">عدد الأكواد:</label>
+              <input
+                type="number"
+                min="1"
+                max="500"
+                value={codeCount}
+                onChange={(e) => setCodeCount(e.target.value)}
+                className="w-20 px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                placeholder="10"
+              />
+            </div>
+            <div className="flex gap-2">
             <Link
               href="/admin/payment-requests"
               className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-5 py-2 rounded-lg shadow font-medium transition"
@@ -234,6 +297,7 @@ export default function AdminCoursesPage() {
               <FaPlusCircle />
               إضافة دورة
             </Link>
+            </div>
           </div>
         </div>
 
@@ -254,6 +318,8 @@ export default function AdminCoursesPage() {
               <th className="px-4 py-3 text-center text-sm font-medium text-gray-600">الحالة</th>
               <th className="px-4 py-3 text-center text-sm font-medium text-gray-600">دورة مميزة</th>
               <th className="px-4 py-3 text-center text-sm font-medium text-gray-600">تعديل</th>
+              <th className="px-4 py-3 text-center text-sm font-medium text-gray-600">الطلاب</th>
+              <th className="px-4 py-3 text-center text-sm font-medium text-gray-600">أكواد</th>
               <th className="px-4 py-3 text-center text-sm font-medium text-gray-600">حذف</th>
             </tr>
           </thead>
@@ -378,13 +444,30 @@ export default function AdminCoursesPage() {
                   )}
                 </td>
                 <td className="px-4 py-3 text-center">
-                  <button 
-                    onClick={() => handleDelete(course._id)} 
-                    className="text-red-600 hover:text-red-800 p-2"
-                    title="حذف"
-                  >
-                    <FaTrash className="text-lg" />
-                  </button>
+                  <div className="flex items-center justify-center gap-2">
+                    <Link
+                      href={`/admin/courses/${course._id}/students`}
+                      className="text-blue-600 hover:text-blue-800 p-2"
+                      title="عرض طلاب الكورس"
+                    >
+                      <FaUsers className="text-lg" />
+                    </Link>
+                    <button 
+                      onClick={() => handleGenerateCodes(course._id)} 
+                      disabled={generatingCodesFor === course._id}
+                      className="text-purple-600 hover:text-purple-800 p-2 disabled:opacity-50"
+                      title="إنشاء أكواد للكورس"
+                    >
+                      <FaKey className="text-lg" />
+                    </button>
+                    <button 
+                      onClick={() => handleDelete(course._id)} 
+                      className="text-red-600 hover:text-red-800 p-2"
+                      title="حذف"
+                    >
+                      <FaTrash className="text-lg" />
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}

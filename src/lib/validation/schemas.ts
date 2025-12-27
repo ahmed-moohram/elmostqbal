@@ -170,7 +170,7 @@ export const paymentRequestSchema = z.object({
   coursePrice: z.number().min(0, 'السعر يجب أن يكون موجباً').optional(),
   teacherName: z.string().optional(),
   teacherPhone: z.string().optional(),
-  price: z.number().min(0, 'السعر يجب أن يكون موجباً'),
+  price: z.number().min(0, 'السعر يجب أن يكون موجباً').optional(),
 }).refine(
   (data) => data.courseId || data.bookId,
   { message: 'يجب توفير معرف الكورس أو الكتاب' }
@@ -206,5 +206,13 @@ export const uuidSchema = z.string().uuid('معرف غير صحيح');
 export const paginationSchema = z.object({
   page: z.number().int().min(1).default(1),
   limit: z.number().int().min(1).max(100).default(10),
+});
+
+// Course Access Code Schemas
+export const courseAccessCodeRedeemSchema = z.object({
+  courseId: z.string().uuid('معرف الكورس غير صحيح'),
+  studentId: z.string().uuid('معرف الطالب غير صحيح').optional(),
+  studentPhone: z.string().regex(/^[0-9]{10,15}$/,'رقم الهاتف غير صحيح').optional(),
+  code: z.string().min(1, 'الكود مطلوب'),
 });
 

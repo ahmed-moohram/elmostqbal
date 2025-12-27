@@ -105,7 +105,7 @@ export default function Home() {
 
         const { data: usersRows, error: usersError } = await supabase
           .from('users')
-          .select('id, name, avatar_url, profile_picture, avatar')
+          .select('id, name, avatar_url, profile_picture')
           .in('id', userIds);
 
         if (usersError) {
