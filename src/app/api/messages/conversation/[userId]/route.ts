@@ -63,12 +63,7 @@ export async function GET(
         .order('created_at', { ascending: true }),
     ]);
 
-    const sentMessages = sentResult.data || [];
-    const receivedMessages = receivedResult.data || [];
-    const messages = [...sentMessages, ...receivedMessages];
-    
-    // ترتيب الرسائل حسب التاريخ
-    messages.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+    const messagesError = sentResult.error || receivedResult.error;
 
     if (messagesError) {
       console.error('Error fetching messages:', messagesError);
@@ -77,6 +72,13 @@ export async function GET(
         { status: 500 },
       );
     }
+
+    const sentMessages = sentResult.data || [];
+    const receivedMessages = receivedResult.data || [];
+    const messages = [...sentMessages, ...receivedMessages];
+    
+    // ترتيب الرسائل حسب التاريخ
+    messages.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
 
     // تحديث حالة القراءة للرسائل التي تم استلامها
     if (messages && messages.length > 0) {
