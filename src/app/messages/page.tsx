@@ -15,11 +15,13 @@ interface Message {
   _id: string;
   sender: {
     _id: string;
+    id?: string;
     name: string;
     avatar?: string;
   };
   receiver: {
     _id: string;
+    id?: string;
     name: string;
     avatar?: string;
   };
@@ -777,7 +779,7 @@ export default function MessagesPage() {
                                 <p className={`text-xs ${
                                   isCurrentUser ? 'text-blue-100' : 'text-gray-500 dark:text-gray-400'
                                 }`}>
-                                  {formatTime(message.createdAt || message.created_at)}
+                                  {formatTime(message.createdAt ?? message.created_at ?? new Date().toISOString())}
                                 </p>
                                 {isCurrentUser && (
                                   <span className={`text-xs ${message.isRead ? 'text-blue-200' : 'text-blue-100'}`}>
