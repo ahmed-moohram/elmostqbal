@@ -28,6 +28,7 @@ interface Message {
   fileUrl?: string;
   isRead: boolean;
   createdAt: string;
+  created_at?: string;
 }
 
 interface Conversation {
@@ -731,7 +732,7 @@ export default function MessagesPage() {
                       </div>
                     ) : (
                       messages.map((message, idx) => {
-                        const isCurrentUser = message.sender?._id === currentUserId || message.sender?.id === currentUserId;
+                        const isCurrentUser = message.sender?._id === currentUserId;
                         return (
                           <div
                             key={`${message._id}-${idx}`}
