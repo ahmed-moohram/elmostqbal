@@ -538,22 +538,6 @@ export default function Home() {
                     01070333143
                   </a>
                 </motion.div>
-                
-                <motion.div 
-                  whileHover={{ x: 5 }}
-                  className="flex items-center gap-3"
-                >
-                  <motion.div 
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.9 }}
-                    className="bg-red-500 hover:bg-red-600 p-2.5 rounded-full transition-all duration-300 shadow-lg hover:shadow-red-500/50"
-                  >
-                    <FaEnvelope className="text-xl text-white" />
-                  </motion.div>
-                  <a href="mailto:info@edufutura.com" className="text-gray-400 hover:text-red-400 transition-colors text-sm">
-                    info@edufutura.com
-                  </a>
-                </motion.div>
               </div>
             </div>
           </div>

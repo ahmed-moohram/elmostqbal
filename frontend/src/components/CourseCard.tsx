@@ -94,6 +94,20 @@ const CourseCard = ({ course, variant = 'default' }: CourseCardProps) => {
   // استخدم الصورة البديلة إذا حدث خطأ في تحميل الصورة الأصلية
   const imageSource = imgError ? getFallbackImage() : course.thumbnail;
 
+  const getMarketingStudentsCount = () => {
+    const s = String(course.id ?? '');
+    let hash = 0;
+    for (let i = 0; i < s.length; i++) {
+      hash = (hash * 31 + s.charCodeAt(i)) >>> 0;
+    }
+    return hash % 2 === 0 ? 500 : 600;
+  };
+
+  const displayRating = Number(course.rating) > 0 ? Number(course.rating) : 5;
+  const displayRatingCount = Number(course.ratingCount) > 0 ? Number(course.ratingCount) : 5;
+  const displayStudentsCount =
+    Number(course.studentsCount) > 0 ? Number(course.studentsCount) : getMarketingStudentsCount();
+
   if (variant === 'minimal') {
     return (
       <Link href={`/courses/${course.id}`} className="group flex gap-4 bg-white dark:bg-gray-800 rounded-lg overflow-hidden hover:shadow-md transition-shadow">
@@ -110,9 +124,9 @@ const CourseCard = ({ course, variant = 'default' }: CourseCardProps) => {
           <h3 className="font-medium text-sm group-hover:text-primary truncate transition-colors">{course.title}</h3>
           <div className="flex items-center gap-1 text-xs text-gray-500">
             <FaStar className="text-yellow-500" />
-            <span>{course.rating.toFixed(1)}</span>
+            <span>{displayRating.toFixed(1)}</span>
             <span>•</span>
-            <span>{course.studentsCount} طالب</span>
+            <span>{displayStudentsCount} طالب</span>
           </div>
         </div>
       </Link>
@@ -162,13 +176,13 @@ const CourseCard = ({ course, variant = 'default' }: CourseCardProps) => {
             <div className="flex items-center gap-3 mb-4">
               <div className="flex items-center gap-1">
                 <FaStar className="text-yellow-500" />
-                <span className="font-medium">{course.rating.toFixed(1)}</span>
-                <span className="text-gray-500 text-sm">({course.ratingCount})</span>
+                <span className="font-medium">{displayRating.toFixed(1)}</span>
+                <span className="text-gray-500 text-sm">({displayRatingCount})</span>
               </div>
               
               <div className="flex items-center gap-1">
                 <FaUsers className="text-primary" />
-                <span className="text-sm">{course.studentsCount} طالب</span>
+                <span className="text-sm">{displayStudentsCount} طالب</span>
               </div>
               
               {course.totalDuration && (
@@ -227,16 +241,16 @@ const CourseCard = ({ course, variant = 'default' }: CourseCardProps) => {
           <p className="text-sm text-gray-500 mb-2">{course.instructor.name}</p>
           
           <div className="flex items-center gap-1 mb-2">
-            <span className="font-medium">{course.rating.toFixed(1)}</span>
+            <span className="font-medium">{displayRating.toFixed(1)}</span>
             <div className="flex text-yellow-500">
               {[1, 2, 3, 4, 5].map((star) => (
                 <FaStar 
                   key={star} 
-                  className={star <= Math.round(course.rating) ? 'text-yellow-500' : 'text-gray-300'} 
+                  className={star <= Math.round(displayRating) ? 'text-yellow-500' : 'text-gray-300'} 
                 />
               ))}
             </div>
-            <span className="text-xs text-gray-500">({course.ratingCount})</span>
+            <span className="text-xs text-gray-500">({displayRatingCount})</span>
           </div>
           
           <div className="flex justify-between items-center">

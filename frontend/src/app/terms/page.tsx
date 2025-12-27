@@ -108,7 +108,6 @@ export default function TermsPage() {
             </p>
             
             <ul className="space-y-2 mb-6">
-              <li>البريد الإلكتروني: <a href="mailto:info@edufutura.com" className="text-primary hover:underline">info@edufutura.com</a></li>
               <li>الهاتف: <a href="tel:+966500000000" className="text-primary hover:underline">+966 50 000 0000</a></li>
               <li>العنوان: الرياض، المملكة العربية السعودية، شارع الملك فهد، برج المستقبل، الطابق 15</li>
             </ul>

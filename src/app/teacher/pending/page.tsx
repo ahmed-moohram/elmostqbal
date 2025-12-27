@@ -182,10 +182,7 @@ export default function TeacherPending() {
             {status === 'pending' && (
               <div className="mt-6 p-4 bg-blue-50 rounded-lg">
                 <p className="text-sm text-blue-800">
-                  <strong>ملاحظة:</strong> إذا كان لديك أي استفسار، يمكنك التواصل معنا عبر البريد الإلكتروني:
-                  <a href="mailto:support@platform.com" className="font-medium underline mr-2">
-                    support@platform.com
-                  </a>
+                  <strong>ملاحظة:</strong> إذا كان لديك أي استفسار، يمكنك التواصل معنا.
                 </p>
               </div>
             )}

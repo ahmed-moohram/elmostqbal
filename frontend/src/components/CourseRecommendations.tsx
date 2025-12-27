@@ -34,6 +34,15 @@ export default function CourseRecommendations({
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'personalized' | 'trending' | 'related'>('personalized');
 
+  const getMarketingStudentsCount = (courseId: string) => {
+    const s = String(courseId ?? '');
+    let hash = 0;
+    for (let i = 0; i < s.length; i++) {
+      hash = (hash * 31 + s.charCodeAt(i)) >>> 0;
+    }
+    return hash % 2 === 0 ? 500 : 600;
+  };
+
   const tabs = [
     { id: 'personalized', label: 'مقترحات لك', icon: FaHeart },
     { id: 'trending', label: 'الأكثر رواجاً', icon: FaFire },
@@ -81,6 +90,12 @@ export default function CourseRecommendations({
   }, [activeTab, userId, currentCourseId, category]);
 
   const CourseCard = ({ course }: { course: Course }) => (
+    (() => {
+      const displayRating = Number(course.rating) > 0 ? Number(course.rating) : 5;
+      const displayStudentsCount =
+        Number(course.studentsCount) > 0 ? Number(course.studentsCount) : getMarketingStudentsCount(course.id);
+
+      return (
     <motion.div
       whileHover={{ y: -5 }}
       className="bg-white dark:bg-gray-800 rounded-xl overflow-hidden shadow-lg hover:shadow-2xl transition-all"
@@ -117,11 +132,11 @@ export default function CourseRecommendations({
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-1">
               <FaStar className="text-yellow-500" />
-              <span className="font-bold text-sm">{course.rating}</span>
+              <span className="font-bold text-sm">{displayRating.toFixed(1)}</span>
             </div>
             <div className="flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400">
               <FaUsers className="text-xs" />
-              {course.studentsCount}
+              {displayStudentsCount}
             </div>
           </div>
 
@@ -140,6 +155,8 @@ export default function CourseRecommendations({
         </div>
       </Link>
     </motion.div>
+      );
+    })()
   );
 
   return (
