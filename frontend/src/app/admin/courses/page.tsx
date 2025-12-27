@@ -208,23 +208,23 @@ export default function AdminCoursesPage() {
 
   return (
     <AdminLayout>
-      <div className="p-6">
-        <div className="flex flex-wrap gap-3 items-center mb-6 justify-between">
-          <h1 className="text-3xl font-bold flex items-center gap-2">
+      <div className="p-3 sm:p-6">
+        <div className="flex flex-col md:flex-row md:flex-wrap gap-3 items-start md:items-center mb-6 md:justify-between">
+          <h1 className="text-xl sm:text-3xl font-bold flex items-center gap-2">
             <FaBook className="text-primary" />
             إدارة الدورات
           </h1>
-          <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
             <Link
               href="/admin/payment-requests"
-              className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-5 py-2 rounded-lg shadow font-medium transition"
+              className="flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white px-5 py-2 rounded-lg shadow font-medium transition w-full sm:w-auto"
             >
               <FaClipboardList />
               قائمة الاشتراكات
             </Link>
             <Link
               href="/admin/courses/new"
-              className="flex items-center gap-2 bg-primary hover:bg-primary-dark text-white px-6 py-2 rounded-lg shadow font-medium transition"
+              className="flex items-center justify-center gap-2 bg-primary hover:bg-primary-dark text-white px-6 py-2 rounded-lg shadow font-medium transition w-full sm:w-auto"
             >
               <FaPlusCircle />
               إضافة دورة
@@ -240,16 +240,17 @@ export default function AdminCoursesPage() {
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">{error}</div>
         ) : (
           <div className="bg-white rounded-lg shadow overflow-hidden">
-            <table className="w-full">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[800px]">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-4 py-3 text-right text-sm font-medium text-gray-600">العنوان</th>
-              <th className="px-4 py-3 text-right text-sm font-medium text-gray-600">الوصف</th>
-              <th className="px-4 py-3 text-right text-sm font-medium text-gray-600">السعر</th>
-              <th className="px-4 py-3 text-center text-sm font-medium text-gray-600">الحالة</th>
-              <th className="px-4 py-3 text-center text-sm font-medium text-gray-600">دورة مميزة</th>
-              <th className="px-4 py-3 text-center text-sm font-medium text-gray-600">تعديل</th>
-              <th className="px-4 py-3 text-center text-sm font-medium text-gray-600">حذف</th>
+              <th className="px-4 py-3 text-right text-sm font-medium text-gray-600 whitespace-nowrap">العنوان</th>
+              <th className="px-4 py-3 text-right text-sm font-medium text-gray-600 hidden md:table-cell">الوصف</th>
+              <th className="px-4 py-3 text-right text-sm font-medium text-gray-600 whitespace-nowrap">السعر</th>
+              <th className="px-4 py-3 text-center text-sm font-medium text-gray-600 whitespace-nowrap">الحالة</th>
+              <th className="px-4 py-3 text-center text-sm font-medium text-gray-600 whitespace-nowrap">دورة مميزة</th>
+              <th className="px-4 py-3 text-center text-sm font-medium text-gray-600 whitespace-nowrap">تعديل</th>
+              <th className="px-4 py-3 text-center text-sm font-medium text-gray-600 whitespace-nowrap">حذف</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
@@ -286,7 +287,7 @@ export default function AdminCoursesPage() {
                     </div>
                   )}
                 </td>
-                <td className="px-4 py-3 text-sm text-gray-600">
+                <td className="px-4 py-3 text-sm text-gray-600 hidden md:table-cell">
                   {editId === course._id ? (
                     <input 
                       value={editDescription} 
@@ -340,7 +341,7 @@ export default function AdminCoursesPage() {
                 </td>
                 <td className="px-4 py-3 text-center">
                   {editId === course._id ? (
-                    <div className="flex items-center justify-center gap-2">
+                    <div className="flex flex-col sm:flex-row items-center justify-center gap-2">
                       <button 
                         onClick={handleSave} 
                         className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 font-medium"
@@ -355,7 +356,7 @@ export default function AdminCoursesPage() {
                       </Link>
                     </div>
                   ) : (
-                    <div className="flex items-center justify-center gap-2">
+                    <div className="flex flex-col sm:flex-row items-center justify-center gap-2">
                       <button 
                         onClick={() => handleEdit(course)} 
                         className="text-blue-600 hover:text-blue-800 p-2"
@@ -385,6 +386,7 @@ export default function AdminCoursesPage() {
             ))}
           </tbody>
         </table>
+            </div>
           </div>
         )}
       </div>
