@@ -1,16 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-if (!supabaseUrl || !supabaseServiceKey) {
-  throw new Error(
-    'Missing Supabase configuration. Check NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY',
-  );
-}
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+﻿import { NextRequest, NextResponse } from 'next/server';
+import { serverSupabase as supabase } from '@/lib/supabase-server';
 
 export async function POST(request: NextRequest) {
   try {
@@ -45,13 +34,9 @@ export async function POST(request: NextRequest) {
       .from('messages')
       .insert({
         sender_id: senderId,
-        receiver_id: receiverId,
-        course_id: courseId || null,
+        recipient_id: receiverId,
         content: content.trim(),
-        sender_role: senderRole,
         is_read: false,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
       })
       .select()
       .single();

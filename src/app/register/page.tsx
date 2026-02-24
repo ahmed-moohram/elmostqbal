@@ -11,26 +11,26 @@ import { useRouter } from 'next/navigation';
 import { Cairo } from 'next/font/google';
 import supabase from '@/lib/supabase-client';
 
-const cairo = Cairo({ 
-  subsets: ['arabic'], 
+const cairo = Cairo({
+  subsets: ['arabic'],
   weight: ['400', '600', '700'],
   display: 'swap'
 });
 
 // مكون وسيط لإدخال رقم الهاتف
-const PhoneInput = ({ 
-  id, 
-  value, 
-  onChange, 
-  placeholder, 
-  error, 
-  required = false, 
+const PhoneInput = ({
+  id,
+  value,
+  onChange,
+  placeholder,
+  error,
+  required = false,
   label,
   highlightStyle = false
-}: { 
-  id: string; 
-  value: string; 
-  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void; 
+}: {
+  id: string;
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   placeholder: string;
   error?: string;
   required?: boolean;
@@ -42,7 +42,7 @@ const PhoneInput = ({
       <label htmlFor={id} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
         {label} {required && <span className="text-red-500">*</span>}
       </label>
-      
+
       <div className="relative">
         <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
           <FaPhone className="text-gray-400" />
@@ -54,9 +54,8 @@ const PhoneInput = ({
           required={required}
           value={value}
           onChange={onChange}
-          className={`block w-full pr-10 py-3 border ${
-            error ? 'border-red-300 dark:border-red-600' : 'border-gray-300 dark:border-gray-600'
-          } rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all`}
+          className={`block w-full pr-10 py-3 border ${error ? 'border-red-300 dark:border-red-600' : 'border-gray-300 dark:border-gray-600'
+            } rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all`}
           placeholder={placeholder}
           dir="ltr"
         />
@@ -69,7 +68,7 @@ const PhoneInput = ({
 
 const RegisterPage = () => {
   const [name, setName] = useState('');
-  const [fatherName, setFatherName] = useState('');
+
   const [email, setEmail] = useState('');
   const [studentPhone, setStudentPhone] = useState('');
   const [parentPhone, setParentPhone] = useState('');
@@ -110,88 +109,88 @@ const RegisterPage = () => {
     const handleMouseMove = (e: MouseEvent) => {
       setMousePosition({ x: e.clientX, y: e.clientY });
     };
-    
+
     window.addEventListener('mousemove', handleMouseMove);
-    
+
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
     };
   }, []);
-  
+
   // تحديث طول كلمة المرور عند تغييرها
   useEffect(() => {
     setPasswordLength(password.length);
   }, [password]);
-  
+
   // تفعيل تأثير الكتابة عند كتابة كلمة المرور
   useEffect(() => {
     if (passwordFocused || password.length > 0) {
       setTypingEffect(prev => prev + 1);
     }
   }, [password, passwordFocused]);
-  
+
   useEffect(() => {
     if (confirmPasswordFocused || confirmPassword.length > 0) {
       setTypingEffect(prev => prev + 1);
     }
   }, [confirmPassword, confirmPasswordFocused]);
-  
+
   // حساب زاوية نظر العين
   const calculateEyeRotation = (eyeRef: React.RefObject<HTMLDivElement | null>, isFocused: boolean, inputRef: React.RefObject<HTMLInputElement | null>, isPassword: boolean = false) => {
     if (!eyeRef.current) return { x: 0, y: 0 };
-    
+
     // إذا كان الحقل مركّزًا، اجعل العين تنظر إليه وتحديدًا إلى يسار الحقل (حيث النص)
     if (isFocused && inputRef.current) {
       const eye = eyeRef.current.getBoundingClientRect();
       const input = inputRef.current.getBoundingClientRect();
-      
+
       const eyeCenterX = eye.left + eye.width / 2;
       const eyeCenterY = eye.top + eye.height / 2;
-      
+
       // ننظر للجزء الأيسر من الحقل (حيث يبدأ النص)
       const inputLeftX = input.left + 20; // نظرة للجهة اليسرى من الحقل
       const inputCenterY = input.top + input.height / 2;
-      
+
       // الاتجاه من العين إلى الهدف
       const deltaX = inputLeftX - eyeCenterX;
       const deltaY = inputCenterY - eyeCenterY;
-      
+
       // حساب المسافة والاتجاه المعياري
       const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
       const normalizedDeltaX = deltaX / (distance || 1);
       const normalizedDeltaY = deltaY / (distance || 1);
-      
+
       // نضبط حدود حركة العين
       const maxMovement = 3;
       const moveX = normalizedDeltaX * Math.min(maxMovement, distance / 20);
-      
+
       // إضافة حركة طفيفة عمودية عند الكتابة
       let moveY = normalizedDeltaY * Math.min(maxMovement, distance / 20);
-      
+
       // إذا كان حقل كلمة مرور ويتم الكتابة، نضيف حركة للأعلى والأسفل
       if (isPassword) {
         // حركة طفيفة للأعلى والأسفل أثناء الكتابة
         moveY += Math.sin(typingEffect * 0.5) * 0.7;
       }
-      
+
       return { x: moveX, y: moveY };
     } else {
       // إذا لم يكن الحقل مركّزًا، اتبع الماوس
       const eye = eyeRef.current.getBoundingClientRect();
       const eyeCenterX = eye.left + eye.width / 2;
       const eyeCenterY = eye.top + eye.height / 2;
-      
+
       const deltaX = mousePosition.x - eyeCenterX;
       const deltaY = mousePosition.y - eyeCenterY;
-      
+
       const maxMovement = 2.5; // حركة أصغر
       const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
       const normalizedDeltaX = deltaX / (distance || 1);
       const normalizedDeltaY = deltaY / (distance || 1);
-      
+
       const moveX = normalizedDeltaX * Math.min(maxMovement, distance / 15);
       const moveY = normalizedDeltaY * Math.min(maxMovement, distance / 15);
-      
+
       return { x: moveX, y: moveY };
     }
   };
@@ -199,7 +198,7 @@ const RegisterPage = () => {
   // التحقق من صحة المدخلات للخطوة الأولى
   const validateStep1 = () => {
     const stepErrors: Record<string, string> = {};
-    
+
     if (!name.trim()) {
       stepErrors.name = 'الاسم مطلوب';
     } else {
@@ -209,92 +208,79 @@ const RegisterPage = () => {
         stepErrors.name = 'يجب إدخال الاسم ثلاثي على الأقل (مثال: أحمد محمد محرم)';
       }
     }
-    
-    if (!fatherName.trim()) {
-      stepErrors.fatherName = 'اسم الأب مطلوب';
-    } else {
-      // التحقق من أن اسم الأب يحتوي على ثلاثة أجزاء على الأقل
-      const fatherNameParts = fatherName.trim().split(/\s+/);
-      if (fatherNameParts.length < 3) {
-        stepErrors.fatherName = 'يجب إدخال اسم الأب ثلاثي على الأقل';
-      }
-    }
-    
+
+
+
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       stepErrors.email = 'البريد الإلكتروني غير صحيح';
     }
-    
+
     if (!studentPhone.trim()) {
       stepErrors.studentPhone = 'رقم هاتف الطالب مطلوب';
     } else if (!/^01[0125][0-9]{8}$/.test(studentPhone)) {
       stepErrors.studentPhone = 'رقم الهاتف غير صحيح، يجب أن يبدأ بـ 01 ويتكون من 11 رقم';
     }
-    
+
     if (!parentPhone.trim()) {
       stepErrors.parentPhone = 'رقم هاتف ولي الأمر مطلوب';
     } else if (!/^01[0125][0-9]{8}$/.test(parentPhone)) {
       stepErrors.parentPhone = 'رقم الهاتف غير صحيح، يجب أن يبدأ بـ 01 ويتكون من 11 رقم';
     }
-    
+
     // التحقق من أن رقم ولي الأمر مختلف عن رقم الطالب
     if (studentPhone && parentPhone && studentPhone === parentPhone) {
       stepErrors.parentPhone = 'هتصيع علينا؟ مينفعش رقم ولي الأمر نفس رقمك يا بايظ 😂';
     }
-    
-    if (motherPhone && !/^01[0125][0-9]{8}$/.test(motherPhone)) {
-      stepErrors.motherPhone = 'رقم الهاتف غير صحيح، يجب أن يبدأ بـ 01 ويتكون من 11 رقم';
-    }
-    
+
     setErrors(stepErrors);
     return Object.keys(stepErrors).length === 0;
   };
-  
+
   // التحقق من صحة المدخلات للخطوة الثانية
   const validateStep2 = () => {
     const stepErrors: Record<string, string> = {};
-    
+
     if (!password) {
       stepErrors.password = 'كلمة المرور مطلوبة';
     } else if (password.length < 8) {
       stepErrors.password = 'كلمة المرور يجب أن تكون 8 أحرف على الأقل';
     }
-    
+
     if (!confirmPassword) {
       stepErrors.confirmPassword = 'تأكيد كلمة المرور مطلوب';
     } else if (confirmPassword !== password) {
       stepErrors.confirmPassword = 'كلمتا المرور غير متطابقتين';
     }
-    
+
     if (!agreeTerms) {
       stepErrors.agreeTerms = 'يجب الموافقة على الشروط والأحكام';
     }
-    
+
     setErrors(stepErrors);
     return Object.keys(stepErrors).length === 0;
   };
 
-  // التنقل بين خطوات التسجيل
   const handleNextStep = () => {
     if (currentStep === 1 && validateStep1()) {
       setCurrentStep(2);
     } else if (currentStep === 2) {
-      // تحقق من اسم ولي الأمر ورقم هاتفه فقط في الخطوة الثانية
+      // تحقق من حقول الخطوة الثانية
       const stepErrors: Record<string, string> = {};
-      
-      if (!parentPhone.trim()) {
-        stepErrors.parentPhone = 'رقم هاتف ولي الأمر مطلوب';
-      } else if (!/^01[0125][0-9]{8}$/.test(parentPhone)) {
-        stepErrors.parentPhone = 'رقم الهاتف غير صحيح، يجب أن يبدأ بـ 01 ويتكون من 11 رقم';
+
+      if (!motherPhone.trim()) {
+        stepErrors.motherPhone = 'رقم هاتف الأم مطلوب';
+      } else if (!/^01[0125][0-9]{8}$/.test(motherPhone)) {
+        stepErrors.motherPhone = 'رقم الهاتف غير صحيح، يجب أن يبدأ بـ 01 ويتكون من 11 رقم';
       }
-      
+
       setErrors(stepErrors);
-      
+
       if (Object.keys(stepErrors).length === 0) {
         setCurrentStep(3);
       }
     }
   };
-  
+
   const handlePrevStep = () => {
     if (currentStep > 1) {
       setCurrentStep(currentStep - 1);
@@ -305,17 +291,17 @@ const RegisterPage = () => {
   // إرسال نموذج التسجيل
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (currentStep === 3 && !validateStep2()) {
       return;
     }
 
     setIsLoading(true);
     setErrors({});
-    
+
     try {
       console.log('🔵 التسجيل عبر Supabase مع تشفير آمن...');
-      
+
       // التحقق من قوة كلمة المرور أولاً
       const { isValid, errors: passwordErrors } = validatePasswordStrength(password);
       if (!isValid) {
@@ -323,39 +309,35 @@ const RegisterPage = () => {
         setIsLoading(false);
         return;
       }
-      
+
       // تشفير كلمة المرور باستخدام bcrypt
       const hashedPassword = await hashPassword(password);
-      
+
       // التحقق من وجود المستخدم
       const { data: existingUser } = await supabase
         .from('users')
         .select('*')
         .or(`email.eq.${email || `${studentPhone}@student.com`},phone.eq.${studentPhone}`)
         .single();
-      
+
       if (existingUser) {
         setErrors({ general: 'رقم الهاتف أو البريد الإلكتروني مسجل مسبقاً' });
         setIsLoading(false);
         return;
       }
-      
+
       // إنشاء المستخدم الجديد
-      const fullName = `${name} ${fatherName}`;
-      
       const { data: newUser, error: insertError } = await supabase
         .from('users')
         .insert({
-          name: fullName,
+          name: name,
           email: email || `${studentPhone}@student.com`,
           phone: studentPhone,
           password_hash: hashedPassword, // استخدام كلمة المرور المشفرة بـ bcrypt
           role: 'student',
-          // بيانات إضافية
-          father_name: fatherName,
           student_phone: studentPhone,
           parent_phone: parentPhone,
-          mother_phone: motherPhone || null,
+          mother_phone: motherPhone,
           school_name: schoolName || null,
           city: city || 'القاهرة',
           grade_level: gradeLevel || 'الصف الثالث الثانوي',
@@ -363,19 +345,19 @@ const RegisterPage = () => {
         })
         .select()
         .single();
-      
+
       if (insertError) {
         console.error('خطأ في التسجيل:', insertError);
         setErrors({ general: insertError.message || 'فشل التسجيل' });
         setIsLoading(false);
         return;
       }
-      
+
       console.log('✅ تم التسجيل بنجاح');
-      
+
       // حفظ بعض بيانات الطالب فقط (للرجوع لها لاحقاً إن لزم)
       localStorage.setItem('studentInfo', JSON.stringify({
-        name: fullName,
+        name: name,
         phone: studentPhone,
         email: email || `${studentPhone}@student.com`
       }));
@@ -385,10 +367,10 @@ const RegisterPage = () => {
 
       // تحويل الطالب مباشرة إلى صفحة تسجيل الدخول ليقوم بتسجيل الدخول أولاً
       router.push('/login');
-      
+
     } catch (err: any) {
       console.error('🔴 خطأ في التسجيل:', err);
-      setErrors({ 
+      setErrors({
         general: err.message || 'حدث خطأ في التسجيل'
       });
     } finally {
@@ -402,7 +384,7 @@ const RegisterPage = () => {
       <div className="flex items-center justify-center mb-8">
         <div className="flex items-center">
           <motion.div
-            animate={{ 
+            animate={{
               backgroundColor: currentStep >= 1 ? '#6d28d9' : '#e5e7eb',
               borderColor: currentStep >= 1 ? '#6d28d9' : '#e5e7eb',
               color: currentStep >= 1 ? '#ffffff' : '#9ca3af'
@@ -412,14 +394,14 @@ const RegisterPage = () => {
             {currentStep > 1 ? <FaCheckCircle /> : 1}
           </motion.div>
           <div className="w-16 h-1 mx-2 bg-gray-200 dark:bg-gray-700">
-            <motion.div 
+            <motion.div
               initial={{ width: 0 }}
               animate={{ width: currentStep > 1 ? '100%' : '0%' }}
               className="h-full bg-primary"
             />
           </div>
           <motion.div
-            animate={{ 
+            animate={{
               backgroundColor: currentStep >= 2 ? '#6d28d9' : '#e5e7eb',
               borderColor: currentStep >= 2 ? '#6d28d9' : '#e5e7eb',
               color: currentStep >= 2 ? '#ffffff' : '#9ca3af'
@@ -429,14 +411,14 @@ const RegisterPage = () => {
             {currentStep > 2 ? <FaCheckCircle /> : 2}
           </motion.div>
           <div className="w-16 h-1 mx-2 bg-gray-200 dark:bg-gray-700">
-            <motion.div 
+            <motion.div
               initial={{ width: 0 }}
               animate={{ width: currentStep > 2 ? '100%' : '0%' }}
               className="h-full bg-primary"
             />
           </div>
           <motion.div
-            animate={{ 
+            animate={{
               backgroundColor: currentStep >= 3 ? '#6d28d9' : '#e5e7eb',
               borderColor: currentStep >= 3 ? '#6d28d9' : '#e5e7eb',
               color: currentStep >= 3 ? '#ffffff' : '#9ca3af'
@@ -476,7 +458,7 @@ const RegisterPage = () => {
         <div className="absolute inset-0 bg-[url('/grid.svg')] bg-center [mask-image:linear-gradient(180deg,white,rgba(255,255,255,0))]" />
         <div className="absolute inset-0 bg-gradient-to-br from-indigo-900/20 via-purple-900/30 to-gray-900 opacity-80" />
       </div>
-      
+
       <div className="w-full max-w-5xl">
         <div className="flex flex-col md:flex-row bg-white dark:bg-gray-800 rounded-2xl shadow-2xl overflow-hidden">
           {/* الجانب الأيسر - صورة وشعار */}
@@ -491,18 +473,18 @@ const RegisterPage = () => {
                 </pattern>
               </defs>
             </div>
-            
+
             <div className="relative h-full flex flex-col justify-between">
               <div className="mb-8">
-            <motion.div
+                <motion.div
                   initial={{ opacity: 0, y: -20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.5 }}
                   className="flex items-center gap-3"
                 >
                   <div className="relative w-12 h-12 overflow-hidden">
-              <Image
-                src="/logo.png"
+                    <Image
+                      src="/logo.png"
                       alt="شعار المنصة"
                       fill
                       sizes="48px"
@@ -515,7 +497,7 @@ const RegisterPage = () => {
                   </div>
                 </motion.div>
               </div>
-              
+
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -525,7 +507,7 @@ const RegisterPage = () => {
                 <p className="text-white/80 mb-8">
                   ابدأ رحلة التعلم مع منصة <span className="font-bold text-white">المستقبل</span> واكتسب المهارات التي تحتاجها لتطوير مستقبلك المهني.
                 </p>
-                
+
                 <div className="bg-white/10 backdrop-blur-sm p-6 rounded-xl border border-white/20">
                   <div className="text-white font-medium mb-3">مزايا العضوية</div>
                   <ul className="space-y-2">
@@ -547,8 +529,8 @@ const RegisterPage = () => {
                     </li>
                   </ul>
                 </div>
-            </motion.div>
-            
+              </motion.div>
+
               <div className="mt-auto">
                 <div className="text-white/60 text-sm">© 2024 منصة المستقبل التعليمية. جميع الحقوق محفوظة.</div>
               </div>
@@ -567,13 +549,13 @@ const RegisterPage = () => {
                 <h2 className={`text-2xl font-bold text-gray-800 dark:text-white mb-2 ${cairo.className}`}>إنشاء حساب جديد</h2>
                 <p className="text-gray-500 dark:text-gray-400">أدخل بياناتك لإنشاء حساب جديد</p>
               </div>
-              
+
               <ProgressIndicator />
-              
+
               <div className="bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 p-3 rounded-lg mb-6 text-sm">
                 الرجاء إكمال المعلومات المطلوبة في كل خطوة. ستقوم بإدخال معلومات ولي الأمر في الخطوة الثانية.
               </div>
-              
+
               {errors.general && (
                 <motion.div
                   initial={{ opacity: 0, y: -10 }}
@@ -594,7 +576,7 @@ const RegisterPage = () => {
                   )}
                 </motion.div>
               )}
-              
+
               <form onSubmit={handleSubmit}>
                 {currentStep === 1 && (
                   <motion.div
@@ -608,55 +590,35 @@ const RegisterPage = () => {
                       <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                         الاسم الكامل
                       </label>
-                  <div className="relative">
-                        <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                          <FaUser className="text-gray-400" />
-                    </div>
-                    <input
-                          id="name"
-                          name="name"
-                      type="text"
-                          required
-                          value={name}
-                          onChange={(e) => setName(e.target.value)}
-                          className={`block w-full pr-10 py-3 border ${errors.name ? 'border-red-300 dark:border-red-600' : 'border-gray-300 dark:border-gray-600'} rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all`}
-                          placeholder="أدخل اسمك الكامل"
-                    />
-                  </div>
-                      {errors.name && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.name}</p>}
-                </div>
-
-                    <div className="mb-6">
-                      <label htmlFor="fatherName" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        اسم الأب
-                      </label>
                       <div className="relative">
                         <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
                           <FaUser className="text-gray-400" />
                         </div>
                         <input
-                          id="fatherName"
-                          name="fatherName"
+                          id="name"
+                          name="name"
                           type="text"
                           required
-                          value={fatherName}
-                          onChange={(e) => setFatherName(e.target.value)}
-                          className={`block w-full pr-10 py-3 border ${errors.fatherName ? 'border-red-300 dark:border-red-600' : 'border-gray-300 dark:border-gray-600'} rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all`}
-                          placeholder="أدخل اسم الأب"
+                          value={name}
+                          onChange={(e) => setName(e.target.value)}
+                          className={`block w-full pr-10 py-3 border ${errors.name ? 'border-red-300 dark:border-red-600' : 'border-gray-300 dark:border-gray-600'} rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all`}
+                          placeholder="أدخل اسمك الكامل"
                         />
                       </div>
-                      {errors.fatherName && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.fatherName}</p>}
+                      {errors.name && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.name}</p>}
                     </div>
+
+
 
                     <div className="mb-6">
                       <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                         البريد الإلكتروني (اختياري)
                       </label>
-                  <div className="relative">
+                      <div className="relative">
                         <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
                           <FaEnvelope className="text-gray-400" />
-                    </div>
-                    <input
+                        </div>
+                        <input
                           id="email"
                           name="email"
                           type="email"
@@ -665,20 +627,20 @@ const RegisterPage = () => {
                           className={`block w-full pr-10 py-3 border ${errors.email ? 'border-red-300 dark:border-red-600' : 'border-gray-300 dark:border-gray-600'} rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all`}
                           placeholder="example@email.com"
                           dir="ltr"
-                    />
-                  </div>
+                        />
+                      </div>
                       {errors.email && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.email}</p>}
-                </div>
+                    </div>
 
                     <div className="mb-6">
                       <label htmlFor="studentPhone" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                         رقم هاتف الطالب
                       </label>
-                  <div className="relative">
+                      <div className="relative">
                         <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
                           <FaPhone className="text-gray-400" />
-                    </div>
-                    <input
+                        </div>
+                        <input
                           id="studentPhone"
                           name="studentPhone"
                           type="tel"
@@ -688,8 +650,8 @@ const RegisterPage = () => {
                           className={`block w-full pr-10 py-3 border ${errors.studentPhone ? 'border-red-300 dark:border-red-600' : 'border-gray-300 dark:border-gray-600'} rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all`}
                           placeholder="01xxxxxxxxx"
                           dir="ltr"
-                    />
-                  </div>
+                        />
+                      </div>
                       {errors.studentPhone && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.studentPhone}</p>}
                     </div>
 
@@ -706,7 +668,7 @@ const RegisterPage = () => {
 
                     <div className="mb-6 text-xs text-gray-500 dark:text-gray-400 -mt-4 text-right">
                       <span className="text-orange-500">*</span> يجب أن يكون رقم هاتف ولي الأمر مختلفًا عن رقم هاتف الطالب
-                </div>
+                    </div>
 
                     <motion.button
                       whileHover={{ scale: 1.02 }}
@@ -720,7 +682,7 @@ const RegisterPage = () => {
                     </motion.button>
                   </motion.div>
                 )}
-                
+
                 {currentStep === 2 && (
                   <motion.div
                     initial={{ opacity: 0, x: 20 }}
@@ -731,7 +693,7 @@ const RegisterPage = () => {
                     {/* الخطوة الثانية: معلومات الأسرة والمدرسة */}
                     <div className="mb-6">
                       <label htmlFor="motherPhone" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        رقم هاتف الأم (اختياري)
+                        رقم هاتف الأم <span className="text-red-500">*</span>
                       </label>
                       <div className="relative">
                         <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
@@ -741,6 +703,7 @@ const RegisterPage = () => {
                           id="motherPhone"
                           name="motherPhone"
                           type="tel"
+                          required
                           value={motherPhone}
                           onChange={(e) => setMotherPhone(e.target.value)}
                           className={`block w-full pr-10 py-3 border ${errors.motherPhone ? 'border-red-300 dark:border-red-600' : 'border-gray-300 dark:border-gray-600'} rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all`}
@@ -841,7 +804,7 @@ const RegisterPage = () => {
                       >
                         <span className="flex items-center justify-center">&#8592; السابق</span>
                       </motion.button>
-                      
+
                       <motion.button
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
@@ -855,7 +818,7 @@ const RegisterPage = () => {
                     </div>
                   </motion.div>
                 )}
-                
+
                 {currentStep === 3 && (
                   <motion.div
                     initial={{ opacity: 0, x: 20 }}
@@ -868,11 +831,11 @@ const RegisterPage = () => {
                       <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                         كلمة المرور
                       </label>
-                  <div className="relative">
+                      <div className="relative">
                         <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
                           <FaLock className="text-gray-400" />
-                    </div>
-                    <input
+                        </div>
+                        <input
                           id="password"
                           name="password"
                           type={showPassword ? "text" : "password"}
@@ -893,24 +856,24 @@ const RegisterPage = () => {
                           whileHover={{ scale: 1.1 }}
                           whileTap={{ scale: 0.9 }}
                         >
-                          <div 
+                          <div
                             ref={eyeRef1}
                             className="relative w-10 h-7 flex items-center justify-center"
                           >
                             {/* عين واقعية باستخدام SVG */}
-                            <svg width="100%" height="100%" viewBox="0 0 100 60" fill="none" xmlns="http://www.w3.org/2000/svg" style={{overflow: 'visible'}}>
+                            <svg width="100%" height="100%" viewBox="0 0 100 60" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ overflow: 'visible' }}>
                               {/* الشكل الخارجي للعين */}
                               <motion.path
                                 d="M98 30C98 30 76.5 55 50 55C23.5 55 2 30 2 30C2 30 23.5 5 50 5C76.5 5 98 30 98 30Z"
-                                fill="white" 
-                                stroke="#888888" 
+                                fill="white"
+                                stroke="#888888"
                                 strokeWidth="2"
                                 initial={false}
-                                animate={!showPassword ? {scaleY: 0.05, scaleX: 0.95} : {scaleY: 1, scaleX: 1}}
-                                transition={{duration: 0.3}}
-                                style={{transformOrigin: '50% 50%', filter: 'drop-shadow(0px 2px 3px rgba(0,0,0,0.2))'}}
+                                animate={!showPassword ? { scaleY: 0.05, scaleX: 0.95 } : { scaleY: 1, scaleX: 1 }}
+                                transition={{ duration: 0.3 }}
+                                style={{ transformOrigin: '50% 50%', filter: 'drop-shadow(0px 2px 3px rgba(0,0,0,0.2))' }}
                               />
-                              
+
                               {/* الجفن العلوي */}
                               <motion.path
                                 d="M5 30C5 30 26.5 6 50 6C73.5 6 95 30 95 30"
@@ -920,16 +883,16 @@ const RegisterPage = () => {
                                 strokeLinecap="round"
                                 initial={false}
                                 animate={
-                                  !showPassword 
-                                    ? {d: "M5 30C5 30 26.5 31 50 31C73.5 31 95 30 95 30"} 
-                                    : (passwordFocused 
-                                      ? {d: "M5 20C5 20 26.5 -5 50 -5C73.5 -5 95 20 95 20"} 
-                                      : {d: "M5 10C5 10 26.5 -15 50 -15C73.5 -15 95 10 95 10"})
+                                  !showPassword
+                                    ? { d: "M5 30C5 30 26.5 31 50 31C73.5 31 95 30 95 30" }
+                                    : (passwordFocused
+                                      ? { d: "M5 20C5 20 26.5 -5 50 -5C73.5 -5 95 20 95 20" }
+                                      : { d: "M5 10C5 10 26.5 -15 50 -15C73.5 -15 95 10 95 10" })
                                 }
-                                transition={{type: "spring", stiffness: 150, damping: 15}}
-                                style={{transformOrigin: '50% 50%'}}
+                                transition={{ type: "spring", stiffness: 150, damping: 15 }}
+                                style={{ transformOrigin: '50% 50%' }}
                               />
-                              
+
                               {/* الجفن السفلي */}
                               <motion.path
                                 d="M5 30C5 30 26.5 55 50 55C73.5 55 95 30 95 30"
@@ -939,49 +902,49 @@ const RegisterPage = () => {
                                 strokeLinecap="round"
                                 initial={false}
                                 animate={
-                                  !showPassword 
-                                    ? {d: "M5 30C5 30 26.5 29 50 29C73.5 29 95 30 95 30"} 
-                                    : (passwordFocused 
-                                      ? {d: "M5 40C5 40 26.5 60 50 60C73.5 60 95 40 95 40"} 
-                                      : {d: "M5 50C5 50 26.5 68 50 68C73.5 68 95 50 95 50"})
+                                  !showPassword
+                                    ? { d: "M5 30C5 30 26.5 29 50 29C73.5 29 95 30 95 30" }
+                                    : (passwordFocused
+                                      ? { d: "M5 40C5 40 26.5 60 50 60C73.5 60 95 40 95 40" }
+                                      : { d: "M5 50C5 50 26.5 68 50 68C73.5 68 95 50 95 50" })
                                 }
-                                transition={{type: "spring", stiffness: 150, damping: 15}}
-                                style={{transformOrigin: '50% 50%'}}
+                                transition={{ type: "spring", stiffness: 150, damping: 15 }}
+                                style={{ transformOrigin: '50% 50%' }}
                               />
-                              
+
                               {/* القزحية والبؤبؤ */}
                               <motion.g
                                 animate={showPassword ? {
-                                  x: passwordFocused ? 
-                                      Math.sin(typingEffect * 0.4) * 8 - 10 : // حركة جانبية مع كل حرف
-                                      -10,
+                                  x: passwordFocused ?
+                                    Math.sin(typingEffect * 0.4) * 8 - 10 : // حركة جانبية مع كل حرف
+                                    -10,
                                   y: calculateEyeRotation(eyeRef1, passwordFocused, passwordInputRef, true).y * 3
-                                } : {x: 0, y: 0}} // عند إغلاق العين يعود للمنتصف
-                                transition={{type: "spring", stiffness: 300, damping: 30}}
+                                } : { x: 0, y: 0 }} // عند إغلاق العين يعود للمنتصف
+                                transition={{ type: "spring", stiffness: 300, damping: 30 }}
                               >
                                 {/* القزحية */}
-                                <circle 
-                                  cx="50" 
-                                  cy="30" 
-                                  r="15" 
-                                  fill="url(#eyeGradient1)" 
+                                <circle
+                                  cx="50"
+                                  cy="30"
+                                  r="15"
+                                  fill="url(#eyeGradient1)"
                                 />
-                                
+
                                 {/* البؤبؤ */}
-                                <motion.circle 
-                                  cx="50" 
-                                  cy="30" 
-                                  r="7" 
-                                  fill="black" 
+                                <motion.circle
+                                  cx="50"
+                                  cy="30"
+                                  r="7"
+                                  fill="black"
                                   animate={
-                                    !showPassword 
+                                    !showPassword
                                       ? { scale: 0.4, x: 0, y: 0 } // عند إغلاق العين يصغر البؤبؤ ويرجع للمركز
-                                      : passwordFocused 
-                                        ? { 
-                                            scale: [1, 1.2, 1],
-                                            x: Math.sin(typingEffect * 0.2) * 2, // حركة أفقية خفيفة عند الكتابة
-                                            y: Math.cos(typingEffect * 0.3) * 2  // حركة رأسية خفيفة عند الكتابة
-                                          }
+                                      : passwordFocused
+                                        ? {
+                                          scale: [1, 1.2, 1],
+                                          x: Math.sin(typingEffect * 0.2) * 2, // حركة أفقية خفيفة عند الكتابة
+                                          y: Math.cos(typingEffect * 0.3) * 2  // حركة رأسية خفيفة عند الكتابة
+                                        }
                                         : { scale: [1, 0.8, 1] }
                                   }
                                   transition={{
@@ -989,17 +952,17 @@ const RegisterPage = () => {
                                     repeat: Infinity,
                                     repeatType: "reverse"
                                   }}
-                                  style={{transformOrigin: '50px 30px'}}
+                                  style={{ transformOrigin: '50px 30px' }}
                                 />
-                                
+
                                 {/* انعكاس الضوء في البؤبؤ */}
                                 <circle cx="47" cy="27" r="2" fill="white" opacity="0.8" />
                                 <circle cx="52" cy="33" r="1" fill="white" opacity="0.3" />
                               </motion.g>
-                              
+
                               {/* انعكاس ضوء في بياض العين */}
                               <ellipse cx="30" cy="20" rx="5" ry="2" fill="white" opacity="0.5" />
-                              
+
                               {/* تدرج للقزحية */}
                               <defs>
                                 <radialGradient id="eyeGradient1" cx="0.5" cy="0.5" r="0.5" fx="0.7" fy="0.3">
@@ -1011,18 +974,18 @@ const RegisterPage = () => {
                             </svg>
                           </div>
                         </motion.button>
-                  </div>
+                      </div>
                       {errors.password && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.password}</p>}
                       <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                         كلمة المرور يجب أن تحتوي على 8 أحرف على الأقل
                       </p>
-                </div>
+                    </div>
 
                     <div className="mb-6">
                       <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                         تأكيد كلمة المرور
                       </label>
-                  <div className="relative">
+                      <div className="relative">
                         <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
                           <FaLock className="text-gray-400" />
                         </div>
@@ -1048,23 +1011,23 @@ const RegisterPage = () => {
                           whileTap={{ scale: 0.9 }}
                         >
                           <div
-                            ref={eyeRef2} 
+                            ref={eyeRef2}
                             className="relative w-10 h-7 flex items-center justify-center"
                           >
                             {/* عين واقعية باستخدام SVG */}
-                            <svg width="100%" height="100%" viewBox="0 0 100 60" fill="none" xmlns="http://www.w3.org/2000/svg" style={{overflow: 'visible'}}>
+                            <svg width="100%" height="100%" viewBox="0 0 100 60" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ overflow: 'visible' }}>
                               {/* الشكل الخارجي للعين */}
                               <motion.path
                                 d="M98 30C98 30 76.5 55 50 55C23.5 55 2 30 2 30C2 30 23.5 5 50 5C76.5 5 98 30 98 30Z"
-                                fill="white" 
-                                stroke="#888888" 
+                                fill="white"
+                                stroke="#888888"
                                 strokeWidth="2"
                                 initial={false}
-                                animate={!showConfirmPassword ? {scaleY: 0.05, scaleX: 0.95} : {scaleY: 1, scaleX: 1}}
-                                transition={{duration: 0.3}}
-                                style={{transformOrigin: '50% 50%', filter: 'drop-shadow(0px 2px 3px rgba(0,0,0,0.2))'}}
+                                animate={!showConfirmPassword ? { scaleY: 0.05, scaleX: 0.95 } : { scaleY: 1, scaleX: 1 }}
+                                transition={{ duration: 0.3 }}
+                                style={{ transformOrigin: '50% 50%', filter: 'drop-shadow(0px 2px 3px rgba(0,0,0,0.2))' }}
                               />
-                              
+
                               {/* الجفن العلوي */}
                               <motion.path
                                 d="M5 30C5 30 26.5 6 50 6C73.5 6 95 30 95 30"
@@ -1074,16 +1037,16 @@ const RegisterPage = () => {
                                 strokeLinecap="round"
                                 initial={false}
                                 animate={
-                                  !showConfirmPassword 
-                                    ? {d: "M5 30C5 30 26.5 31 50 31C73.5 31 95 30 95 30"} 
-                                    : (confirmPasswordFocused 
-                                      ? {d: "M5 20C5 20 26.5 -5 50 -5C73.5 -5 95 20 95 20"} 
-                                      : {d: "M5 10C5 10 26.5 -15 50 -15C73.5 -15 95 10 95 10"})
+                                  !showConfirmPassword
+                                    ? { d: "M5 30C5 30 26.5 31 50 31C73.5 31 95 30 95 30" }
+                                    : (confirmPasswordFocused
+                                      ? { d: "M5 20C5 20 26.5 -5 50 -5C73.5 -5 95 20 95 20" }
+                                      : { d: "M5 10C5 10 26.5 -15 50 -15C73.5 -15 95 10 95 10" })
                                 }
-                                transition={{type: "spring", stiffness: 150, damping: 15}}
-                                style={{transformOrigin: '50% 50%'}}
+                                transition={{ type: "spring", stiffness: 150, damping: 15 }}
+                                style={{ transformOrigin: '50% 50%' }}
                               />
-                              
+
                               {/* الجفن السفلي */}
                               <motion.path
                                 d="M5 30C5 30 26.5 55 50 55C73.5 55 95 30 95 30"
@@ -1093,49 +1056,49 @@ const RegisterPage = () => {
                                 strokeLinecap="round"
                                 initial={false}
                                 animate={
-                                  !showConfirmPassword 
-                                    ? {d: "M5 30C5 30 26.5 29 50 29C73.5 29 95 30 95 30"} 
-                                    : (confirmPasswordFocused 
-                                      ? {d: "M5 40C5 40 26.5 60 50 60C73.5 60 95 40 95 40"} 
-                                      : {d: "M5 50C5 50 26.5 68 50 68C73.5 68 95 50 95 50"})
+                                  !showConfirmPassword
+                                    ? { d: "M5 30C5 30 26.5 29 50 29C73.5 29 95 30 95 30" }
+                                    : (confirmPasswordFocused
+                                      ? { d: "M5 40C5 40 26.5 60 50 60C73.5 60 95 40 95 40" }
+                                      : { d: "M5 50C5 50 26.5 68 50 68C73.5 68 95 50 95 50" })
                                 }
-                                transition={{type: "spring", stiffness: 150, damping: 15}}
-                                style={{transformOrigin: '50% 50%'}}
+                                transition={{ type: "spring", stiffness: 150, damping: 15 }}
+                                style={{ transformOrigin: '50% 50%' }}
                               />
-                              
+
                               {/* القزحية والبؤبؤ */}
                               <motion.g
                                 animate={showConfirmPassword ? {
-                                  x: confirmPasswordFocused ? 
-                                      Math.sin(typingEffect * 0.4) * 8 - 10 : // حركة جانبية مع كل حرف
-                                      -10,
+                                  x: confirmPasswordFocused ?
+                                    Math.sin(typingEffect * 0.4) * 8 - 10 : // حركة جانبية مع كل حرف
+                                    -10,
                                   y: calculateEyeRotation(eyeRef2, confirmPasswordFocused, confirmPasswordInputRef, true).y * 3
-                                } : {x: 0, y: 0}} // عند إغلاق العين يعود للمنتصف
-                                transition={{type: "spring", stiffness: 300, damping: 30}}
+                                } : { x: 0, y: 0 }} // عند إغلاق العين يعود للمنتصف
+                                transition={{ type: "spring", stiffness: 300, damping: 30 }}
                               >
                                 {/* القزحية */}
-                                <circle 
-                                  cx="50" 
-                                  cy="30" 
-                                  r="15" 
-                                  fill="url(#eyeGradient2)" 
+                                <circle
+                                  cx="50"
+                                  cy="30"
+                                  r="15"
+                                  fill="url(#eyeGradient2)"
                                 />
-                                
+
                                 {/* البؤبؤ */}
-                                <motion.circle 
-                                  cx="50" 
-                                  cy="30" 
-                                  r="7" 
-                                  fill="black" 
+                                <motion.circle
+                                  cx="50"
+                                  cy="30"
+                                  r="7"
+                                  fill="black"
                                   animate={
-                                    !showConfirmPassword 
+                                    !showConfirmPassword
                                       ? { scale: 0.4, x: 0, y: 0 } // عند إغلاق العين يصغر البؤبؤ ويرجع للمركز
-                                      : confirmPasswordFocused 
-                                        ? { 
-                                            scale: [1, 1.2, 1],
-                                            x: Math.sin(typingEffect * 0.2) * 2, // حركة أفقية خفيفة عند الكتابة
-                                            y: Math.cos(typingEffect * 0.3) * 2  // حركة رأسية خفيفة عند الكتابة
-                                          }
+                                      : confirmPasswordFocused
+                                        ? {
+                                          scale: [1, 1.2, 1],
+                                          x: Math.sin(typingEffect * 0.2) * 2, // حركة أفقية خفيفة عند الكتابة
+                                          y: Math.cos(typingEffect * 0.3) * 2  // حركة رأسية خفيفة عند الكتابة
+                                        }
                                         : { scale: [1, 0.8, 1] }
                                   }
                                   transition={{
@@ -1143,17 +1106,17 @@ const RegisterPage = () => {
                                     repeat: Infinity,
                                     repeatType: "reverse"
                                   }}
-                                  style={{transformOrigin: '50px 30px'}}
+                                  style={{ transformOrigin: '50px 30px' }}
                                 />
-                                
+
                                 {/* انعكاس الضوء في البؤبؤ */}
                                 <circle cx="47" cy="27" r="2" fill="white" opacity="0.8" />
                                 <circle cx="52" cy="33" r="1" fill="white" opacity="0.3" />
                               </motion.g>
-                              
+
                               {/* انعكاس ضوء في بياض العين */}
                               <ellipse cx="30" cy="20" rx="5" ry="2" fill="white" opacity="0.5" />
-                              
+
                               {/* تدرج للقزحية */}
                               <defs>
                                 <radialGradient id="eyeGradient2" cx="0.5" cy="0.5" r="0.5" fx="0.7" fy="0.3">
@@ -1168,27 +1131,27 @@ const RegisterPage = () => {
                       </div>
                       {errors.confirmPassword && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.confirmPassword}</p>}
                     </div>
-                    
+
                     <div className="mb-6">
                       <div className="flex items-start">
                         <div className="flex items-center h-5">
-                    <input
+                          <input
                             id="agreeTerms"
                             name="agreeTerms"
                             type="checkbox"
                             checked={agreeTerms}
                             onChange={(e) => setAgreeTerms(e.target.checked)}
                             className="w-4 h-4 text-indigo-600 bg-gray-100 border-gray-300 dark:border-gray-600 rounded focus:ring-indigo-500 dark:bg-gray-700"
-                    />
-                  </div>
+                          />
+                        </div>
                         <div className="mr-3 text-sm">
                           <label htmlFor="agreeTerms" className="text-gray-600 dark:text-gray-300">
                             أوافق على <Link href="/terms" className="text-indigo-600 hover:underline">الشروط والأحكام</Link> و <Link href="/privacy" className="text-indigo-600 hover:underline">سياسة الخصوصية</Link>
                           </label>
-                </div>
-                  </div>
+                        </div>
+                      </div>
                       {errors.agreeTerms && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.agreeTerms}</p>}
-                </div>
+                    </div>
 
                     <div className="flex gap-3 mb-6">
                       <motion.button
@@ -1201,11 +1164,11 @@ const RegisterPage = () => {
                       >
                         <span className="flex items-center justify-center">&#8592; السابق</span>
                       </motion.button>
-                      
+
                       <motion.button
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
-                    type="submit"
+                        type="submit"
                         disabled={isLoading}
                         className="w-2/3 py-3 px-2 md:px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center md:text-base text-sm shadow-lg hover:shadow-xl active:translate-y-0.5 touch-manipulation"
                         style={{ fontSize: '14px', fontWeight: 'bold' }}
@@ -1218,26 +1181,26 @@ const RegisterPage = () => {
                             </svg>
                             <span className="whitespace-nowrap text-sm">جاري التسجيل...</span>
                           </>
-                    ) : (
+                        ) : (
                           <span className="flex items-center justify-center whitespace-nowrap text-base md:text-lg font-bold">
                             إنشاء حساب
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 rtl:ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                             </svg>
                           </span>
-                    )}
+                        )}
                       </motion.button>
-                </div>
+                    </div>
                   </motion.div>
                 )}
               </form>
-              
+
               <div className="my-6 flex items-center">
                 <div className="flex-1 border-t border-gray-200 dark:border-gray-700"></div>
                 <div className="px-3 text-sm text-gray-500 dark:text-gray-400">أو</div>
                 <div className="flex-1 border-t border-gray-200 dark:border-gray-700"></div>
               </div>
-              
+
               <div className="grid grid-cols-3 gap-3">
                 <motion.button
                   whileHover={{ scale: 1.05 }}
@@ -1264,11 +1227,11 @@ const RegisterPage = () => {
                   <FaTwitter className="text-blue-400" />
                 </motion.button>
               </div>
-              
+
               <div className="mt-8 text-center">
                 <p className="text-sm text-gray-600 dark:text-gray-400">
                   لديك حساب بالفعل؟{' '}
-                  <Link href="/login" 
+                  <Link href="/login"
                     className="font-medium text-white bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 transition-colors duration-150 py-2 px-4 rounded-lg shadow-md hover:shadow-lg active:translate-y-0.5 inline-flex items-center justify-center touch-manipulation"
                   >
                     <span className="text-sm font-bold">تسجيل الدخول</span>

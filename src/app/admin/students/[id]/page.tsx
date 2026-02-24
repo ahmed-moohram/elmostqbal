@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import AdminLayout from '@/components/AdminLayout';
-import { 
+import {
   FaUser, FaPhone, FaEnvelope, FaGraduationCap, FaTrophy,
   FaArrowLeft, FaChartLine, FaClock, FaCheckCircle, FaStar
 } from 'react-icons/fa';
@@ -217,7 +217,7 @@ export default function StudentDetailsPage() {
       <div className="p-6">
         {/* Header */}
         <div className="mb-6">
-          <Link 
+          <Link
             href="/admin/users"
             className="text-primary hover:text-primary-dark flex items-center gap-2 mb-4"
           >
@@ -257,7 +257,7 @@ export default function StudentDetailsPage() {
               </div>
               <h2 className="text-2xl font-bold text-center mb-2">{student.name}</h2>
               <p className="text-center text-blue-100 mb-4">{student.grade}</p>
-              
+
               <div className="space-y-3 mt-4">
                 <div className="flex items-center gap-3 bg-white bg-opacity-20 p-3 rounded">
                   <FaEnvelope />
@@ -266,7 +266,7 @@ export default function StudentDetailsPage() {
                     <p className="font-medium">{student.email}</p>
                   </div>
                 </div>
-                
+
                 <div className="flex items-center gap-3 bg-white bg-opacity-20 p-3 rounded">
                   <FaPhone />
                   <div className="text-sm">
@@ -274,12 +274,20 @@ export default function StudentDetailsPage() {
                     <p className="font-medium">{student.phone}</p>
                   </div>
                 </div>
-                
+
                 <div className="flex items-center gap-3 bg-white bg-opacity-20 p-3 rounded">
                   <FaPhone />
                   <div className="text-sm">
                     <p className="opacity-80">رقم ولي الأمر</p>
-                    <p className="font-medium">{student.parentPhone}</p>
+                    <p className="font-medium">{student.parentPhone || '—'}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 bg-white bg-opacity-20 p-3 rounded">
+                  <FaPhone />
+                  <div className="text-sm">
+                    <p className="opacity-80">رقم هاتف الأم</p>
+                    <p className="font-medium">{student.motherPhone || '—'}</p>
                   </div>
                 </div>
               </div>
@@ -323,11 +331,11 @@ export default function StudentDetailsPage() {
                     <p className="text-3xl font-bold text-purple-600">
                       {student.courses.length > 0
                         ? Math.round(
-                            student.courses.reduce(
-                              (sum: number, c: any) => sum + c.progress,
-                              0
-                            ) / student.courses.length
-                          )
+                          student.courses.reduce(
+                            (sum: number, c: any) => sum + c.progress,
+                            0
+                          ) / student.courses.length
+                        )
                         : 0}
                       %
                     </p>
@@ -360,11 +368,10 @@ export default function StudentDetailsPage() {
                 <div>
                   <p className="text-gray-600 text-sm">الحالة</p>
                   <span
-                    className={`px-3 py-1 rounded text-sm font-medium ${
-                      student.isActive
+                    className={`px-3 py-1 rounded text-sm font-medium ${student.isActive
                         ? 'bg-green-100 text-green-800'
                         : 'bg-gray-100 text-gray-800'
-                    }`}
+                      }`}
                   >
                     {student.isActive ? 'نشط' : 'غير نشط'}
                   </span>
@@ -412,7 +419,7 @@ export default function StudentDetailsPage() {
                     <span className="text-sm font-bold text-primary">{course.progress}%</span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-3">
-                    <div 
+                    <div
                       className="bg-gradient-to-r from-primary to-purple-600 h-3 rounded-full transition-all duration-500"
                       style={{ width: `${course.progress}%` }}
                     ></div>

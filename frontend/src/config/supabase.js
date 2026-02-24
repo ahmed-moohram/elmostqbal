@@ -116,7 +116,6 @@ export const signUp = async(userData) => {
                 .insert({
                     id: authData.user.id,
                     name: userData.name,
-                    father_name: userData.fatherName,
                     student_phone: userData.studentPhone,
                     parent_phone: userData.parentPhone,
                     email: userData.email,

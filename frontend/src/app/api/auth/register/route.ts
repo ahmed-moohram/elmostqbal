@@ -33,7 +33,6 @@ export async function POST(request: NextRequest) {
       role = 'student',
       // بيانات إضافية للطلاب
       phone,
-      fatherName,
       studentPhone,
       parentPhone,
       motherPhone,
@@ -96,7 +95,6 @@ export async function POST(request: NextRequest) {
         role: role as 'student' | 'teacher' | 'admin',
         avatar_url: `/avatars/${role}-default.png`,
         // بيانات إضافية للطلاب
-        father_name: fatherName,
         student_phone: studentPhone,
         parent_phone: parentPhone,
         mother_phone: motherPhone,

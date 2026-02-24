@@ -1,27 +1,16 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-if (!supabaseUrl || !supabaseServiceKey) {
-  throw new Error(
-    'Missing Supabase configuration. Check NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY',
-  );
-}
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+﻿import { NextRequest, NextResponse } from 'next/server';
+import { serverSupabase as supabase } from '@/lib/supabase-server';
 
 export async function GET(request: NextRequest) {
   try {
     const authHeader = request.headers.get('authorization');
-    
+
     // جلب معرف المستخدم الحالي
     let currentUserId: string | null = null;
-    
+
     const searchParams = request.nextUrl.searchParams;
     const currentUserIdParam = searchParams.get('currentUserId');
-    
+
     if (currentUserIdParam) {
       currentUserId = currentUserIdParam;
     }
@@ -37,8 +26,7 @@ export async function GET(request: NextRequest) {
     const { data: messages, error: messagesError } = await supabase
       .from('messages')
       .select('*')
-      .or(`sender_id.eq.${currentUserId},receiver_id.eq.${currentUserId}`)
-      .eq('is_deleted', false)
+      .or(`sender_id.eq.${currentUserId},recipient_id.eq.${currentUserId}`)
       .order('created_at', { ascending: false });
 
     if (messagesError) {
@@ -55,7 +43,7 @@ export async function GET(request: NextRequest) {
     messages?.forEach((message) => {
       const otherUserId =
         message.sender_id === currentUserId
-          ? message.receiver_id
+          ? message.recipient_id
           : message.sender_id;
 
       if (!conversationsMap.has(otherUserId)) {
@@ -76,7 +64,7 @@ export async function GET(request: NextRequest) {
 
       // حساب الرسائل غير المقروءة
       if (
-        message.receiver_id === currentUserId &&
+        message.recipient_id === currentUserId &&
         !message.is_read
       ) {
         const conv = conversationsMap.get(otherUserId);
@@ -86,7 +74,7 @@ export async function GET(request: NextRequest) {
 
     // جلب معلومات جميع المستخدمين في المحادثات
     const userIds = Array.from(conversationsMap.keys());
-    
+
     if (userIds.length === 0) {
       return NextResponse.json([]);
     }

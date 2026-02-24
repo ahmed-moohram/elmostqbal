@@ -210,9 +210,9 @@ export const paginationSchema = z.object({
 
 // Course Access Code Schemas
 export const courseAccessCodeRedeemSchema = z.object({
-  courseId: z.string().uuid('معرف الكورس غير صحيح'),
-  studentId: z.string().uuid('معرف الطالب غير صحيح').optional(),
-  studentPhone: z.string().regex(/^[0-9]{10,15}$/,'رقم الهاتف غير صحيح').optional(),
+  courseId: z.string().min(1, 'معرف الكورس مطلوب'),
+  studentId: z.string().optional().nullable().or(z.literal('')),
+  studentPhone: z.string().optional().nullable().or(z.literal('')),
   code: z.string().min(1, 'الكود مطلوب'),
 });
 

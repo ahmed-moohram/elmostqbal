@@ -7,9 +7,9 @@ import { toast } from 'react-hot-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import supabase from '@/lib/supabase-client';
 import CourseChat from '@/components/CourseChat';
-import { 
-  FaUsers, FaBookOpen, FaChartLine, FaDollarSign, 
-  FaVideo, FaComments, FaBell, FaPlus, FaEdit, 
+import {
+  FaUsers, FaBookOpen, FaChartLine, FaDollarSign,
+  FaVideo, FaComments, FaBell, FaPlus, FaEdit,
   FaTrash, FaEye, FaCog, FaSignOutAlt, FaGraduationCap,
   FaStar, FaClock, FaCheckCircle, FaEnvelope, FaWhatsapp,
   FaFilePdf, FaUpload, FaDownload, FaBook
@@ -102,17 +102,18 @@ interface Message {
 interface TeacherLibraryBook {
   id: string;
   title: string;
-  author: string;
   description: string;
-  category: string;
+  author: string;
   file_url: string;
   file_size: number;
+  cover_image?: string;
+  category: string;
+  created_at: string;
   download_count: number;
   view_count: number;
-  created_at: string;
-  cover_image?: string | null;
-  price?: number | null;
-  is_paid?: boolean | null;
+  is_public?: boolean;
+  price?: number;
+  is_paid?: boolean;
 }
 export default function TeacherDashboard() {
   const router = useRouter();
@@ -178,6 +179,7 @@ export default function TeacherDashboard() {
     is_paid: false,
   });
   const [selectedBookFile, setSelectedBookFile] = useState<File | null>(null);
+  const [editingBookId, setEditingBookId] = useState<string | null>(null);
   const [bookUploading, setBookUploading] = useState(false);
   const [selectedCoverFile, setSelectedCoverFile] = useState<File | null>(null);
   const [bookSourceType, setBookSourceType] = useState<'upload' | 'external'>('upload');
@@ -429,37 +431,61 @@ export default function TeacherDashboard() {
         }
       }
 
-      const { data: book, error: dbError } = await supabase
-        .from('library_books')
-        .insert({
-          title: bookFormData.title,
-          author: bookFormData.author,
-          description: bookFormData.description,
-          category: bookFormData.category,
-          file_url: fileUrl,
-          file_size: fileSize,
-          file_path: filePath,
+      const bookDataToSave: any = {
+        title: bookFormData.title,
+        author: bookFormData.author,
+        description: bookFormData.description,
+        category: bookFormData.category,
+        course_id: bookFormData.course_id || null,
+        is_public: bookFormData.is_public,
+        price: numericPrice,
+        is_paid: numericPrice != null && numericPrice > 0 ? true : bookFormData.is_paid,
+        metadata: {
+          original_name: bookSourceType === 'upload' && selectedBookFile ? selectedBookFile.name : null,
+          upload_date: new Date().toISOString(),
+          source: bookSourceType,
+          external_url: bookSourceType === 'external' ? bookExternalUrl.trim() : undefined,
+        },
+      };
+
+      if (!editingBookId) {
+        Object.assign(bookDataToSave, {
           uploaded_by: user.id,
           teacher_id: user.id,
-          course_id: bookFormData.course_id || null,
-          is_public: bookFormData.is_public,
           download_count: 0,
           view_count: 0,
-          cover_image: coverPublicUrl,
-          price: numericPrice,
-          is_paid: numericPrice != null && numericPrice > 0 ? true : bookFormData.is_paid,
-          metadata: {
-            original_name:
-              bookSourceType === 'upload' && selectedBookFile
-                ? selectedBookFile.name
-                : null,
-            upload_date: new Date().toISOString(),
-            source: bookSourceType,
-            external_url: bookSourceType === 'external' ? bookExternalUrl.trim() : undefined,
-          },
-        })
-        .select()
-        .single();
+        });
+      }
+
+      if (fileUrl) {
+        bookDataToSave.file_url = fileUrl;
+        bookDataToSave.file_size = fileSize;
+        bookDataToSave.file_path = filePath;
+      }
+
+      if (coverPublicUrl) {
+        bookDataToSave.cover_image = coverPublicUrl;
+      }
+
+      let dbError, book;
+      if (editingBookId) {
+        const { data, error } = await supabase
+          .from('library_books')
+          .update(bookDataToSave)
+          .eq('id', editingBookId)
+          .select()
+          .single();
+        dbError = error;
+        book = data;
+      } else {
+        const { data, error } = await supabase
+          .from('library_books')
+          .insert(bookDataToSave)
+          .select()
+          .single();
+        dbError = error;
+        book = data;
+      }
 
       if (dbError) {
         console.error('Database error:', dbError);
@@ -481,12 +507,13 @@ export default function TeacherDashboard() {
         setBookUploadProgress(100);
       }
 
-      toast.success('تم رفع الكتاب بنجاح!');
+      toast.success(editingBookId ? 'تم تعديل الكتاب بنجاح!' : 'تم رفع الكتاب بنجاح!');
 
       setSelectedBookFile(null);
       setSelectedCoverFile(null);
       setBookSourceType('upload');
       setBookExternalUrl('');
+      setEditingBookId(null);
       setBookFormData({
         title: '',
         author: '',
@@ -499,7 +526,9 @@ export default function TeacherDashboard() {
       });
 
       await fetchTeacherBooks();
-      await sendBookUploadNotification(user.id, book);
+      if (!editingBookId) {
+        await sendBookUploadNotification(user.id, book);
+      }
     } catch (error) {
       console.error('Error uploading teacher book:', error);
       toast.error('حدث خطأ في رفع الكتاب');
@@ -553,13 +582,15 @@ export default function TeacherDashboard() {
     if (!confirm('هل أنت متأكد من حذف هذا الكتاب؟')) return;
 
     try {
-      const pathParts = book.file_url.split('/').slice(-3).join('/');
-      const { error: storageError } = await supabase.storage
-        .from('pdf-library')
-        .remove([pathParts]);
+      if (book.file_url.includes("supabase.co")) {
+        const pathParts = book.file_url.split('/').slice(-3).join('/');
+        const { error: storageError } = await supabase.storage
+          .from('pdf-library')
+          .remove([pathParts]);
 
-      if (storageError) {
-        console.error('Storage error:', storageError);
+        if (storageError) {
+          console.error('Storage error:', storageError);
+        }
       }
 
       const { error: dbError } = await supabase
@@ -579,6 +610,50 @@ export default function TeacherDashboard() {
       console.error('Error deleting book:', error);
       toast.error('حدث خطأ في حذف الكتاب');
     }
+  };
+
+  const editBook = (book: TeacherLibraryBook) => {
+    setEditingBookId(book.id);
+    setBookFormData({
+      title: book.title || '',
+      author: book.author || '',
+      description: book.description || '',
+      category: book.category || 'general',
+      course_id: '', // can be populated if needed
+      is_public: book.is_public ?? true,
+      price: book.price ? String(book.price) : '',
+      is_paid: book.is_paid || false,
+    });
+
+    if (book.file_url && !book.file_url.includes('supabase.co')) {
+      setBookSourceType('external');
+      setBookExternalUrl(book.file_url);
+    } else {
+      setBookSourceType('upload');
+      setBookExternalUrl('');
+    }
+
+    setSelectedBookFile(null);
+    setSelectedCoverFile(null);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const cancelEditBook = () => {
+    setEditingBookId(null);
+    setBookFormData({
+      title: '',
+      author: '',
+      description: '',
+      category: 'general',
+      course_id: '',
+      is_public: true,
+      price: '',
+      is_paid: false,
+    });
+    setBookSourceType('upload');
+    setBookExternalUrl('');
+    setSelectedBookFile(null);
+    setSelectedCoverFile(null);
   };
 
   const handleChangeAvatar = () => {
@@ -693,10 +768,10 @@ export default function TeacherDashboard() {
       // جلب الامتحانات التي حصل فيها على الدرجة الكاملة (100%)
       const perfectScoreQuizzes = quizData
         ? quizData.filter((q: any) => {
-            const score = Number(q.score || 0);
-            const totalQuestions = Number(q.total_questions || 0);
-            return totalQuestions > 0 && score === totalQuestions;
-          })
+          const score = Number(q.score || 0);
+          const totalQuestions = Number(q.total_questions || 0);
+          return totalQuestions > 0 && score === totalQuestions;
+        })
         : [];
 
       let averageQuizScore = 0;
@@ -745,10 +820,10 @@ export default function TeacherDashboard() {
           totalPoints = Number((pointsRow as any).total_points || 0) || 0;
         }
 
-      // جلب جميع الإنجازات مع التفاصيل الكاملة
-      const { data: achievementsRows, error: achievementsError } = await supabase
-        .from('user_achievements')
-        .select(`
+        // جلب جميع الإنجازات مع التفاصيل الكاملة
+        const { data: achievementsRows, error: achievementsError } = await supabase
+          .from('user_achievements')
+          .select(`
           *,
           achievement:achievements(
             id,
@@ -760,21 +835,21 @@ export default function TeacherDashboard() {
           ),
           course:courses(id, title)
         `)
-        .eq('user_id', student.userId)
-        .eq('is_completed', true)
-        .order('earned_at', { ascending: false });
+          .eq('user_id', student.userId)
+          .eq('is_completed', true)
+          .order('earned_at', { ascending: false });
 
-      if (!achievementsError && Array.isArray(achievementsRows)) {
-        achievementsCount = achievementsRows.length;
-        const courseRows = achievementsRows.filter(
-          (row: any) => String(row.course_id || '') === String(student.courseId)
-        );
-        courseAchievementsCount = courseRows.length;
-        // جلب جميع إنجازات الكورس (ليس فقط 3)
-        latestCourseAchievements = courseRows
-          .map((row: any) => row.achievement?.title)
-          .filter((t: any) => typeof t === 'string' && t.trim().length > 0);
-      }
+        if (!achievementsError && Array.isArray(achievementsRows)) {
+          achievementsCount = achievementsRows.length;
+          const courseRows = achievementsRows.filter(
+            (row: any) => String(row.course_id || '') === String(student.courseId)
+          );
+          courseAchievementsCount = courseRows.length;
+          // جلب جميع إنجازات الكورس (ليس فقط 3)
+          latestCourseAchievements = courseRows
+            .map((row: any) => row.achievement?.title)
+            .filter((t: any) => typeof t === 'string' && t.trim().length > 0);
+        }
       } catch (achError) {
         console.error('Error loading achievements for parent report:', achError);
       }
@@ -807,12 +882,12 @@ export default function TeacherDashboard() {
       const perfectScoreQuizzesLine =
         perfectScoreQuizzes.length > 0
           ? `\n\n🎯 الامتحانات التي حصل فيها على الدرجة الكاملة (${perfectScoreQuizzes.length} امتحان):\n${perfectScoreQuizzes.map((q: any, idx: number) => {
-              const quizTitle = q.quiz_title || q.title || `امتحان ${idx + 1}`;
-              const score = Number(q.score || 0);
-              const total = Number(q.total_questions || 0);
-              const date = q.attempted_at ? new Date(q.attempted_at).toLocaleDateString('ar-EG') : '';
-              return `${idx + 1}. ${quizTitle} - ${score}/${total} (${date})`;
-            }).join('\n')}`
+            const quizTitle = q.quiz_title || q.title || `امتحان ${idx + 1}`;
+            const score = Number(q.score || 0);
+            const total = Number(q.total_questions || 0);
+            const date = q.attempted_at ? new Date(q.attempted_at).toLocaleDateString('ar-EG') : '';
+            return `${idx + 1}. ${quizTitle} - ${score}/${total} (${date})`;
+          }).join('\n')}`
           : '\n\n🎯 لم يحصل الطالب على الدرجة الكاملة في أي امتحان حتى الآن.';
 
       const text = `السلام عليكم ورحمة الله وبركاته
@@ -979,7 +1054,7 @@ export default function TeacherDashboard() {
         );
         const avgRating = mappedCourses.length
           ? mappedCourses.reduce((sum, course) => sum + (course.rating || 0), 0) /
-            mappedCourses.length
+          mappedCourses.length
           : 0;
 
         let avgQuizScore = 0;
@@ -1042,8 +1117,8 @@ export default function TeacherDashboard() {
             const studentsFromApi: Student[] = Array.isArray(json)
               ? json
               : Array.isArray(json.students)
-              ? json.students
-              : [];
+                ? json.students
+                : [];
 
             setStudents(studentsFromApi);
 
@@ -1245,9 +1320,9 @@ export default function TeacherDashboard() {
       const averageQuizScore =
         quizData && quizData.length > 0
           ? quizData.reduce(
-              (sum: number, q: any) => sum + (Number(q.score) || 0),
-              0
-            ) / quizData.length
+            (sum: number, q: any) => sum + (Number(q.score) || 0),
+            0
+          ) / quizData.length
           : 0;
 
       let achievementsCount = 0;
@@ -1387,11 +1462,10 @@ export default function TeacherDashboard() {
           <nav className="space-y-2">
             <button
               onClick={() => setActiveTab('overview')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition ${
-                activeTab === 'overview'
-                  ? 'bg-purple-100 text-purple-700 font-medium'
-                  : 'hover:bg-gray-100'
-              }`}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition ${activeTab === 'overview'
+                ? 'bg-purple-100 text-purple-700 font-medium'
+                : 'hover:bg-gray-100'
+                }`}
             >
               <FaChartLine />
               نظرة عامة
@@ -1399,11 +1473,10 @@ export default function TeacherDashboard() {
 
             <button
               onClick={() => setActiveTab('courses')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition ${
-                activeTab === 'courses'
-                  ? 'bg-purple-100 text-purple-700 font-medium'
-                  : 'hover:bg-gray-100'
-              }`}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition ${activeTab === 'courses'
+                ? 'bg-purple-100 text-purple-700 font-medium'
+                : 'hover:bg-gray-100'
+                }`}
             >
               <FaBookOpen />
               الكورسات
@@ -1411,11 +1484,10 @@ export default function TeacherDashboard() {
 
             <button
               onClick={() => setActiveTab('library')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition ${
-                activeTab === 'library'
-                  ? 'bg-purple-100 text-purple-700 font-medium'
-                  : 'hover:bg-gray-100'
-              }`}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition ${activeTab === 'library'
+                ? 'bg-purple-100 text-purple-700 font-medium'
+                : 'hover:bg-gray-100'
+                }`}
             >
               <FaBook />
               المكتبة (الكتب)
@@ -1423,11 +1495,10 @@ export default function TeacherDashboard() {
 
             <button
               onClick={() => setActiveTab('students')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition ${
-                activeTab === 'students'
-                  ? 'bg-purple-100 text-purple-700 font-medium'
-                  : 'hover:bg-gray-100'
-              }`}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition ${activeTab === 'students'
+                ? 'bg-purple-100 text-purple-700 font-medium'
+                : 'hover:bg-gray-100'
+                }`}
             >
               <FaUsers />
               الطلاب
@@ -1435,11 +1506,10 @@ export default function TeacherDashboard() {
 
             <button
               onClick={() => setActiveTab('messages')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition relative ${
-                activeTab === 'messages'
-                  ? 'bg-purple-100 text-purple-700 font-medium'
-                  : 'hover:bg-gray-100'
-              }`}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition relative ${activeTab === 'messages'
+                ? 'bg-purple-100 text-purple-700 font-medium'
+                : 'hover:bg-gray-100'
+                }`}
             >
               <FaComments />
               الرسائل
@@ -1450,11 +1520,10 @@ export default function TeacherDashboard() {
 
             <button
               onClick={() => setActiveTab('earnings')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition ${
-                activeTab === 'earnings'
-                  ? 'bg-purple-100 text-purple-700 font-medium'
-                  : 'hover:bg-gray-100'
-              }`}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition ${activeTab === 'earnings'
+                ? 'bg-purple-100 text-purple-700 font-medium'
+                : 'hover:bg-gray-100'
+                }`}
             >
               <FaDollarSign />
               الأرباح
@@ -1464,11 +1533,10 @@ export default function TeacherDashboard() {
 
             <button
               onClick={() => setActiveTab('settings')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition ${
-                activeTab === 'settings'
-                  ? 'bg-purple-100 text-purple-700 font-medium'
-                  : 'hover:bg-gray-100'
-              }`}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition ${activeTab === 'settings'
+                ? 'bg-purple-100 text-purple-700 font-medium'
+                : 'hover:bg-gray-100'
+                }`}
             >
               <FaCog />
               الإعدادات
@@ -1610,9 +1678,8 @@ export default function TeacherDashboard() {
                         className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg"
                       >
                         <div
-                          className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                            hasProgress ? 'bg-green-100' : 'bg-blue-100'
-                          }`}
+                          className={`w-10 h-10 rounded-full flex items-center justify-center ${hasProgress ? 'bg-green-100' : 'bg-blue-100'
+                            }`}
                         >
                           {hasProgress ? (
                             <FaCheckCircle className="text-green-600" />
@@ -1651,18 +1718,17 @@ export default function TeacherDashboard() {
           <div className="grid lg:grid-cols-2 gap-6">
             {/* قسم رفع كتاب */}
             <div className="bg-white rounded-xl shadow-lg p-6">
-              <h2 className="text-xl font-bold mb-4">رفع كتاب جديد</h2>
+              <h2 className="text-xl font-bold mb-4">{editingBookId ? 'تعديل بيانات الكتاب' : 'رفع كتاب جديد'}</h2>
 
               {/* اختيار مصدر الكتاب */}
               <div className="flex items-center gap-3 mb-4">
                 <button
                   type="button"
                   onClick={() => setBookSourceType('upload')}
-                  className={`px-3 py-1.5 text-sm rounded-full border transition ${
-                    bookSourceType === 'upload'
-                      ? 'bg-purple-600 text-white border-purple-600'
-                      : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-                  }`}
+                  className={`px-3 py-1.5 text-sm rounded-full border transition ${bookSourceType === 'upload'
+                    ? 'bg-purple-600 text-white border-purple-600'
+                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                    }`}
                 >
                   ملف مرفوع (PDF / PPTX)
                 </button>
@@ -1671,11 +1737,10 @@ export default function TeacherDashboard() {
                   onClick={() => {
                     setBookSourceType('external');
                   }}
-                  className={`px-3 py-1.5 text-sm rounded-full border transition ${
-                    bookSourceType === 'external'
-                      ? 'bg-purple-600 text-white border-purple-600'
-                      : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-                  }`}
+                  className={`px-3 py-1.5 text-sm rounded-full border transition ${bookSourceType === 'external'
+                    ? 'bg-purple-600 text-white border-purple-600'
+                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                    }`}
                 >
                   رابط خارجي (جوجل درايف)
                 </button>
@@ -1684,11 +1749,10 @@ export default function TeacherDashboard() {
               {bookSourceType === 'upload' && (
                 <div
                   {...getBookRootProps()}
-                  className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
-                    isBookDragActive
-                      ? 'border-purple-500 bg-purple-50'
-                      : 'border-gray-300 hover:border-purple-400'
-                  }`}
+                  className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${isBookDragActive
+                    ? 'border-purple-500 bg-purple-50'
+                    : 'border-gray-300 hover:border-purple-400'
+                    }`}
                 >
                   <input {...getBookInputProps()} />
                   <FaUpload className="text-4xl text-gray-400 mx-auto mb-4" />
@@ -1900,23 +1964,35 @@ export default function TeacherDashboard() {
                     </label>
                   </div>
 
-                  <button
-                    onClick={uploadBookPDF}
-                    disabled={bookUploading}
-                    className="w-full bg-purple-600 text-white py-3 rounded-lg hover:bg-purple-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                  >
-                    {bookUploading ? (
-                      <>
-                        <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent" />
-                        جاري الرفع...
-                      </>
-                    ) : (
-                      <>
-                        <FaUpload />
-                        رفع الكتاب
-                      </>
+                  <div className="flex gap-2 mt-4">
+                    <button
+                      onClick={uploadBookPDF}
+                      disabled={bookUploading}
+                      className="flex-1 bg-purple-600 text-white py-3 rounded-lg hover:bg-purple-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      {bookUploading ? (
+                        <>
+                          <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent" />
+                          جاري الحفظ...
+                        </>
+                      ) : (
+                        <>
+                          <FaUpload />
+                          {editingBookId ? 'حفظ التعديلات' : 'رفع الكتاب'}
+                        </>
+                      )}
+                    </button>
+
+                    {editingBookId && (
+                      <button
+                        onClick={cancelEditBook}
+                        disabled={bookUploading}
+                        className="bg-gray-200 text-gray-800 px-6 py-3 rounded-lg hover:bg-gray-300 transition"
+                      >
+                        إلغاء
+                      </button>
                     )}
-                  </button>
+                  </div>
                 </motion.div>
               )}
             </div>
@@ -1957,6 +2033,13 @@ export default function TeacherDashboard() {
                             title="عرض"
                           >
                             <FaEye />
+                          </button>
+                          <button
+                            onClick={() => editBook(book)}
+                            className="p-2 text-yellow-600 hover:bg-yellow-50 rounded-lg transition"
+                            title="تعديل"
+                          >
+                            <FaEdit />
                           </button>
                           <button
                             onClick={() => downloadBookPDF(book)}
@@ -2012,11 +2095,10 @@ export default function TeacherDashboard() {
                   <div className="flex items-center justify-between mb-2">
                     <h3 className="font-bold text-lg">{course.title}</h3>
                     <span
-                      className={`px-2 py-1 text-xs rounded ${
-                        course.isPublished
-                          ? 'bg-green-100 text-green-600'
-                          : 'bg-yellow-100 text-yellow-600'
-                      }`}
+                      className={`px-2 py-1 text-xs rounded ${course.isPublished
+                        ? 'bg-green-100 text-green-600'
+                        : 'bg-yellow-100 text-yellow-600'
+                        }`}
                     >
                       {course.isPublished ? 'منشور' : 'مسودة'}
                     </span>
@@ -2174,11 +2256,10 @@ export default function TeacherDashboard() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span
-                            className={`px-2 py-1 text-xs rounded ${
-                              student.lastActive === 'الآن'
-                                ? 'bg-green-100 text-green-600'
-                                : 'bg-gray-100 text-gray-600'
-                            }`}
+                            className={`px-2 py-1 text-xs rounded ${student.lastActive === 'الآن'
+                              ? 'bg-green-100 text-green-600'
+                              : 'bg-gray-100 text-gray-600'
+                              }`}
                           >
                             {student.lastActive}
                           </span>
@@ -2290,9 +2371,8 @@ export default function TeacherDashboard() {
               {messages.map((message) => (
                 <div
                   key={message.id}
-                  className={`p-6 hover:bg-gray-50 cursor-pointer ${
-                    !message.isRead ? 'bg-blue-50' : ''
-                  }`}
+                  className={`p-6 hover:bg-gray-50 cursor-pointer ${!message.isRead ? 'bg-blue-50' : ''
+                    }`}
                 >
                   <div className="flex items-start gap-4">
                     <img
@@ -2425,11 +2505,10 @@ export default function TeacherDashboard() {
                                 </td>
                                 <td className="px-4 py-2">
                                   <span
-                                    className={`px-2 py-1 text-xs rounded ${
-                                      q.passed
-                                        ? 'bg-green-100 text-green-600'
-                                        : 'bg-red-100 text-red-600'
-                                    }`}
+                                    className={`px-2 py-1 text-xs rounded ${q.passed
+                                      ? 'bg-green-100 text-green-600'
+                                      : 'bg-red-100 text-red-600'
+                                      }`}
                                   >
                                     {q.passed ? 'ناجح' : 'راسب'}
                                   </span>
@@ -2437,8 +2516,8 @@ export default function TeacherDashboard() {
                                 <td className="px-4 py-2">
                                   {q.attempted_at
                                     ? new Date(q.attempted_at).toLocaleString(
-                                        'ar-EG'
-                                      )
+                                      'ar-EG'
+                                    )
                                     : '-'}
                                 </td>
                               </tr>

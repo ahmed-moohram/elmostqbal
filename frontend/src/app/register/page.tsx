@@ -69,7 +69,6 @@ const PhoneInput = ({
 
 const RegisterPage = () => {
   const [name, setName] = useState('');
-  const [fatherName, setFatherName] = useState('');
   const [email, setEmail] = useState('');
   const [studentPhone, setStudentPhone] = useState('');
   const [parentPhone, setParentPhone] = useState('');
@@ -210,16 +209,6 @@ const RegisterPage = () => {
       }
     }
     
-    if (!fatherName.trim()) {
-      stepErrors.fatherName = 'اسم الأب مطلوب';
-    } else {
-      // التحقق من أن اسم الأب يحتوي على ثلاثة أجزاء على الأقل
-      const fatherNameParts = fatherName.trim().split(/\s+/);
-      if (fatherNameParts.length < 3) {
-        stepErrors.fatherName = 'يجب إدخال اسم الأب ثلاثي على الأقل';
-      }
-    }
-    
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       stepErrors.email = 'البريد الإلكتروني غير صحيح';
     }
@@ -341,7 +330,7 @@ const RegisterPage = () => {
       }
       
       // إنشاء المستخدم الجديد
-      const fullName = `${name} ${fatherName}`;
+      const fullName = name;
       
       const { data: newUser, error: insertError } = await supabase
         .from('users')
@@ -352,7 +341,6 @@ const RegisterPage = () => {
           password_hash: hashedPassword, // استخدام كلمة المرور المشفرة بـ bcrypt
           role: 'student',
           // بيانات إضافية
-          father_name: fatherName,
           student_phone: studentPhone,
           parent_phone: parentPhone,
           mother_phone: motherPhone || null,
@@ -381,7 +369,6 @@ const RegisterPage = () => {
         phone: newUser.phone,
         role: newUser.role,
         // بيانات إضافية من النموذج
-        fatherName: fatherName,
         studentPhone: studentPhone,
         parentPhone: parentPhone,
         motherPhone: motherPhone,
@@ -650,28 +637,6 @@ const RegisterPage = () => {
                   </div>
                       {errors.name && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.name}</p>}
                 </div>
-
-                    <div className="mb-6">
-                      <label htmlFor="fatherName" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        اسم الأب
-                      </label>
-                      <div className="relative">
-                        <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                          <FaUser className="text-gray-400" />
-                        </div>
-                        <input
-                          id="fatherName"
-                          name="fatherName"
-                          type="text"
-                          required
-                          value={fatherName}
-                          onChange={(e) => setFatherName(e.target.value)}
-                          className={`block w-full pr-10 py-3 border ${errors.fatherName ? 'border-red-300 dark:border-red-600' : 'border-gray-300 dark:border-gray-600'} rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all`}
-                          placeholder="أدخل اسم الأب"
-                        />
-                      </div>
-                      {errors.fatherName && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.fatherName}</p>}
-                    </div>
 
                     <div className="mb-6">
                       <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">

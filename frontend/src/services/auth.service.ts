@@ -15,7 +15,6 @@ export interface LoginResponse {
 
 export interface RegisterData {
   name: string;
-  fatherName: string;
   studentPhone: string;
   parentPhone: string;
   motherPhone?: string;

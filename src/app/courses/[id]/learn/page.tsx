@@ -42,7 +42,7 @@ interface Lesson {
 interface Question {
   id: string;
   text: string;
-    options: string[];
+  options: string[];
   correctAnswer: string;
 }
 
@@ -208,7 +208,7 @@ export default function CourseLearnPage() {
   const params = useParams();
   const courseId = params?.id as string;
   const router = useRouter();
-  
+
   // State variables
   const [course, setCourse] = useState<Course | null>(null);
   const [showSidebar, setShowSidebar] = useState(true);
@@ -227,7 +227,7 @@ export default function CourseLearnPage() {
   const [lessonMeta, setLessonMeta] = useState<
     Record<string, { hasCode: boolean; isFree: boolean; isPreview: boolean }>
   >({});
-  
+
   // استخدام hook الخاص بتقدم الدورة
   const {
     progress,
@@ -255,13 +255,13 @@ export default function CourseLearnPage() {
       console.error('Error loading unlocked lessons from localStorage:', e);
     }
   }, [courseId]);
-  
+
   // تحميل بيانات الدورة
   useEffect(() => {
     async function fetchCourseData() {
       setIsLoading(true);
       setError(null);
-      
+
       try {
         // التحقق من اشتراك الطالب أولاً
         const userStr = localStorage.getItem('user');
@@ -271,14 +271,14 @@ export default function CourseLearnPage() {
           router.replace('/login');
           return;
         }
-        
+
         const user = JSON.parse(userStr);
         const studentPhone = user.phone;
-        
+
         // فحص إذا كان الطالب مشترك ومعتمد من الأدمن
         const enrolledCoursesStr = localStorage.getItem(`student_${studentPhone}_courses`);
         let isEnrolled = false;
-        
+
         if (enrolledCoursesStr) {
           try {
             const enrolledCourses = JSON.parse(enrolledCoursesStr);
@@ -287,7 +287,7 @@ export default function CourseLearnPage() {
             console.error('Error checking enrollment:', e);
           }
         }
-        
+
         if (!isEnrolled) {
           setError('ليس لديك صلاحية للوصول لهذا الكورس. يرجى التسجيل أو انتظار موافقة المدرس/الأدمن.');
           setIsLoading(false);
@@ -296,10 +296,10 @@ export default function CourseLearnPage() {
           }, 2000);
           return;
         }
-        
+
         // استدعاء API للحصول على بيانات الدورة
         const courseData = await coursesService.getCourseContent(courseId);
-        
+
         if (courseData) {
           // التحقق من انتهاء صلاحية الكورس
           if (courseData.expiryDate) {
@@ -307,23 +307,23 @@ export default function CourseLearnPage() {
             const today = new Date();
             courseData.isExpired = today > expiryDate;
           }
-          
+
           setCourse(courseData);
-          
+
           // إذا انتهت الصلاحية، لا نعرض المحتوى
           if (courseData.isExpired) {
             setError(`انتهت صلاحية هذا الكورس في ${new Date(courseData.expiryDate!).toLocaleDateString('ar-EG')}`);
             setIsLoading(false);
             return;
           }
-          
+
           // افتراضيًا، أظهر جميع الوحدات مفتوحة
           const modulesState: Record<string, boolean> = {};
           courseData.modules.forEach((module: Module) => {
             modulesState[module.id] = true;
           });
           setShowModules(modulesState);
-          
+
           // تحميل أول درس إذا لم يكن هناك درس محدد
           if (!currentLessonId && courseData.modules.length > 0 && courseData.modules[0].lessons.length > 0) {
             loadLesson(courseData.modules[0].lessons[0].id);
@@ -336,7 +336,7 @@ export default function CourseLearnPage() {
         setIsLoading(false);
       }
     }
-    
+
     fetchCourseData();
   }, [courseId, currentLessonId]);
 
@@ -365,19 +365,19 @@ export default function CourseLearnPage() {
 
     fetchLessonMeta();
   }, [currentLessonId, lessonMeta]);
-  
+
   // بدء جلسة دراسة جديدة عند فتح الصفحة
   useEffect(() => {
     if (courseId) {
       startStudySession();
-      
+
       // إنهاء الجلسة عند مغادرة الصفحة
       return () => {
         endStudySession();
       };
     }
   }, [courseId, startStudySession, endStudySession]);
-  
+
   // تبديل حالة عرض الوحدة
   const toggleModule = (moduleId: string) => {
     setShowModules(prev => ({
@@ -385,13 +385,13 @@ export default function CourseLearnPage() {
       [moduleId]: !prev[moduleId]
     }));
   };
-  
+
   // تحميل درس محدد
   const loadLesson = (lessonId: string) => {
     if (!course) return;
-    
+
     let foundLesson: Lesson | null = null;
-    
+
     for (const module of course.modules) {
       const lesson = module.lessons.find(l => l.id === lessonId);
       if (lesson) {
@@ -399,7 +399,7 @@ export default function CourseLearnPage() {
         break;
       }
     }
-    
+
     if (foundLesson) {
       setCurrentLesson(foundLesson);
       setCurrentLessonId(lessonId);
@@ -409,14 +409,14 @@ export default function CourseLearnPage() {
       setCodeError(null);
     }
   };
-  
+
   // تحديث حالة الدرس كمكتمل
   const markAsComplete = async () => {
     if (!courseId || !currentLessonId) return;
-    
+
     await updateLessonStatus(currentLessonId, { completed: true });
   };
-  
+
   // تتبع تقدم الفيديو
   const handleVideoProgress = useCallback((progress: number, currentTime: number, duration: number) => {
     if (courseId && currentLessonId) {
@@ -437,7 +437,7 @@ export default function CourseLearnPage() {
     setCodeError(null);
 
     try {
-      const res = await fetch(`/api/lessons/${currentLessonId}` , {
+      const res = await fetch(`/api/lessons/${currentLessonId}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -486,33 +486,33 @@ export default function CourseLearnPage() {
   const isLessonUnlocked =
     !!currentLessonId &&
     (unlockedLessons.includes(currentLessonId) || !lessonRequiresCode);
-  
+
   // تقديم الاختبار
   const submitQuiz = async () => {
     if (!course || !currentLesson || currentLesson.type !== 'quiz') return;
-    
+
     setQuizSubmitted(true);
-    
+
     // حساب الإجابات الصحيحة
     let correctAnswers = 0;
     const quiz = currentLesson as QuizLesson;
-    
+
     quiz.questions.forEach(question => {
       if (userAnswers[question.id] === question.correctAnswer) {
         correctAnswers++;
       }
     });
-    
+
     // حساب النتيجة وتخزينها
     const score = Math.round((correctAnswers / quiz.questions.length) * 100);
     setQuizScore(score);
-    
+
     // إذا اجتاز الطالب الاختبار بنسبة 70% أو أكثر، نعتبر الدرس مكتملًا
     if (score >= 70) {
       await updateLessonStatus(currentLessonId, { completed: true });
     }
   };
-  
+
   // تعامل مع إجابة الطالب
   const handleAnswerSelect = (questionId: string, answerId: string) => {
     setUserAnswers(prev => ({
@@ -531,7 +531,7 @@ export default function CourseLearnPage() {
       </div>
     );
   }
-  
+
   if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
@@ -577,7 +577,7 @@ export default function CourseLearnPage() {
               <h2 className="text-xl font-bold mb-4 text-center dark:text-white">حدثت مشكلة</h2>
               <p className="text-gray-600 dark:text-gray-300 mb-6 text-center">{error}</p>
               <div className="flex justify-center">
-                <button 
+                <button
                   onClick={() => router.replace(`/courses/${courseId}`)}
                   className="btn-primary"
                 >
@@ -596,7 +596,7 @@ export default function CourseLearnPage() {
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
         <div className="text-center">
           <p className="text-gray-500 mb-4">لم يتم العثور على محتوى</p>
-          <button 
+          <button
             onClick={() => router.replace(`/courses/${courseId}`)}
             className="btn-primary"
           >
@@ -613,7 +613,7 @@ export default function CourseLearnPage() {
       <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 py-3 px-4">
         <div className="flex justify-between items-center">
           <div className="flex items-center">
-            <button 
+            <button
               onClick={() => router.replace(`/courses/${courseId}`)}
               className="btn-outline p-2 ml-4"
             >
@@ -621,21 +621,21 @@ export default function CourseLearnPage() {
             </button>
             <h1 className="text-xl font-bold dark:text-white">{course.title}</h1>
           </div>
-          
+
           <div className="flex items-center gap-4">
             <div className="hidden md:block">
               <div className="flex items-center">
                 <span className="text-sm text-gray-600 dark:text-gray-400 ml-2">تقدمك: {progress}%</span>
                 <div className="w-32 bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
-                  <div 
-                    className="bg-primary h-2.5 rounded-full" 
+                  <div
+                    className="bg-primary h-2.5 rounded-full"
                     style={{ width: `${progress}%` }}
                   ></div>
                 </div>
               </div>
             </div>
-            
-            <button 
+
+            <button
               onClick={() => setShowSidebar(!showSidebar)}
               className="bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 p-2 rounded-lg transition"
             >
@@ -643,7 +643,7 @@ export default function CourseLearnPage() {
             </button>
           </div>
         </div>
-        
+
         {/* تاريخ انتهاء الصلاحية */}
         {course.expiryDate && !course.isExpired && (
           <div className="mt-3 flex items-center gap-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg px-4 py-2">
@@ -661,22 +661,22 @@ export default function CourseLearnPage() {
           <aside className="w-full md:w-80 bg-gray-50 border-l border-gray-200 overflow-y-auto">
             <div className="p-4">
               <h2 className="text-xl font-bold mb-4">محتويات الدورة</h2>
-              
+
               <div className="mb-4">
                 <div className="flex items-center">
                   <span className="text-sm text-gray-600 ml-2">التقدم العام: {progress}%</span>
                   <div className="w-full bg-gray-200 rounded-full h-2.5">
-                    <div 
-                      className="bg-primary h-2.5 rounded-full" 
+                    <div
+                      className="bg-primary h-2.5 rounded-full"
                       style={{ width: `${progress}%` }}
                     ></div>
                   </div>
                 </div>
               </div>
-              
-                {course.modules.map(module => (
-                  <div key={module.id} className="border border-gray-200 rounded-lg overflow-hidden">
-                    <button
+
+              {course.modules.map(module => (
+                <div key={module.id} className="border border-gray-200 rounded-lg overflow-hidden">
+                  <button
                     onClick={() => toggleModule(module.id)}
                     className="w-full p-3 flex items-center justify-between bg-gray-100 hover:bg-gray-200 transition"
                   >
@@ -687,88 +687,96 @@ export default function CourseLearnPage() {
                       </span>
                       {showModules[module.id] ? <FaAngleUp /> : <FaAngleDown />}
                     </div>
-                    </button>
-                    
-                    {showModules[module.id] && (
-                      <div className="bg-gray-50 p-1">
-                        {module.lessons.map(lesson => (
-                          <button
-                            key={lesson.id}
-                            onClick={() => loadLesson(lesson.id)}
-                            className={`w-full flex items-center p-3 rounded-lg text-right transition ${
-                              currentLessonId === lesson.id 
-                                ? 'bg-primary/10 text-primary' 
-                                : 'hover:bg-gray-100'
+                  </button>
+
+                  {showModules[module.id] && (
+                    <div className="bg-gray-50 p-1">
+                      {module.lessons.map(lesson => (
+                        <button
+                          key={lesson.id}
+                          onClick={() => loadLesson(lesson.id)}
+                          className={`w-full flex items-center p-3 rounded-lg text-right transition ${currentLessonId === lesson.id
+                            ? 'bg-primary/10 text-primary'
+                            : 'hover:bg-gray-100'
                             }`}
-                          >
-                            <div className="ml-3">
+                        >
+                          <div className="ml-3">
                             {completedLessons.includes(lesson.id) ? (
-                                <FaCheckCircle className="text-green-500" />
-                              ) : (
-                                <FaRegCircle className="text-gray-400" />
-                              )}
-                            </div>
-                            <div className="flex-1 text-right">
-                              <p className={`${currentLessonId === lesson.id ? 'font-medium' : ''}`}>
-                                {lesson.title}
-                              </p>
-                              <div className="flex items-center text-xs text-gray-500">
-                                {lesson.type === 'video' && <FaPlay className="ml-1" />}
+                              <FaCheckCircle className="text-green-500" />
+                            ) : (
+                              <FaRegCircle className="text-gray-400" />
+                            )}
+                          </div>
+                          <div className="flex-1 text-right">
+                            <p className={`${currentLessonId === lesson.id ? 'font-medium' : ''}`}>
+                              {lesson.title}
+                            </p>
+                            <div className="flex items-center text-xs text-gray-500">
+                              {lesson.type === 'video' && <FaPlay className="ml-1" />}
                               {lesson.type === 'quiz' && <FaQuestion className="ml-1" />}
-                                {lesson.type === 'assignment' && <FaRegFileAlt className="ml-1" />}
-                                <span>{lesson.duration}</span>
-                              </div>
+                              {lesson.type === 'assignment' && <FaRegFileAlt className="ml-1" />}
+                              <span>{lesson.duration}</span>
                             </div>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
           </aside>
         )}
-        
+
         {/* المحتوى الرئيسي */}
         <main className="flex-1 flex flex-col overflow-hidden">
           <div className="flex-1 overflow-y-auto bg-white">
             {currentLesson.type === 'video' && (
-              <motion.div 
+              <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 className="h-full flex flex-col"
               >
                 {/* مشغل الفيديو */}
-                <div className="aspect-video bg-black relative">
+                <div className={lessonRequiresCode && !isLessonUnlocked ? "min-h-[380px] bg-black relative flex items-center justify-center" : "aspect-video bg-black relative"}>
                   {lessonRequiresCode && !isLessonUnlocked ? (
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/60 px-4">
-                      <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 text-center">
-                        <h3 className="text-lg font-bold mb-2">هذا الدرس محمي بكود</h3>
-                        <p className="text-sm text-gray-600 mb-4">
-                          أدخل الكود الذي حصلت عليه بعد الدفع لفتح هذا الفيديو.
+                    <div className="w-full h-full flex items-center justify-center px-4 py-6">
+                      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full p-6 text-center">
+                        <div className="w-16 h-16 bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                          </svg>
+                        </div>
+                        <h3 className="text-lg font-bold mb-2 dark:text-white">هذا الفيديو محمي بكود</h3>
+                        <p className="text-sm text-gray-600 dark:text-gray-300 mb-5 font-medium">
+                          أدخل كود هذا الدرس الذي حصلت عليه من المدرس لفتح الفيديو.
                         </p>
-                        <input
-                          type="text"
-                          value={codeInput}
-                          onChange={(e) => setCodeInput(e.target.value)}
-                          className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary mb-3"
-                          placeholder="أدخل الكود هنا"
-                        />
-                        {codeError && (
-                          <p className="text-sm text-red-600 mb-2">{codeError}</p>
-                        )}
-                        <button
-                          type="button"
-                          onClick={handleVerifyCode}
-                          disabled={isVerifyingCode}
-                          className="w-full bg-primary hover:bg-primary/90 text-white py-2 rounded-lg text-sm font-semibold disabled:opacity-50"
-                        >
-                          {isVerifyingCode ? 'جاري التحقق...' : 'تفعيل الكود وفتح الفيديو'}
-                        </button>
+
+                        <div className="space-y-3">
+                          <input
+                            type="text"
+                            value={codeInput}
+                            onChange={(e) => setCodeInput(e.target.value)}
+                            className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-primary text-center dark:bg-gray-700 dark:text-white transition-shadow"
+                            placeholder="أدخل الكود هنا"
+                            dir="ltr"
+                          />
+                          {codeError && (
+                            <p className="text-sm text-red-600 dark:text-red-400 font-medium">{codeError}</p>
+                          )}
+                          <button
+                            type="button"
+                            onClick={handleVerifyCode}
+                            disabled={isVerifyingCode}
+                            className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg text-base font-bold disabled:opacity-50 transition-colors shadow-md"
+                          >
+                            {isVerifyingCode ? 'جاري التحقق...' : 'تفعيل الكود وفتح الفيديو'}
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ) : (
-                    <VideoPlayer 
+                    <VideoPlayer
                       src={currentLesson.videoUrl || ''}
                       courseId={courseId}
                       lessonId={currentLessonId}
@@ -777,7 +785,7 @@ export default function CourseLearnPage() {
                     />
                   )}
                 </div>
-                
+
                 <div className="p-6 flex-1">
                   <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
                     <div>
@@ -793,24 +801,24 @@ export default function CourseLearnPage() {
                         )}
                       </div>
                     </div>
-                    
+
                     {!isLessonCompleted && (
-                        <button
-                          onClick={markAsComplete}
+                      <button
+                        onClick={markAsComplete}
                         className="mt-4 md:mt-0 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg flex items-center justify-center transition"
-                        >
+                      >
                         <FaRegCheckCircle className="ml-2" />
                         تمييز كمكتمل
-                        </button>
-                      )}
+                      </button>
+                    )}
                   </div>
-                  
+
                   <div className="bg-gray-100 rounded-lg p-4 mb-6">
                     <p className="text-gray-700">
                       {currentLesson.description}
                     </p>
                   </div>
-                  
+
                   {currentLesson.resources && currentLesson.resources.length > 0 && (
                     <div className="mb-6">
                       <h3 className="text-lg font-bold mb-4">الموارد التعليمية</h3>
@@ -836,9 +844,9 @@ export default function CourseLearnPage() {
                       </div>
                     </div>
                   )}
-                  
+
                   <div className="flex items-center justify-between pt-4 border-t">
-                      <button 
+                    <button
                       className="flex items-center text-gray-600 opacity-50 cursor-not-allowed transition"
                       disabled
                       title="المشاركة معطلة لحماية المحتوى"
@@ -849,8 +857,8 @@ export default function CourseLearnPage() {
                     >
                       <FaShare className="ml-2" />
                       مشاركة (معطلة)
-                      </button>
-                    
+                    </button>
+
                     <div className="flex gap-4">
                       <button className="btn-outline">الدرس السابق</button>
                       <button className="btn-primary">الدرس التالي</button>
@@ -859,9 +867,9 @@ export default function CourseLearnPage() {
                 </div>
               </motion.div>
             )}
-            
+
             {currentLesson.type === 'quiz' && (
-              <motion.div 
+              <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 className="p-6"
@@ -872,17 +880,17 @@ export default function CourseLearnPage() {
                     <span className="text-sm bg-gray-100 px-2 py-1 rounded-lg">{currentLesson.duration}</span>
                   </div>
                 </div>
-                
+
                 <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
                   <p className="text-gray-700 mb-4">
                     {currentLesson.description}
                   </p>
                 </div>
-                
-                  <div className="space-y-6">
+
+                <div className="space-y-6">
                   {(currentLesson as QuizLesson).questions?.map((question, qIndex) => (
-                    <div 
-                      key={question.id} 
+                    <div
+                      key={question.id}
                       className="bg-white rounded-lg border border-gray-200 p-6"
                     >
                       <h3 className="text-lg font-medium mb-4 flex items-center">
@@ -890,27 +898,26 @@ export default function CourseLearnPage() {
                           {qIndex + 1}
                         </span>
                         {question.text}
-                            </h3>
-                      
-                            <div className="space-y-2">
-                              {question.options.map((option, oIndex) => (
-                                <label 
-                                  key={oIndex} 
-                                  className={`flex items-center p-3 border rounded-lg cursor-pointer transition ${
-                              userAnswers[question.id] === option
-                                      ? 'border-primary bg-primary/5'
-                                      : 'border-gray-200 hover:bg-gray-50'
-                                  }`}
-                                >
-                                  <input
-                                    type="radio"
-                                    name={`question-${question.id}`}
+                      </h3>
+
+                      <div className="space-y-2">
+                        {question.options.map((option, oIndex) => (
+                          <label
+                            key={oIndex}
+                            className={`flex items-center p-3 border rounded-lg cursor-pointer transition ${userAnswers[question.id] === option
+                              ? 'border-primary bg-primary/5'
+                              : 'border-gray-200 hover:bg-gray-50'
+                              }`}
+                          >
+                            <input
+                              type="radio"
+                              name={`question-${question.id}`}
                               checked={userAnswers[question.id] === option}
                               onChange={() => handleAnswerSelect(question.id, option)}
-                                    className="ml-2"
-                                  />
-                                  <span>{option}</span>
-                            
+                              className="ml-2"
+                            />
+                            <span>{option}</span>
+
                             {quizSubmitted && userAnswers[question.id] === option && (
                               <>
                                 {option === question.correctAnswer ? (
@@ -926,40 +933,38 @@ export default function CourseLearnPage() {
                                 )}
                               </>
                             )}
-                                </label>
-                              ))}
-                            </div>
-                          </div>
+                          </label>
                         ))}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                
+
                 <div className="mt-6 flex justify-between items-center">
                   {quizSubmitted ? (
                     <div className="w-full bg-gray-100 p-4 rounded-lg">
                       <div className="flex items-center justify-between mb-2">
                         <h3 className="text-lg font-bold">النتيجة:</h3>
-                        <span className={`text-lg font-bold ${
-                          quizScore >= 70 ? 'text-green-600' : 'text-red-600'
-                        }`}>
+                        <span className={`text-lg font-bold ${quizScore >= 70 ? 'text-green-600' : 'text-red-600'
+                          }`}>
                           {quizScore}%
                         </span>
                       </div>
                       <div className="w-full bg-gray-200 h-2 rounded-full">
-                        <div 
-                          className={`h-2 rounded-full ${
-                            quizScore >= 70 ? 'bg-green-500' : 'bg-red-500'
-                          }`}
+                        <div
+                          className={`h-2 rounded-full ${quizScore >= 70 ? 'bg-green-500' : 'bg-red-500'
+                            }`}
                           style={{ width: `${quizScore}%` }}
                         ></div>
                       </div>
                       <p className="mt-3 text-center">
-                        {quizScore >= 70 
-                          ? 'أحسنت! لقد نجحت في الاختبار' 
+                        {quizScore >= 70
+                          ? 'أحسنت! لقد نجحت في الاختبار'
                           : 'حاول مرة أخرى للحصول على درجة أعلى'}
                       </p>
                     </div>
                   ) : (
-                    <button 
+                    <button
                       onClick={submitQuiz}
                       className="w-full bg-primary hover:bg-primary/90 text-white py-3 rounded-lg transition"
                     >

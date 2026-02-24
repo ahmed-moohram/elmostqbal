@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { API_BASE_URL } from '@/lib/api';
 import ChatBox from './ChatBox';
 
 interface Conversation {
@@ -41,49 +40,64 @@ const ConversationsList: React.FC<ConversationsListProps> = ({ isOpen, onClose }
     }
   }, [isOpen]);
 
+  const getCurrentUserId = (): string | null => {
+    try {
+      const userJson = localStorage.getItem('user');
+      if (userJson) {
+        const user = JSON.parse(userJson);
+        return user.id || user._id || null;
+      }
+    } catch (e) { }
+    return localStorage.getItem('userId');
+  };
+
   const fetchConversations = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE_URL}/api/messages/conversations`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
+      const currentUserId = getCurrentUserId();
+      if (!currentUserId) {
+        setConversations([]);
+        return;
+      }
+
+      const response = await fetch(
+        `/api/messages/conversations?currentUserId=${encodeURIComponent(currentUserId)}`,
+        {
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
         }
-      });
-      
+      );
+
       if (response.ok) {
         const data = await response.json();
-        setConversations(data.data);
+        // API يرجع array مباشرة (مش data.data)
+        const list = Array.isArray(data) ? data : (data?.data || []);
+        setConversations(list);
       }
     } catch (error) {
       console.error('Error fetching conversations:', error);
+      setConversations([]);
     } finally {
       setLoading(false);
     }
   };
 
   const formatTime = (dateString: string) => {
+    if (!dateString) return '';
     const date = new Date(dateString);
     const now = new Date();
     const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
-    
+
     if (diffInHours < 24) {
-      return date.toLocaleTimeString('ar-SA', { 
-        hour: '2-digit', 
-        minute: '2-digit' 
-      });
+      return date.toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' });
     } else if (diffInHours < 48) {
       return 'أمس';
     } else {
-      return date.toLocaleDateString('ar-SA', { 
-        month: 'short', 
-        day: 'numeric' 
-      });
+      return date.toLocaleDateString('ar-SA', { month: 'short', day: 'numeric' });
     }
   };
 
   const truncateText = (text: string, maxLength: number = 30) => {
-    return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
+    return text && text.length > maxLength ? text.substring(0, maxLength) + '...' : (text || '');
   };
 
   if (!isOpen) return null;
@@ -118,24 +132,26 @@ const ConversationsList: React.FC<ConversationsListProps> = ({ isOpen, onClose }
             conversations.map((conversation) => (
               <div
                 key={conversation._id}
-                onClick={() => setSelectedChat({
-                  userId: conversation.user._id,
-                  userName: conversation.user.name,
-                  userAvatar: conversation.user.avatar
-                })}
+                onClick={() =>
+                  setSelectedChat({
+                    userId: conversation.user._id,
+                    userName: conversation.user.name,
+                    userAvatar: conversation.user.avatar,
+                  })
+                }
                 className="flex items-center p-4 hover:bg-gray-50 cursor-pointer border-b border-gray-100 transition-colors"
               >
                 <div className="relative">
                   <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center">
                     {conversation.user.avatar ? (
-                      <img 
-                        src={conversation.user.avatar} 
-                        alt={conversation.user.name} 
+                      <img
+                        src={conversation.user.avatar}
+                        alt={conversation.user.name}
                         className="w-12 h-12 rounded-full object-cover"
                       />
                     ) : (
                       <span className="text-lg font-semibold text-gray-600">
-                        {conversation.user.name.charAt(0)}
+                        {conversation.user.name?.charAt(0) || '?'}
                       </span>
                     )}
                   </div>
@@ -145,22 +161,26 @@ const ConversationsList: React.FC<ConversationsListProps> = ({ isOpen, onClose }
                     </div>
                   )}
                 </div>
-                
-                <div className="flex-1 ml-3">
+
+                <div className="flex-1 ml-3 mr-3" dir="rtl">
                   <div className="flex items-center justify-between">
                     <h4 className="font-semibold text-sm text-gray-800">
                       {conversation.user.name}
                     </h4>
                     <span className="text-xs text-gray-500">
-                      {formatTime(conversation.lastMessage.createdAt)}
+                      {formatTime(conversation.lastMessage?.createdAt || '')}
                     </span>
                   </div>
                   <p className="text-sm text-gray-600 mt-1">
-                    {truncateText(conversation.lastMessage.content)}
+                    {truncateText(conversation.lastMessage?.content || '')}
                   </p>
                   <div className="flex items-center mt-1">
                     <span className="text-xs text-gray-400">
-                      {conversation.user.role === 'teacher' ? '👨‍🏫 مدرس' : '👨‍🎓 طالب'}
+                      {conversation.user.role === 'teacher'
+                        ? '👨‍🏫 مدرس'
+                        : conversation.user.role === 'admin'
+                          ? '⚙️ أدمن'
+                          : '👨‍🎓 طالب'}
                     </span>
                   </div>
                 </div>

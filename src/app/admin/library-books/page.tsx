@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { useDropzone } from "react-dropzone";
 import { motion, AnimatePresence } from "framer-motion";
-import { FaBook, FaFilePdf, FaUpload, FaEye, FaDownload, FaTrash, FaDollarSign } from "react-icons/fa";
+import { FaBook, FaFilePdf, FaUpload, FaEye, FaDownload, FaTrash, FaDollarSign, FaEdit } from "react-icons/fa";
 import { toast } from "react-hot-toast";
 import AdminLayout from "@/components/AdminLayout";
 import supabase from "@/lib/supabase-client";
@@ -42,6 +42,7 @@ export default function AdminLibraryBooksPage() {
   });
   const [sourceType, setSourceType] = useState<"upload" | "external">("upload");
   const [externalUrl, setExternalUrl] = useState("");
+  const [editingBookId, setEditingBookId] = useState<string | null>(null);
 
   const fetchBooks = useCallback(async () => {
     try {
@@ -132,9 +133,13 @@ export default function AdminLibraryBooksPage() {
     setUploading(true);
 
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      let user: any = null;
+      try {
+        const userJson = localStorage.getItem('user');
+        if (userJson) {
+          user = JSON.parse(userJson);
+        }
+      } catch (e) { }
 
       if (!user) {
         toast.error("يجب تسجيل الدخول أولاً");
@@ -207,34 +212,57 @@ export default function AdminLibraryBooksPage() {
         }
       }
 
-      const { data: book, error: dbError } = await supabase
-        .from("library_books")
-        .insert({
-          title: formData.title,
-          author: formData.author,
-          description: formData.description,
-          category: formData.category,
-          file_url: fileUrl,
-          file_size: fileSize,
-          file_path: filePath,
-          uploaded_by: user.id,
-          is_public: formData.is_public,
+      const bookData: any = {
+        title: formData.title,
+        author: formData.author,
+        description: formData.description,
+        category: formData.category,
+        is_public: formData.is_public,
+        price: numericPrice,
+        is_paid: numericPrice != null && numericPrice > 0 ? true : formData.is_paid,
+      };
+
+      if (!editingBookId) {
+        Object.assign(bookData, {
+          uploaded_by: user.id || null, // Allow fallback if custom auth is missing id
           download_count: 0,
           view_count: 0,
-          cover_image: coverPublicUrl,
-          price: numericPrice,
-          is_paid: numericPrice != null && numericPrice > 0 ? true : formData.is_paid,
-          metadata: {
-            original_name:
-              sourceType === "upload" && selectedFile ? selectedFile.name : null,
-            upload_date: new Date().toISOString(),
-            created_by: "admin",
-            source: sourceType,
-            external_url: sourceType === "external" ? externalUrl.trim() : undefined,
-          },
-        })
-        .select()
-        .single();
+        });
+      }
+
+      if (fileUrl) {
+        bookData.file_url = fileUrl;
+        bookData.file_size = fileSize;
+        bookData.file_path = filePath;
+      }
+
+      if (coverPublicUrl) {
+        bookData.cover_image = coverPublicUrl;
+      }
+
+      // Metadata Update
+      bookData.metadata = {
+        original_name:
+          sourceType === "upload" && selectedFile ? selectedFile.name : null,
+        upload_date: new Date().toISOString(),
+        created_by: "admin",
+        source: sourceType,
+        external_url: sourceType === "external" ? externalUrl.trim() : undefined,
+      };
+
+      let dbError;
+      if (editingBookId) {
+        const { error } = await supabase
+          .from("library_books")
+          .update(bookData)
+          .eq("id", editingBookId);
+        dbError = error;
+      } else {
+        const { error } = await supabase
+          .from("library_books")
+          .insert(bookData);
+        dbError = error;
+      }
 
       if (dbError) {
         console.error("Database error:", dbError);
@@ -252,12 +280,13 @@ export default function AdminLibraryBooksPage() {
         return;
       }
 
-      toast.success("تم رفع الكتاب بنجاح!");
+      toast.success(editingBookId ? "تم تعديل الكتاب بنجاح!" : "تم رفع الكتاب بنجاح!");
 
       setSelectedFile(null);
       setSelectedCoverFile(null);
       setSourceType("upload");
       setExternalUrl("");
+      setEditingBookId(null);
       setFormData({
         title: "",
         author: "",
@@ -275,6 +304,47 @@ export default function AdminLibraryBooksPage() {
     } finally {
       setUploading(false);
     }
+  };
+
+  const handleEdit = (book: AdminLibraryBook) => {
+    setEditingBookId(book.id);
+    setFormData({
+      title: book.title || "",
+      author: book.author || "",
+      description: book.description || "",
+      category: book.category || "general",
+      is_public: book.is_public ?? true,
+      price: book.price ? String(book.price) : "",
+      is_paid: book.is_paid || false,
+    });
+
+    if (book.file_url && !book.file_url.includes("supabase.co")) {
+      setSourceType("external");
+      setExternalUrl(book.file_url);
+    } else {
+      setSourceType("upload");
+      setExternalUrl("");
+    }
+    setSelectedFile(null);
+    setSelectedCoverFile(null);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const cancelEdit = () => {
+    setEditingBookId(null);
+    setFormData({
+      title: "",
+      author: "",
+      description: "",
+      category: "general",
+      is_public: true,
+      price: "",
+      is_paid: false,
+    });
+    setSourceType("upload");
+    setExternalUrl("");
+    setSelectedFile(null);
+    setSelectedCoverFile(null);
   };
 
   const handleDelete = async (book: AdminLibraryBook) => {
@@ -354,29 +424,27 @@ export default function AdminLibraryBooksPage() {
         <div className="grid lg:grid-cols-2 gap-6">
           {/* قسم رفع كتاب */}
           <div className="bg-white rounded-xl shadow-lg p-6">
-            <h2 className="text-xl font-bold mb-4">رفع كتاب جديد</h2>
+            <h2 className="text-xl font-bold mb-4">{editingBookId ? "تعديل بيانات الكتاب" : "رفع كتاب جديد"}</h2>
 
             {/* اختيار مصدر الكتاب */}
             <div className="flex items-center gap-3 mb-4">
               <button
                 type="button"
                 onClick={() => setSourceType("upload")}
-                className={`px-3 py-1.5 text-sm rounded-full border transition ${
-                  sourceType === "upload"
-                    ? "bg-primary text-white border-primary"
-                    : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-                }`}
+                className={`px-3 py-1.5 text-sm rounded-full border transition ${sourceType === "upload"
+                  ? "bg-primary text-white border-primary"
+                  : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                  }`}
               >
                 ملف مرفوع (PDF / PPTX)
               </button>
               <button
                 type="button"
                 onClick={() => setSourceType("external")}
-                className={`px-3 py-1.5 text-sm rounded-full border transition ${
-                  sourceType === "external"
-                    ? "bg-primary text-white border-primary"
-                    : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-                }`}
+                className={`px-3 py-1.5 text-sm rounded-full border transition ${sourceType === "external"
+                  ? "bg-primary text-white border-primary"
+                  : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                  }`}
               >
                 رابط خارجي (جوجل درايف)
               </button>
@@ -385,11 +453,10 @@ export default function AdminLibraryBooksPage() {
             {sourceType === "upload" && (
               <div
                 {...getRootProps()}
-                className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
-                  isDragActive
-                    ? "border-primary bg-primary/5"
-                    : "border-gray-300 hover:border-primary"
-                }`}
+                className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${isDragActive
+                  ? "border-primary bg-primary/5"
+                  : "border-gray-300 hover:border-primary"
+                  }`}
               >
                 <input {...getInputProps()} />
                 <FaUpload className="text-4xl text-gray-400 mx-auto mb-4" />
@@ -560,23 +627,35 @@ export default function AdminLibraryBooksPage() {
                   </label>
                 </div>
 
-                <button
-                  onClick={handleUpload}
-                  disabled={uploading}
-                  className="w-full bg-primary text-white py-3 rounded-lg hover:bg-primary-dark transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                >
-                  {uploading ? (
-                    <>
-                      <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent" />
-                      جاري الرفع...
-                    </>
-                  ) : (
-                    <>
-                      <FaUpload />
-                      رفع الكتاب
-                    </>
+                <div className="flex gap-2 mt-4">
+                  <button
+                    onClick={handleUpload}
+                    disabled={uploading}
+                    className="flex-1 bg-primary text-white py-3 rounded-lg hover:bg-primary-dark transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    {uploading ? (
+                      <>
+                        <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent" />
+                        جاري الحفظ...
+                      </>
+                    ) : (
+                      <>
+                        <FaUpload />
+                        {editingBookId ? "حفظ التعديلات" : "رفع الكتاب"}
+                      </>
+                    )}
+                  </button>
+
+                  {editingBookId && (
+                    <button
+                      onClick={cancelEdit}
+                      disabled={uploading}
+                      className="bg-gray-200 text-gray-800 px-6 py-3 rounded-lg hover:bg-gray-300 transition"
+                    >
+                      إلغاء
+                    </button>
                   )}
-                </button>
+                </div>
               </motion.div>
             )}
           </div>
@@ -628,6 +707,13 @@ export default function AdminLibraryBooksPage() {
                             title="عرض"
                           >
                             <FaEye />
+                          </button>
+                          <button
+                            onClick={() => handleEdit(book)}
+                            className="p-2 text-yellow-600 hover:bg-yellow-50 rounded-lg transition"
+                            title="تعديل"
+                          >
+                            <FaEdit />
                           </button>
                           <button
                             onClick={() => handleDownload(book)}

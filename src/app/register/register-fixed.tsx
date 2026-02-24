@@ -11,7 +11,7 @@ export default function RegisterPage() {
   
   // بيانات النموذج
   const [name, setName] = useState('');
-  const [fatherName, setFatherName] = useState('');
+
   const [studentPhone, setStudentPhone] = useState('');
   const [parentPhone, setParentPhone] = useState('');
   const [motherPhone, setMotherPhone] = useState('');
@@ -28,7 +28,7 @@ export default function RegisterPage() {
     const newErrors: any = {};
     
     if (!name) newErrors.name = 'الاسم مطلوب';
-    if (!fatherName) newErrors.fatherName = 'اسم الأب مطلوب';
+
     if (!studentPhone) newErrors.studentPhone = 'رقم هاتف الطالب مطلوب';
     if (!parentPhone) newErrors.parentPhone = 'رقم هاتف ولي الأمر مطلوب';
     if (!city) newErrors.city = 'المدينة مطلوبة';
@@ -100,7 +100,7 @@ export default function RegisterPage() {
       const { data: newUser, error: insertError } = await supabase
         .from('users')
         .insert({
-          name: `${name} ${fatherName}`,
+          name: name,
           email: email || `${studentPhone}@student.com`,
           phone: studentPhone,
           password: btoa(password), // تشفير بسيط للتجربة
@@ -188,19 +188,7 @@ export default function RegisterPage() {
                 {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
               </div>
               
-              <div>
-                <label className="block text-gray-700 text-sm font-bold mb-2">
-                  اسم الأب
-                </label>
-                <input
-                  type="text"
-                  value={fatherName}
-                  onChange={(e) => setFatherName(e.target.value)}
-                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.fatherName ? 'border-red-500' : 'border-gray-300'}`}
-                  placeholder="أدخل اسم الأب"
-                />
-                {errors.fatherName && <p className="text-red-500 text-xs mt-1">{errors.fatherName}</p>}
-              </div>
+
               
               <div>
                 <label className="block text-gray-700 text-sm font-bold mb-2">

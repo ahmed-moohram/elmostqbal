@@ -51,7 +51,7 @@ export default function ProtectedVideoPlayer({
   const [lessonHasCode, setLessonHasCode] = useState(false);
   const [lessonIsFreeOrPreview, setLessonIsFreeOrPreview] = useState(false);
   const [metaLoaded, setMetaLoaded] = useState(false);
-  
+
   // حالة تتبع التقدم
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
   const [watchedSeconds, setWatchedSeconds] = useState(0);
@@ -178,9 +178,9 @@ export default function ProtectedVideoPlayer({
           const newSeconds = prev + 1;
           const newProgress = Math.min(Math.round((newSeconds / totalSeconds) * 100), 100);
           setProgressPercent(newProgress);
-          
+
           // لا نستدعي callback هنا مباشرة - سنستخدم useEffect منفصل
-          
+
           return newSeconds;
         });
       }, 1000);
@@ -203,14 +203,14 @@ export default function ProtectedVideoPlayer({
   useEffect(() => {
     if (onProgressRef.current && watchedSeconds > 0 && isVideoPlaying) {
       const totalSeconds = duration * 60;
-      const currentProgress = totalSeconds > 0 
+      const currentProgress = totalSeconds > 0
         ? Math.min(Math.round((watchedSeconds / totalSeconds) * 100), 100)
         : 0;
-      
+
       // نتحقق من أن القيمة تغيرت قبل الاستدعاء
-      if (!lastProgressRef.current || 
-          lastProgressRef.current.progress !== currentProgress || 
-          lastProgressRef.current.seconds !== watchedSeconds) {
+      if (!lastProgressRef.current ||
+        lastProgressRef.current.progress !== currentProgress ||
+        lastProgressRef.current.seconds !== watchedSeconds) {
         lastProgressRef.current = { progress: currentProgress, seconds: watchedSeconds };
         // نستخدم setTimeout لتأجيل الاستدعاء حتى بعد انتهاء render
         setTimeout(() => {
@@ -233,7 +233,7 @@ export default function ProtectedVideoPlayer({
           // الحصول على userId من localStorage
           const userStr = localStorage.getItem('user');
           let userId: string | null = null;
-          
+
           if (userStr) {
             try {
               const user = JSON.parse(userStr);
@@ -249,13 +249,13 @@ export default function ProtectedVideoPlayer({
           }
 
           const totalSeconds = duration * 60;
-          const currentProgressPercent = totalSeconds > 0 
+          const currentProgressPercent = totalSeconds > 0
             ? Math.min(Math.round((watchedSeconds / totalSeconds) * 100), 100)
             : 0;
 
           const response = await fetch('/api/lesson-progress', {
             method: 'POST',
-            headers: { 
+            headers: {
               'Content-Type': 'application/json',
               'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
             },
@@ -353,11 +353,11 @@ export default function ProtectedVideoPlayer({
     const finalCoursePrice = actualCoursePrice || coursePrice;
 
     if (!finalCourseName || !finalCoursePrice) {
-      console.error('❌ بيانات الكورس غير متوفرة:', { 
-        actualCourseName, 
-        courseName, 
-        actualCoursePrice, 
-        coursePrice 
+      console.error('❌ بيانات الكورس غير متوفرة:', {
+        actualCourseName,
+        courseName,
+        actualCoursePrice,
+        coursePrice
       });
 
       // محاولة جلب البيانات من localStorage مرة أخرى
@@ -424,11 +424,11 @@ export default function ProtectedVideoPlayer({
 
         // رقم الواتساب الذي سيستقبل الرسالة (يمكن تغييره)
         const whatsappNumber = '201012345678'; // ضع رقمك هنا بدون +
-        
+
         // فتح الواتساب مع الرسالة المعدة
         const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodedMessage}`;
         window.open(whatsappUrl, '_blank');
-        
+
         // إغلاق نافذة الدفع
         setShowPaymentModal(false);
       } else {
@@ -467,7 +467,7 @@ export default function ProtectedVideoPlayer({
             // تعطيل أزرار المشاركة في Google Drive
             return `https://drive.google.com/file/d/${fileId}/preview?usp=sharing&rm=minimal`;
           }
-        } catch (e) {}
+        } catch (e) { }
       }
 
       if (url.includes('youtube.com/watch')) {
@@ -535,7 +535,7 @@ export default function ProtectedVideoPlayer({
             onContextMenu={(e) => e.preventDefault()}
           />
           {/* طبقة حماية لمنع الوصول لأزرار المشاركة */}
-          <div 
+          <div
             className="absolute inset-0 z-30 pointer-events-none"
             style={{
               background: 'transparent',
@@ -592,23 +592,23 @@ export default function ProtectedVideoPlayer({
 
   const renderLockedVideo = () => {
     return (
-      <div className="w-full aspect-video bg-gradient-to-br from-gray-900 to-gray-800 rounded-xl overflow-hidden relative">
-        <div className="absolute inset-0 flex flex-col items-center justify-center text-white p-8">
-          <div className="bg-white/10 backdrop-blur-sm rounded-full p-8 mb-6">
-            <FaLock className="text-6xl" />
+      <div className="w-full min-h-[400px] md:aspect-video bg-gradient-to-br from-gray-900 to-gray-800 rounded-xl overflow-y-auto relative flex flex-col items-center justify-center p-6 md:p-8">
+        <div className="flex flex-col items-center justify-center text-white w-full max-w-lg mx-auto">
+          <div className="bg-white/10 backdrop-blur-sm rounded-full p-6 md:p-8 mb-4 md:mb-6">
+            <FaLock className="text-4xl md:text-6xl" />
           </div>
 
-          <h2 className="text-2xl font-bold mb-2">هذا الفيديو محمي بكود</h2>
-          <p className="text-gray-300 text-center mb-4">
+          <h2 className="text-xl md:text-2xl font-bold mb-2 text-center">هذا الفيديو محمي بكود</h2>
+          <p className="text-sm md:text-base text-gray-300 text-center mb-6">
             أدخل كود هذا الدرس الذي حصلت عليه من المدرس لفتح الفيديو.
           </p>
 
-          <div className="w-full max-w-md space-y-3">
+          <div className="w-full space-y-3">
             <input
               type="text"
               value={codeInput}
               onChange={(e) => setCodeInput(e.target.value)}
-              className="w-full px-4 py-2 rounded-lg border border-gray-600 bg-gray-900/60 text-white focus:outline-none focus:ring-2 focus:ring-green-500"
+              className="w-full px-4 py-3 md:py-2 rounded-lg border border-gray-600 bg-gray-900/60 text-white focus:outline-none focus:ring-2 focus:ring-green-500"
               placeholder="أدخل الكود هنا"
             />
             {codeError && (
@@ -618,7 +618,7 @@ export default function ProtectedVideoPlayer({
               type="button"
               onClick={handleVerifyCode}
               disabled={isVerifyingCode}
-              className="w-full px-4 py-2 rounded-lg bg-green-500 hover:bg-green-600 text-white font-bold transition disabled:opacity-60"
+              className="w-full px-4 py-3 md:py-2 rounded-lg bg-green-500 hover:bg-green-600 text-white font-bold transition disabled:opacity-60"
             >
               {isVerifyingCode
                 ? 'جاري التحقق من الكود...'
@@ -798,17 +798,17 @@ export default function ProtectedVideoPlayer({
 
   return (
     <>
-      <div className="w-full aspect-video bg-gradient-to-br from-gray-900 to-gray-800 rounded-xl overflow-hidden relative">
-        <div className="absolute inset-0 flex flex-col items-center justify-center text-white p-8">
-          <div className="bg-white/10 backdrop-blur-sm rounded-full p-8 mb-6">
-            <FaLock className="text-6xl" />
+      <div className="w-full min-h-[400px] md:aspect-video bg-gradient-to-br from-gray-900 to-gray-800 rounded-xl overflow-y-auto relative flex flex-col items-center justify-center p-6 md:p-8">
+        <div className="flex flex-col items-center justify-center text-white w-full max-w-lg mx-auto">
+          <div className="bg-white/10 backdrop-blur-sm rounded-full p-6 md:p-8 mb-4 md:mb-6">
+            <FaLock className="text-4xl md:text-6xl" />
           </div>
-          
-          <h2 className="text-2xl font-bold mb-2">محتوى مغلق</h2>
-          <p className="text-gray-300 text-center mb-6">
+
+          <h2 className="text-xl md:text-2xl font-bold mb-2 text-center">محتوى مغلق</h2>
+          <p className="text-sm md:text-base text-gray-300 text-center mb-6">
             يجب الاشتراك في الكورس لمشاهدة هذا المحتوى
           </p>
-          
+
           <button
             onClick={() => {
               if (onEnroll) {
@@ -817,10 +817,10 @@ export default function ProtectedVideoPlayer({
                 setShowPaymentModal(true);
               }
             }}
-            className="px-8 py-4 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-bold rounded-xl shadow-xl transition transform hover:scale-105 flex items-center gap-3"
+            className="w-full md:w-auto px-8 py-4 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-bold rounded-xl shadow-xl transition transform hover:scale-105 flex items-center justify-center gap-3"
           >
-            <FaShoppingCart className="text-xl" />
-            اشترك الآن ({actualCoursePrice || coursePrice} جنيه)
+            <FaShoppingCart className="text-xl flex-shrink-0" />
+            <span>اشترك الآن ({actualCoursePrice || coursePrice} جنيه)</span>
           </button>
         </div>
       </div>

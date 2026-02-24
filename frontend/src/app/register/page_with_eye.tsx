@@ -21,7 +21,6 @@ export default function RegisterPage() {
   
   // بيانات النموذج
   const [name, setName] = useState('');
-  const [fatherName, setFatherName] = useState('');
   const [studentPhone, setStudentPhone] = useState('');
   const [parentPhone, setParentPhone] = useState('');
   const [motherPhone, setMotherPhone] = useState('');
@@ -48,7 +47,6 @@ export default function RegisterPage() {
     const newErrors: any = {};
     
     if (!name) newErrors.name = 'الاسم مطلوب';
-    if (!fatherName) newErrors.fatherName = 'اسم الأب مطلوب';
     if (!studentPhone) newErrors.studentPhone = 'رقم هاتف الطالب مطلوب';
     if (!parentPhone) newErrors.parentPhone = 'رقم هاتف ولي الأمر مطلوب';
     if (!city) newErrors.city = 'المدينة مطلوبة';
@@ -109,7 +107,7 @@ export default function RegisterPage() {
       const { data: newUser, error: insertError } = await supabase
         .from('users')
         .insert({
-          name: `${name} ${fatherName}`,
+          name: name,
           email: email || `${studentPhone}@student.com`,
           phone: studentPhone,
           password: btoa(password), // تشفير بسيط
@@ -221,21 +219,6 @@ export default function RegisterPage() {
                   placeholder="أدخل اسم الطالب"
                 />
                 {errors.name && <p className="text-red-300 text-xs mt-1">{errors.name}</p>}
-              </div>
-              
-              <div>
-                <label className="block text-white text-sm font-bold mb-2">
-                  <FaUser className="inline ml-2" />
-                  اسم الأب
-                </label>
-                <input
-                  type="text"
-                  value={fatherName}
-                  onChange={(e) => setFatherName(e.target.value)}
-                  className={`w-full px-3 py-2 bg-white/10 border rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-400 text-white placeholder-gray-400 ${errors.fatherName ? 'border-red-400' : 'border-white/30'}`}
-                  placeholder="أدخل اسم الأب"
-                />
-                {errors.fatherName && <p className="text-red-300 text-xs mt-1">{errors.fatherName}</p>}
               </div>
               
               <div>

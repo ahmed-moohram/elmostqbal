@@ -2,41 +2,24 @@ import { NextRequest, NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { cookies } from 'next/headers';
 import { compare } from 'bcryptjs';
+import { createClient } from '@supabase/supabase-js';
 import { userLoginSchema, validateRequest } from '@/lib/validation';
+
+// Supabase Configuration
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+
+if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
+  throw new Error('❌ Missing Supabase configuration! Check your .env.local file');
+}
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
 // مفتاح التشفير - يجب تخزينه في متغيرات البيئة في الإنتاج
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_key_replace_in_production';
 
 // مدة صلاحية التوكن (7 أيام)
 const TOKEN_EXPIRY = 60 * 60 * 24 * 7;
-
-// قاعدة بيانات مؤقتة للمستخدمين - في الإنتاج سيتم استبدالها بقاعدة بيانات حقيقية
-const USERS = [
-  {
-    id: '1',
-    name: 'أحمد محمد',
-    email: 'admin@mustaqbal.edu',
-    password: '$2a$12$xVEzhL5JCWO2Qv1UwNXPqeUY0YvyRvqYorKMcXCLASLZ0/G3KGafi', // "admin123"
-    role: 'admin',
-    avatar: '/avatars/admin.png'
-  },
-  {
-    id: '2',
-    name: 'محمد علي',
-    email: 'teacher@mustaqbal.edu',
-    password: '$2a$12$I7QLhMUJN3n.FCpDf/O0aOKn6yMq17zW7X7mkFJF2nISL9bBiHZGK', // "teacher123"
-    role: 'teacher',
-    avatar: '/avatars/teacher.png'
-  },
-  {
-    id: '3',
-    name: 'سارة أحمد',
-    email: 'student@mustaqbal.edu',
-    password: '$2a$12$QGX5hEuWc0JWjgCqWsJdFerOZEpCNNFQh/VJ6Zj0mSCdbpyPH.kYu', // "student123"
-    role: 'student',
-    avatar: '/avatars/student.png'
-  }
-];
 
 // واجهة API لتسجيل الدخول
 export async function POST(request: NextRequest) {
@@ -48,28 +31,32 @@ export async function POST(request: NextRequest) {
     }
 
     const { email, password } = validation.data;
-    
+
     // البحث عن المستخدم في قاعدة البيانات
-    const user = USERS.find(user => user.email === email);
-    
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('email', email)
+      .single();
+
     // التحقق من وجود المستخدم
-    if (!user) {
+    if (userError || !user) {
       return NextResponse.json(
         { error: 'البريد الإلكتروني أو كلمة المرور غير صحيحة' },
         { status: 401 }
       );
     }
-    
+
     // التحقق من كلمة المرور
-    const isPasswordValid = await compare(password, user.password);
-    
+    const isPasswordValid = await compare(password, user.password_hash);
+
     if (!isPasswordValid) {
       return NextResponse.json(
         { error: 'البريد الإلكتروني أو كلمة المرور غير صحيحة' },
         { status: 401 }
       );
     }
-    
+
     // إنشاء JWT token
     const token = jwt.sign(
       {
@@ -77,12 +64,13 @@ export async function POST(request: NextRequest) {
         name: user.name,
         email: user.email,
         role: user.role,
-        avatar: user.avatar
+        avatar: user.avatar_url,
+        phone: user.phone || user.student_phone,
       },
       JWT_SECRET,
       { expiresIn: TOKEN_EXPIRY }
     );
-    
+
     // تعيين الكوكيز
     const cookieStore = cookies();
     cookieStore.set('auth_token', token, {
@@ -92,10 +80,10 @@ export async function POST(request: NextRequest) {
       maxAge: TOKEN_EXPIRY,
       path: '/'
     });
-    
+
     // إرجاع البيانات دون كلمة المرور
     const { password: _, ...userWithoutPassword } = user;
-    
+
     return NextResponse.json({
       success: true,
       message: 'تم تسجيل الدخول بنجاح',

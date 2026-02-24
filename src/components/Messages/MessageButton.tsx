@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { API_BASE_URL } from '@/lib/api';
 import ConversationsList from './ConversationsList';
 
 const MessageButton: React.FC = () => {
@@ -20,12 +19,26 @@ const MessageButton: React.FC = () => {
       const token = localStorage.getItem('token');
       if (!token) return;
 
-      const response = await fetch(`${API_BASE_URL}/api/messages/unread-count`, {
+      let currentUserId: string | null = null;
+      try {
+        const userJson = localStorage.getItem('user');
+        if (userJson) {
+          const user = JSON.parse(userJson);
+          currentUserId = user.id || user._id || null;
+        }
+      } catch (e) { }
+      if (!currentUserId) {
+        currentUserId = localStorage.getItem('userId');
+      }
+
+      if (!currentUserId) return;
+
+      const response = await fetch(`/api/messages/unread-count?currentUserId=${encodeURIComponent(currentUserId)}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         setUnreadCount(data.data.unreadCount);
@@ -50,9 +63,9 @@ const MessageButton: React.FC = () => {
         )}
       </button>
 
-      <ConversationsList 
-        isOpen={isOpen} 
-        onClose={() => setIsOpen(false)} 
+      <ConversationsList
+        isOpen={isOpen}
+        onClose={() => setIsOpen(false)}
       />
     </>
   );

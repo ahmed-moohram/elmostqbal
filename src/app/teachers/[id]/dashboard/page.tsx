@@ -19,6 +19,7 @@ import {
 import { toast } from 'react-hot-toast';
 import supabase from '@/lib/supabase-client';
 import { uploadLessonVideo } from '@/lib/supabase-upload';
+import AdminTeacherChat from '@/components/Messages/AdminTeacherChat';
 
 interface Teacher {
   id: string;
@@ -78,7 +79,7 @@ export default function TeacherDashboardById() {
 
   const [teacher, setTeacher] = useState<Teacher | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'overview' | 'courses' | 'students' | 'upload'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'courses' | 'students' | 'upload' | 'messages'>('overview');
   const [courses, setCourses] = useState<Course[]>([]);
   const [lessonsByCourse, setLessonsByCourse] = useState<Record<string, Lesson[]>>({});
   const [students, setStudents] = useState<Student[]>([]);
@@ -330,11 +331,11 @@ export default function TeacherDashboardById() {
         const updatedLessons = existing.map((l) =>
           l.id === lesson.id
             ? {
-                ...l,
-                title: updatedLesson?.title || newTitle,
-                durationMinutes:
-                  Number((updatedLesson as any)?.duration_minutes) || newDuration,
-              }
+              ...l,
+              title: updatedLesson?.title || newTitle,
+              durationMinutes:
+                Number((updatedLesson as any)?.duration_minutes) || newDuration,
+            }
             : l
         );
         return { ...prev, [courseId]: updatedLessons };
@@ -413,8 +414,8 @@ export default function TeacherDashboardById() {
   };
 
   const handleOpenChat = (studentId: string, studentName: string) => {
-    toast.success(`فتح محادثة مع ${studentName}...`);
-    router.push(`/messages?user=${studentId}`);
+    setActiveTab('messages');
+    toast.success(`انتقل إلى علامة التبويب الرسائل وافتح محادثة مع ${studentName} أو ابدأ واحدة جديدة...`);
   };
 
   const handleViewStudent = () => {
@@ -458,15 +459,15 @@ export default function TeacherDashboardById() {
               { id: 'courses', label: 'الكورسات', icon: FaChalkboardTeacher },
               { id: 'students', label: 'الطلاب', icon: FaUsers },
               { id: 'upload', label: 'رفع المحتوى', icon: FaUpload },
+              { id: 'messages', label: 'الرسائل', icon: FaComment },
             ].map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
-                className={`flex items-center gap-2 px-4 py-3 border-b-2 transition ${
-                  activeTab === tab.id
+                className={`flex items-center gap-2 px-4 py-3 border-b-2 transition ${activeTab === tab.id
                     ? 'border-primary text-primary font-bold'
                     : 'border-transparent text-gray-600 hover:text-primary'
-                }`}
+                  }`}
               >
                 <tab.icon />
                 {tab.label}
@@ -891,6 +892,13 @@ export default function TeacherDashboardById() {
                 </div>
               </form>
             </div>
+          </div>
+        )}
+
+        {activeTab === 'messages' && teacherId && (
+          <div className="space-y-6">
+            <h2 className="text-2xl font-bold">الرسائل والمحادثات للمدرس</h2>
+            <AdminTeacherChat teacherId={teacherId} />
           </div>
         )}
       </div>

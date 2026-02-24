@@ -47,15 +47,15 @@ export default function AchievementsManagement() {
       setLoading(true);
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
       const token = localStorage.getItem('token');
-      
-      // جلب إنجازات الطلاب من API
+
+      // جلب إsنجازات الطلاب من API
       const response = await fetch(`${API_URL}/api/admin/achievements`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         }
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         const achievementsData = data.achievements || data || [];
@@ -211,12 +211,11 @@ export default function AchievementsManagement() {
                     {/* Rank and Student Info */}
                     <div className="flex items-center gap-4 flex-1">
                       {/* Rank Badge */}
-                      <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg ${
-                        index === 0 ? 'bg-yellow-400 text-yellow-900' :
+                      <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg ${index === 0 ? 'bg-yellow-400 text-yellow-900' :
                         index === 1 ? 'bg-gray-300 text-gray-700' :
-                        index === 2 ? 'bg-orange-400 text-orange-900' :
-                        'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
-                      }`}>
+                          index === 2 ? 'bg-orange-400 text-orange-900' :
+                            'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
+                        }`}>
                         {index + 1}
                       </div>
 
@@ -344,7 +343,7 @@ export default function AchievementsManagement() {
                               {achievement.description}
                             </p>
                             <p className="text-xs text-gray-500 dark:text-gray-500 mt-2">
-                              {getAchievementTypeLabel(achievement.type)} • 
+                              {getAchievementTypeLabel(achievement.type)} •
                               {new Date(achievement.earnedAt).toLocaleDateString('ar-EG', {
                                 year: 'numeric',
                                 month: 'long',

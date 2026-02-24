@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import '@testing-library/jest-dom';
 import ErrorBoundary from '@/components/ErrorBoundary';
 
 // Mock console.error to avoid noise in test output
