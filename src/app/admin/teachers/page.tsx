@@ -422,16 +422,16 @@ export default function AdminTeachersPage() {
                   transition={{ duration: 0.3 }}
                   className="hover:bg-gray-50 dark:hover:bg-gray-750"
                 >
-                  <td className="px-4 py-3">
-                    <div className="relative w-10 h-10 rounded-full overflow-hidden">
-                      <Image 
-                        src={teacher.image || '/placeholder-avatar.png'} 
-                        alt={teacher.name}
-                        fill
-                        className="object-cover"
-                      />
-                    </div>
-                  </td>
+                    <td className="px-4 py-3">
+                      <div className="relative w-10 h-10 rounded-full overflow-hidden">
+                        <img 
+                          src={teacher.image && teacher.image !== '/placeholder-avatar.png' ? teacher.image : '/placeholder-avatar.png'} 
+                          alt={teacher.name}
+                          className="w-full h-full object-cover"
+                          onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder-avatar.png'; }}
+                        />
+                      </div>
+                    </td>
                   <td className="px-4 py-3 text-sm text-gray-800 dark:text-gray-200 font-medium">{teacher.name}</td>
                   <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">{teacher.specialty}</td>
                   <td className="px-4 py-3">
@@ -508,7 +508,7 @@ export default function AdminTeachersPage() {
                         رفع صورة
                       </button>
                       <Link 
-                        href={`/admin/teachers/${teacher.id}`}
+                        href={`/teachers/${teacher.id}`}
                         className="text-primary hover:text-primary-700"
                       >
                         عرض
