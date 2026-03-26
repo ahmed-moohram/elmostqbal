@@ -68,7 +68,7 @@ export default function PublicTeacherPage() {
   const [teacher, setTeacher] = useState<TeacherProfile | null>(null);
   const [courses, setCourses] = useState<TeacherCourse[]>([]);
   const [books, setBooks] = useState<TeacherBook[]>([]);
-  const [avatarSrc, setAvatarSrc] = useState<string>('/placeholder-avatar.png');
+  const [avatarSrc, setAvatarSrc] = useState<string>('');
 
   useEffect(() => {
     const loadTeacher = async () => {
@@ -232,14 +232,11 @@ export default function PublicTeacherPage() {
         {/* هيدر المدرس */}
         <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-xl p-6 sm:p-10 mb-12 flex flex-col md:flex-row items-center gap-8">
           <div className="relative w-32 h-32 sm:w-40 sm:h-40">
-            <Image
+            <img
               src={avatarSrc || '/placeholder-avatar.png'}
               alt={teacher.name}
-              fill
-              sizes="(min-width: 640px) 10rem, 8rem"
-              priority
-              className="object-cover rounded-full border-4 border-primary/30 shadow-2xl"
-              onError={() => setAvatarSrc('/placeholder-avatar.png')}
+              className="w-full h-full object-cover rounded-full border-4 border-primary/30 shadow-2xl"
+              onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder-avatar.png'; }}
             />
           </div>
           <div className="flex-1 text-center md:text-right space-y-3">
