@@ -1,0 +1,77 @@
+/* Animaciones para el dashboard */
+
+/* Animación de fadeIn para elementos que aparecen gradualmente */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.5s ease-out forwards;
+}
+
+/* Animación de conteo para números que crecen */
+@keyframes countUp {
+  from {
+    opacity: 0.5;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-countUp {
+  animation: countUp 1s ease-out forwards;
+}
+
+/* Animación de pulso para destacar elementos */
+@keyframes pulse {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.05);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-pulse {
+  animation: pulse 2s infinite;
+}
+
+/* Animaciones para hover */
+.hover-scale {
+  transition: transform 0.3s ease;
+}
+
+.hover-scale:hover {
+  transform: scale(1.05);
+}
+
+/* Transiciones generales */
+.transition-all {
+  transition-property: all;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 300ms;
+}
+
+/* Animación para el cambio de gráficos */
+.chart-transition {
+  transition: opacity 0.3s ease-in-out;
+}
+
+/* Estilos adicionales para mejorar la apariencia RTL */
+.rtl-chart-container {
+  direction: rtl;
+}

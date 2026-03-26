@@ -1,0 +1,71 @@
+========================================
+أوامر رفع المشروع على GitHub
+========================================
+
+الخطوة 1: افتح PowerShell في مجلد المشروع
+----------------------------------------
+cd D:\2\معتصم
+
+الخطوة 2: انسخ هذه الأوامر بالترتيب
+----------------------------------------
+
+git init
+
+git add .
+
+git commit -m "Initial commit: Educational Platform"
+
+git remote add origin https://github.com/USERNAME/educational-platform.git
+
+git branch -M main
+
+git push -u origin main
+
+
+========================================
+⚠️ مهم: استبدل USERNAME باسم المستخدم
+========================================
+
+مثال:
+إذا اسمك على GitHub هو: moatasem123
+يصبح الأمر:
+git remote add origin https://github.com/moatasem123/educational-platform.git
+
+
+========================================
+في حالة وجود مشاكل
+========================================
+
+مشكلة 1: remote origin already exists
+--------------------------------------
+git remote remove origin
+git remote add origin https://github.com/USERNAME/educational-platform.git
+
+
+مشكلة 2: rejected push
+-----------------------
+git pull origin main --allow-unrelated-histories
+git push origin main
+
+
+مشكلة 3: طلب كلمة المرور
+-------------------------
+استخدم Personal Access Token:
+1. افتح: https://github.com/settings/tokens
+2. Generate new token (classic)
+3. اختر: repo
+4. Generate token
+5. انسخ التوكن واستخدمه بدلاً من كلمة المرور
+
+
+========================================
+أمر واحد يرفع كل شيء (انسخ والصق):
+========================================
+
+cd D:\2\معتصم && git init && git add . && git commit -m "Initial commit" && git remote add origin https://github.com/USERNAME/educational-platform.git && git branch -M main && git push -u origin main
+
+
+========================================
+بعد الرفع:
+========================================
+الرابط: https://github.com/USERNAME/educational-platform

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 250" fill="none">
+  <rect width="400" height="250" fill="#E5E7EB"/>
+  <path d="M150 100C150 88.9543 158.954 80 170 80H230C241.046 80 250 88.9543 250 100V150C250 161.046 241.046 170 230 170H170C158.954 170 150 161.046 150 150V100Z" fill="#9CA3AF"/>
+  <rect x="170" y="100" width="60" height="8" rx="4" fill="white"/>
+  <rect x="170" y="118" width="40" height="8" rx="4" fill="white"/>
+  <rect x="170" y="136" width="50" height="8" rx="4" fill="white"/>
+  <text x="200" y="195" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" fill="#4B5563">صورة الكورس</text>
+</svg>

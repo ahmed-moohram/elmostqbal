@@ -1,0 +1,230 @@
+/**
+ * أنماط التنقل السريع
+ * Quick Navigation Styles
+ */
+
+/* زر التنقل السريع */
+.quick-nav-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.1s ease;
+  position: relative;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+.quick-nav-button::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  transform: translate(-50%, -50%);
+  transition: width 0.3s, height 0.3s;
+}
+
+.quick-nav-button:hover::before {
+  width: 300px;
+  height: 300px;
+}
+
+.quick-nav-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+}
+
+.quick-nav-button:active {
+  transform: scale(0.95);
+  transition: transform 0.05s;
+}
+
+.quick-nav-button.active {
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  box-shadow: 0 5px 15px rgba(245, 87, 108, 0.4);
+}
+
+.quick-nav-button .button-icon {
+  font-size: 20px;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* شريط التنقل السريع */
+.quick-nav-bar {
+  display: flex;
+  gap: 15px;
+  padding: 15px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border-radius: 15px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateX(-50%) translateY(100px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+  }
+}
+
+/* تأثيرات التحميل السريع */
+.page-transition-enter {
+  opacity: 0;
+  transform: translateX(20px);
+}
+
+.page-transition-enter-active {
+  opacity: 1;
+  transform: translateX(0);
+  transition: all 0.15s ease;
+}
+
+.page-transition-exit {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.page-transition-exit-active {
+  opacity: 0;
+  transform: translateX(-20px);
+  transition: all 0.15s ease;
+}
+
+/* مؤشر التحميل الفوري */
+.instant-loader {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #667eea, #764ba2, #f093fb, #f5576c);
+  background-size: 200% 100%;
+  animation: loading 1s linear infinite;
+  z-index: 9999;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.instant-loader.active {
+  opacity: 1;
+}
+
+@keyframes loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* تحسينات الأداء */
+.quick-nav-button,
+.quick-nav-bar {
+  will-change: transform;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* تحسين اللمس للموبايل */
+@media (hover: none) {
+  .quick-nav-button:hover {
+    transform: none;
+    box-shadow: none;
+  }
+  
+  .quick-nav-button:active {
+    transform: scale(0.98);
+  }
+}
+
+/* تصميم متجاوب */
+@media (max-width: 768px) {
+  .quick-nav-bar {
+    width: calc(100% - 20px);
+    left: 10px;
+    right: 10px;
+    transform: none;
+    bottom: 10px;
+    padding: 10px;
+    gap: 10px;
+  }
+  
+  .quick-nav-button {
+    flex: 1;
+    padding: 8px 12px;
+    font-size: 14px;
+  }
+  
+  .quick-nav-button .button-icon {
+    font-size: 18px;
+  }
+  
+  /* إخفاء النص على الشاشات الصغيرة */
+  @media (max-width: 400px) {
+    .quick-nav-button {
+      padding: 10px;
+      justify-content: center;
+    }
+    
+    .quick-nav-button span:not(.button-icon) {
+      display: none;
+    }
+  }
+}
+
+/* وضع الظلام */
+@media (prefers-color-scheme: dark) {
+  .quick-nav-bar {
+    background: rgba(30, 30, 30, 0.95);
+  }
+  
+  .quick-nav-button {
+    background: linear-gradient(135deg, #4a5568 0%, #2d3748 100%);
+  }
+  
+  .quick-nav-button.active {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  }
+}
+
+/* تحسينات إضافية للسرعة */
+* {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  -khtml-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+input, textarea {
+  -webkit-user-select: text;
+  -khtml-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+  user-select: text;
+}

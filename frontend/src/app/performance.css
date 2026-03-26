@@ -1,0 +1,75 @@
+/**
+ * ملف CSS لتحسين الأداء والأنيميشن
+ */
+
+/* تحسين أداء الأنيميشن */
+* {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* تحسين أداء التحولات */
+.transition-optimized {
+  will-change: transform, opacity;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+/* تحسين أداء التمرير */
+html {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* تحسين loading للصور */
+img {
+  content-visibility: auto;
+}
+
+/* تحسين rendering للعناصر الكبيرة */
+.content-container {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 500px;
+}
+
+/* تحسين أداء الخلفية */
+.background-optimized {
+  will-change: scroll-position;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+/* Lazy loading للعناصر */
+.lazy-load {
+  content-visibility: auto;
+}
+
+/* تحسين hover effects */
+.hover-optimized {
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.hover-optimized:hover {
+  transform: translateY(-2px) translateZ(0);
+}
+
+/* تحسين Cards */
+.card-optimized {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  perspective: 1000px;
+}

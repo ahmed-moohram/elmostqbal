@@ -1,0 +1,529 @@
+'use client';
+
+import React, { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
+import Image from 'next/image';
+import AdminLayout from '@/components/AdminLayout';
+import { 
+  FaChartBar, FaGraduationCap, FaChalkboardTeacher, FaBook, 
+  FaSearch, FaFilter, FaEye, FaEdit, FaTrash, FaTimes, FaCheck,
+  FaUpload, FaUserGraduate, FaMoneyBillWave, FaThList, FaThLarge
+} from 'react-icons/fa';
+
+// Clase de almacenamiento para el token
+const userStorage = {
+  getToken: () => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('token') || '';
+    }
+    return '';
+  }
+};
+
+// Interfaces
+interface Course {
+  id: string;
+  title: string;
+  description: string;
+  price: number;
+  discountPrice: number | null;
+  isPublished: boolean;
+  isPaid: boolean;
+  category: string;
+  level: string;
+  thumbnail: string;
+  enrolledStudents: number;
+  createdAt: string;
+}
+
+interface NewCourse {
+  title: string;
+  description: string;
+  price: number;
+  discountPrice: number | null;
+  isPublished: boolean;
+  isPaid: boolean;
+  category: string;
+  level: string;
+  thumbnail: string;
+}
+
+interface Teacher {
+  id: string;
+  name: string;
+  email: string;
+  bio: string;
+  avatar: string;
+  courses: number;
+  students: number;
+  rating: number;
+  specialization: string;
+  joinDate: string;
+}
+
+interface Student {
+  id: string;
+  name: string;
+  email: string;
+  avatar: string;
+  phone: string;
+  enrolledCourses: number;
+  joinDate: string;
+}
+
+interface Stats {
+  totalStudents: number;
+  totalTeachers: number;
+  totalCourses: number;
+  totalRevenue: number;
+}
+
+interface LoadingState {
+  courses: boolean;
+  teachers: boolean;
+  students: boolean;
+  stats: boolean;
+}
+
+export default function AdminPage() {
+  const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Estados para las vistas y filtros
+  const [activeView, setActiveView] = useState<string>('dashboard');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [levelFilter, setLevelFilter] = useState<string>('all');
+  
+  // Estados para los datos
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [filteredCourses, setFilteredCourses] = useState<Course[]>([]);
+  const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [students, setStudents] = useState<Student[]>([]);
+  const [stats, setStats] = useState<Stats>({ 
+    totalStudents: 0, 
+    totalTeachers: 0, 
+    totalCourses: 0, 
+    totalRevenue: 0 
+  });
+  
+  // Estados para modales y carga
+  const [loading, setLoading] = useState<LoadingState>({
+    courses: false,
+    teachers: false,
+    students: false,
+    stats: false
+  });
+  const [error, setError] = useState<string>('');
+  const [showAddCourseModal, setShowAddCourseModal] = useState<boolean>(false);
+  const [showEditCourseModal, setShowEditCourseModal] = useState<boolean>(false);
+  const [currentCourse, setCurrentCourse] = useState<Course | null>(null);
+  const [thumbnail, setThumbnail] = useState<File | null>(null);
+  const [thumbnailPreview, setThumbnailPreview] = useState<string>('');
+  
+  // Nuevo curso
+  const [newCourse, setNewCourse] = useState<NewCourse>({
+    title: '',
+    description: '',
+    price: 0,
+    discountPrice: null,
+    isPublished: false,
+    isPaid: true,
+    category: '',
+    level: 'مبتدئ',
+    thumbnail: ''
+  });
+  
+  // Arrays para selects en formularios
+  const availableCategories = [
+    'تطوير الويب',
+    'تطوير التطبيقات',
+    'الذكاء الاصطناعي',
+    'علوم البيانات',
+    'التسويق الرقمي',
+    'التصميم',
+    'الأعمال',
+    'اللغات',
+    'أخرى'
+  ];
+  
+  const availableLevels = [
+    'مبتدئ',
+    'متوسط',
+    'متقدم'
+  ];
+  
+  // Manejar cambio de imagen de miniatura
+  const handleThumbnailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setThumbnail(file);
+      
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (event.target?.result) {
+          setThumbnailPreview(event.target.result as string);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+  
+  // Cargar datos iniciales
+  const loadInitialData = async () => {
+    try {
+      await Promise.all([
+        fetchCourses(),
+        fetchTeachers(),
+        fetchStudents(),
+        fetchStats()
+      ]);
+    } catch (err) {
+      console.error('Error loading initial data:', err);
+      setError('Error al cargar los datos iniciales. Por favor, intente de nuevo.');
+    }
+  };
+  
+  // Fetch de cursos
+  const fetchCourses = async () => {
+    setLoading(prev => ({ ...prev, courses: true }));
+    try {
+      const token = userStorage.getToken();
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/courses`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Error fetching courses');
+      }
+      
+      const data = await response.json();
+      setCourses(data);
+      setFilteredCourses(data);
+    } catch (err) {
+      console.error('Error fetching courses:', err);
+      setError('Error al cargar los cursos. Por favor, intente de nuevo.');
+    } finally {
+      setLoading(prev => ({ ...prev, courses: false }));
+    }
+  };
+  
+  // Fetch de profesores
+  const fetchTeachers = async () => {
+    setLoading(prev => ({ ...prev, teachers: true }));
+    try {
+      const token = userStorage.getToken();
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/teachers`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Error fetching teachers');
+      }
+      
+      const data = await response.json();
+      setTeachers(data);
+    } catch (err) {
+      console.error('Error fetching teachers:', err);
+      setError('Error al cargar los profesores. Por favor, intente de nuevo.');
+    } finally {
+      setLoading(prev => ({ ...prev, teachers: false }));
+    }
+  };
+  
+  // Fetch de estudiantes
+  const fetchStudents = async () => {
+    setLoading(prev => ({ ...prev, students: true }));
+    try {
+      const token = userStorage.getToken();
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/students`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Error fetching students');
+      }
+      
+      const data = await response.json();
+      setStudents(data);
+    } catch (err) {
+      console.error('Error fetching students:', err);
+      setError('Error al cargar los estudiantes. Por favor, intente de nuevo.');
+    } finally {
+      setLoading(prev => ({ ...prev, students: false }));
+    }
+  };
+  
+  // Fetch de estadísticas
+  const fetchStats = async () => {
+    setLoading(prev => ({ ...prev, stats: true }));
+    try {
+      const token = userStorage.getToken();
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/stats`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Error fetching stats');
+      }
+      
+      const data = await response.json();
+      setStats(data);
+    } catch (err) {
+      console.error('Error fetching stats:', err);
+      setError('Error al cargar las estadísticas. Por favor, intente de nuevo.');
+    } finally {
+      setLoading(prev => ({ ...prev, stats: false }));
+    }
+  };
+  
+  // Abrir modal para editar curso
+  const openEditModal = (course: Course) => {
+    setCurrentCourse(course);
+    setThumbnailPreview(course.thumbnail);
+    setShowEditCourseModal(true);
+  };
+  
+  // Añadir curso
+  const handleAddCourse = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(prev => ({ ...prev, courses: true }));
+    
+    try {
+      const token = userStorage.getToken();
+      const formData = new FormData();
+      
+      // Añadir datos del curso al FormData
+      formData.append('title', newCourse.title);
+      formData.append('description', newCourse.description);
+      formData.append('price', newCourse.price.toString());
+      if (newCourse.discountPrice !== null) {
+        formData.append('discountPrice', newCourse.discountPrice.toString());
+      }
+      formData.append('isPublished', newCourse.isPublished.toString());
+      formData.append('isPaid', newCourse.isPaid.toString());
+      formData.append('category', newCourse.category);
+      formData.append('level', newCourse.level);
+      
+      // Añadir imagen si existe
+      if (thumbnail) {
+        formData.append('thumbnail', thumbnail);
+      }
+      
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/courses`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+      
+      if (!response.ok) {
+        throw new Error('Error adding course');
+      }
+      
+      // Recargar cursos y cerrar modal
+      await fetchCourses();
+      setShowAddCourseModal(false);
+      
+      // Resetear formulario
+      setNewCourse({
+        title: '',
+        description: '',
+        price: 0,
+        discountPrice: null,
+        isPublished: false,
+        isPaid: true,
+        category: '',
+        level: 'مبتدئ',
+        thumbnail: ''
+      });
+      setThumbnail(null);
+      setThumbnailPreview('');
+      
+    } catch (err) {
+      console.error('Error adding course:', err);
+      setError('Error al añadir el curso. Por favor, intente de nuevo.');
+    } finally {
+      setLoading(prev => ({ ...prev, courses: false }));
+    }
+  };
+  
+  // Editar curso
+  const handleEditCourse = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!currentCourse) return;
+    
+    setLoading(prev => ({ ...prev, courses: true }));
+    
+    try {
+      const token = userStorage.getToken();
+      const formData = new FormData();
+      
+      // Añadir datos del curso al FormData
+      formData.append('title', currentCourse.title);
+      formData.append('description', currentCourse.description);
+      formData.append('price', currentCourse.price.toString());
+      if (currentCourse.discountPrice !== null) {
+        formData.append('discountPrice', currentCourse.discountPrice.toString());
+      }
+      formData.append('isPublished', currentCourse.isPublished.toString());
+      formData.append('isPaid', currentCourse.isPaid.toString());
+      formData.append('category', currentCourse.category);
+      formData.append('level', currentCourse.level);
+      
+      // Añadir imagen nueva si existe
+      if (thumbnail) {
+        formData.append('thumbnail', thumbnail);
+      }
+      
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/courses/${currentCourse.id}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+      
+      if (!response.ok) {
+        throw new Error('Error updating course');
+      }
+      
+      // Recargar cursos y cerrar modal
+      await fetchCourses();
+      setShowEditCourseModal(false);
+      setCurrentCourse(null);
+      setThumbnail(null);
+      setThumbnailPreview('');
+      
+    } catch (err) {
+      console.error('Error updating course:', err);
+      setError('Error al actualizar el curso. Por favor, intente de nuevo.');
+    } finally {
+      setLoading(prev => ({ ...prev, courses: false }));
+    }
+  };
+  
+  // Eliminar curso
+  const handleDeleteCourse = async (courseId: string) => {
+    if (!confirm('¿Está seguro de que desea eliminar este curso?')) return;
+    
+    setLoading(prev => ({ ...prev, courses: true }));
+    
+    try {
+      const token = userStorage.getToken();
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/courses/${courseId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Error deleting course');
+      }
+      
+      // Recargar cursos
+      await fetchCourses();
+      
+    } catch (err) {
+      console.error('Error deleting course:', err);
+      setError('Error al eliminar el curso. Por favor, intente de nuevo.');
+    } finally {
+      setLoading(prev => ({ ...prev, courses: false }));
+    }
+  };
+  
+  // Efecto para filtrar cursos
+  useEffect(() => {
+    if (courses.length === 0) return;
+    
+    const filtered = courses.filter(course => {
+      const matchesSearch = course.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          course.description.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const matchesCategory = categoryFilter === 'all' || course.category === categoryFilter;
+      
+      const matchesLevel = levelFilter === 'all' || course.level === levelFilter;
+      
+      return matchesSearch && matchesCategory && matchesLevel;
+    });
+    
+    setFilteredCourses(filtered);
+  }, [courses, searchTerm, categoryFilter, levelFilter]);
+  
+  // Efecto para redireccionar si no hay token
+  useEffect(() => {
+    const token = userStorage.getToken();
+    if (!token) {
+      router.push('/login');
+    } else {
+      loadInitialData();
+    }
+  }, [router]);
+  
+  return (
+    <AdminLayout>
+      {/* Barra superior de navegación */}
+      <div className="bg-white shadow-md rounded-lg mb-6">
+        <div className="flex overflow-x-auto">
+          <button
+            onClick={() => setActiveView('dashboard')}
+            className={`px-6 py-4 flex items-center ${
+              activeView === 'dashboard' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500'
+            }`}
+          >
+            <FaChartBar className="mr-2" />
+            لوحة التحكم
+          </button>
+          <button
+            onClick={() => setActiveView('courses')}
+            className={`px-6 py-4 flex items-center ${
+              activeView === 'courses' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500'
+            }`}
+          >
+            <FaBook className="mr-2" />
+            الدورات
+          </button>
+          <button
+            onClick={() => setActiveView('teachers')}
+            className={`px-6 py-4 flex items-center ${
+              activeView === 'teachers' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500'
+            }`}
+          >
+            <FaChalkboardTeacher className="mr-2" />
+            المعلمون
+          </button>
+          <button
+            onClick={() => setActiveView('students')}
+            className={`px-6 py-4 flex items-center ${
+              activeView === 'students' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500'
+            }`}
+          >
+            <FaGraduationCap className="mr-2" />
+            الطلاب
+          </button>
+        </div>
+      </div>
+      
+      {/* Mensaje de error */}
+      {error && (
+        <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6">
+          <div className="flex items-center">
+            <div className="flex-grow">{error}</div>
+            <button onClick={() => setError('')} className="text-red-700 hover:text-red-900">
+              <FaTimes />
+            </button>
+          </div>
+        </div>
+      )}

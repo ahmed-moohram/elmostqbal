@@ -1,0 +1,201 @@
+/* تأثيرات بصرية لصفحة لوحة التحكم */
+
+/* تأثير التوهج للنص */
+.text-glow {
+  text-shadow: 0 0 10px rgba(109, 40, 217, 0.5);
+}
+
+/* تأثير النبض للأيقونات */
+.icon-pulse {
+  animation: icon-pulse 2s infinite ease-in-out;
+}
+
+@keyframes icon-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 0.8;
+  }
+}
+
+/* تأثير حركة التدرج */
+.animate-pulse-gradient {
+  background-size: 200% 200%;
+  animation: pulse-gradient 2s infinite ease-in-out;
+}
+
+@keyframes pulse-gradient {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+/* تأثير الوميض على شريط التقدم */
+.animate-shimmer {
+  animation: shimmer 2s infinite linear;
+  transform: skewX(-20deg);
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-150%) skewX(-20deg);
+  }
+  100% {
+    transform: translateX(350%) skewX(-20deg);
+  }
+}
+
+/* تأثير عائم للبطاقات */
+.card-float {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.card-float:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 25px -5px rgba(109, 40, 217, 0.1);
+}
+
+/* خلفية متحركة */
+.animated-bg {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: -1;
+  overflow: hidden;
+  background: linear-gradient(120deg, #f5f7fa 0%, #f0f4f8 100%);
+}
+
+.animated-bg::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: radial-gradient(circle at center, rgba(109, 40, 217, 0.03) 0%, rgba(139, 92, 246, 0.02) 30%, transparent 70%);
+  animation: pulse-bg 10s infinite ease-in-out;
+}
+
+@keyframes pulse-bg {
+  0%, 100% {
+    opacity: 0.5;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.2);
+  }
+}
+
+/* تأثير الظلال المتدرجة للبطاقات */
+.card-premium {
+  background-color: white;
+  border-radius: 1rem;
+  padding: 1.5rem;
+  position: relative;
+  overflow: hidden;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 
+    0 4px 6px -1px rgba(0, 0, 0, 0.05), 
+    0 2px 4px -1px rgba(0, 0, 0, 0.03),
+    inset 0 0 20px rgba(255, 255, 255, 0.5);
+}
+
+.card-premium::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  height: 3px;
+  background: linear-gradient(90deg, #6d28d9, #8b5cf6, #6d28d9);
+  background-size: 200% 200%;
+  animation: gradient-move 3s ease infinite;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.card-premium:hover::before {
+  opacity: 1;
+}
+
+@keyframes gradient-move {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.dark .card-premium {
+  background-color: #1f2937;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 
+    0 4px 6px -1px rgba(0, 0, 0, 0.2), 
+    0 2px 4px -1px rgba(0, 0, 0, 0.1),
+    inset 0 0 20px rgba(0, 0, 0, 0.3);
+}
+
+/* أزرار بتأثيرات متقدمة */
+.btn-primary {
+  background: linear-gradient(45deg, #6d28d9, #8b5cf6);
+  border-radius: 0.5rem;
+  color: white;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-primary::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: all 0.6s ease;
+}
+
+.btn-primary:hover::before {
+  left: 100%;
+}
+
+.btn-primary:active {
+  transform: scale(0.97);
+}
+
+.btn-outline {
+  background: transparent;
+  border: 1px solid #d1d5db;
+  border-radius: 0.5rem;
+  color: #6b7280;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.btn-outline:hover {
+  border-color: #6d28d9;
+  color: #6d28d9;
+  box-shadow: 0 0 0 2px rgba(109, 40, 217, 0.1);
+} 

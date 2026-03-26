@@ -1,0 +1,277 @@
+<<<<<<< HEAD
+# منصة المستقبل التعليمية
+
+منصة تعليمية متكاملة تقدم دورات تعليمية احترافية للطلاب في مختلف المجالات، مع نظام إدارة متكامل للمعلمين والإداريين.
+
+## الميزات الرئيسية
+
+- **نظام مصادقة آمن**: يستخدم JWT مع تخزين الـ tokens في cookies بدلاً من localStorage لتحسين الأمان
+- **واجهة مستخدم حديثة**: تصميم عصري وجذاب مع تأثيرات بصرية مميزة
+- **لوحة تحكم متكاملة**: إدارة الدورات والامتحانات والطلاب بكفاءة عالية
+- **نظام دفع مرن**: يدعم طرق دفع متعددة مثل Vodafone Cash وغيرها
+- **نظام إشعارات متطور**: إشعارات فورية للطلاب والمعلمين
+- **تتبع تقدم الطلاب**: تتبع أداء الطلاب وتقدمهم في الدورات المختلفة
+
+## حسابات تجريبية للاختبار
+
+يمكنك استخدام الحسابات التالية لتجربة المنصة:
+
+- **الإدارة**: admin@mustaqbal.edu / admin123
+- **المعلم**: teacher@mustaqbal.edu / teacher123
+- **الطالب**: student@mustaqbal.edu / student123
+
+## تكنولوجيا المشروع
+
+- **الواجهة الأمامية**: React.js مع Next.js و TypeScript
+- **التصميم**: Tailwind CSS و Framer Motion
+- **إدارة الحالة**: React Hooks و Context API
+- **المصادقة**: JWT مع إدارة آمنة للجلسات
+
+## التثبيت والتشغيل
+
+```bash
+# تثبيت التبعيات
+npm install
+
+# تشغيل بيئة التطوير
+npm run dev
+
+# بناء المشروع للإنتاج
+npm run build
+
+# تشغيل نسخة الإنتاج
+npm start
+```
+
+## المتطلبات
+
+- Node.js (الإصدار 18 أو أحدث)
+- npm (الإصدار 9 أو أحدث)
+
+## التحديثات الأخيرة
+
+1. **تحسين نظام المصادقة**:
+   - استبدال localStorage بـ cookies آمنة
+   - تكامل JWT لتوثيق أفضل
+   - تحسين إدارة الجلسات
+
+2. **تحسين الواجهة البصرية**:
+   - إضافة تأثير توهج قوي لشعار "المستقبل"
+   - تحسين التجربة البصرية بتأثيرات حركية متطورة
+
+3. **إصلاح مشاكل التكتيب**:
+   - توحيد أنواع البيانات في واجهات API
+   - تحسين التوافق بين مكونات التطبيق المختلفة
+
+4. **تطوير واجهات API**:
+   - إضافة واجهات API للدورات والامتحانات
+   - تحسين استجابة وأداء الخادم
+
+## المساهمة في المشروع
+
+نرحب بمساهماتكم في تطوير المنصة. يرجى اتباع الخطوات التالية:
+
+1. عمل fork للمشروع
+2. إنشاء فرع جديد للميزة التي تريد إضافتها
+3. تقديم طلب Pull Request مع شرح للتغييرات التي قمت بها
+
+## الترخيص
+
+جميع الحقوق محفوظة © 2025 منصة المستقبل التعليمية
+
+## ⚙️ Environment Variables
+
+### Frontend (.env.local)
+| Variable                      | Description                             | Example/Default                |
+|-------------------------------|-----------------------------------------|-------------------------------|
+| NEXT_PUBLIC_API_URL           | Backend API URL                         | http://localhost:5000         |
+| NEXT_PUBLIC_STRIPE_PUBLIC_KEY | Stripe public key (if using payments)   | pk_test_...                   |
+=======
+# 🎓 منصة تعليمية متكاملة
+## Educational Platform
+
+منصة تعليمية حديثة مبنية بـ **Next.js 14** و **Supabase** و **TypeScript**
+
+![Next.js](https://img.shields.io/badge/Next.js-14-black)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue)
+![Supabase](https://img.shields.io/badge/Supabase-Database-green)
+![TailwindCSS](https://img.shields.io/badge/TailwindCSS-3.0-cyan)
+
+## ✨ المميزات
+
+### 👥 أنواع المستخدمين
+- **الطلاب** - التسجيل في الكورسات ومتابعة التقدم
+- **المدرسين** - إنشاء وإدارة المحتوى التعليمي
+- **المسؤولين** - إدارة كاملة للمنصة
+
+### 📚 الوظائف الأساسية
+- ✅ نظام تسجيل دخول وإنشاء حسابات متكامل مع Supabase
+- ✅ عرض وإدارة الكورسات
+- ✅ نظام التسجيل في الكورسات
+- ✅ متابعة التقدم والإنجازات
+- ✅ نظام النقاط والمستويات
+- ✅ **نظام الشهادات الإلكترونية المعتمدة (جديد!)**
+- ✅ لوحة تحكم للأدمن
+- ✅ **نظام الإشعارات Real-time (جديد!)**
+- ✅ **المكتبة الإلكترونية - رفع وتحميل كتب PDF (جديد!)**
+- ✅ **نظام الدفع بفودافون كاش**
+- ✅ **التقييمات الحقيقية من المستخدمين**
+- ✅ **كل البيانات محفوظة في قاعدة البيانات (لا localStorage)**
+
+## 🚀 البدء السريع
+
+### المتطلبات
+- Node.js 18+ 
+- npm أو yarn
+- حساب Supabase
+
+### التثبيت
+
+1. **استنسخ المشروع**
+```bash
+git clone https://github.com/yourusername/educational-platform.git
+cd educational-platform
+```
+
+2. **ثبت الحزم**
+```bash
+cd frontend
+npm install
+```
+
+3. **إعداد متغيرات البيئة**
+```bash
+cp .env.example .env.local
+```
+
+قم بتحديث `.env.local` بمعلومات Supabase الخاصة بك:
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://wnqifmvgvlmxgswhcwnc.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key_here
+```
+
+4. **إعداد قاعدة البيانات**
+
+افتح Supabase SQL Editor وشغل الملفات بالترتيب:
+```
+sql/add_missing_user_columns.sql
+sql/add_sample_lessons.sql
+sql/final_complete_check.sql
+```
+
+5. **شغل المشروع**
+```bash
+npm run dev
+```
+
+افتح [http://localhost:3000](http://localhost:3000)
+
+## 📁 هيكل المشروع
+
+```
+معتصم/
+├── frontend/               # تطبيق Next.js
+│   ├── src/
+│   │   ├── app/           # صفحات التطبيق
+│   │   ├── components/    # المكونات
+│   │   ├── contexts/      # React Contexts
+│   │   ├── services/      # خدمات API
+│   │   └── lib/          # المكتبات المساعدة
+│   └── public/           # الملفات الثابتة
+├── sql/                  # ملفات قاعدة البيانات
+└── docs/                # التوثيق
+```
+
+## 🔑 حسابات تجريبية
+
+### حساب أدمن
+- **الهاتف:** 01005209667
+- **كلمة المرور:** Ahmed@010052
+
+### حساب مدرس
+- **البريد:** teacher1@test.com
+- **كلمة المرور:** test123
+
+### حساب طالب
+- **البريد:** student1@test.com
+- **كلمة المرور:** test123
+
+## 📊 قاعدة البيانات
+
+### الجداول الرئيسية
+- `users` - المستخدمون
+- `courses` - الكورسات
+- `lessons` - الدروس
+- `course_enrollments` - التسجيلات
+- `payment_requests` - طلبات الدفع
+- `achievements` - الإنجازات
+- `user_achievements` - إنجازات المستخدمين
+- `user_points` - نقاط المستخدمين
+- `certificates` - الشهادات المعتمدة
+- `notifications` - الإشعارات Real-time
+- `library_books` - المكتبة الإلكترونية
+- `reviews` - التقييمات الحقيقية
+- `user_settings` - إعدادات المستخدمين
+- `user_cache` - البيانات المؤقتة (بديل localStorage)
+- `admin_notifications` - إشعارات الأدمن
+
+## 🛠️ التقنيات المستخدمة
+
+- **Frontend:** Next.js 14, React 18, TypeScript
+- **Styling:** TailwindCSS, Framer Motion
+- **Database:** Supabase (PostgreSQL)
+- **Authentication:** Supabase Auth
+- **Icons:** React Icons, Lucide Icons
+- **Forms:** React Hook Form
+- **Notifications:** React Hot Toast
+
+## 📱 الصفحات الرئيسية
+
+- `/` - الصفحة الرئيسية
+- `/courses` - الكورسات
+- `/login` - تسجيل الدخول
+- `/register` - إنشاء حساب
+- `/dashboard` - لوحة التحكم
+- `/profile` - الملف الشخصي
+- `/admin` - لوحة تحكم الأدمن
+- `/library` - المكتبة
+
+## 🔧 الأوامر المفيدة
+
+```bash
+# تشغيل المشروع
+npm run dev
+
+# بناء للإنتاج
+npm run build
+
+# تشغيل الإنتاج
+npm start
+
+# فحص الكود
+npm run lint
+
+# تنسيق الكود
+npm run format
+```
+
+## 📝 الترخيص
+
+MIT
+
+## 👨‍💻 المطور
+
+تم التطوير بواسطة معتصم
+
+## 🤝 المساهمة
+
+نرحب بالمساهمات! يرجى فتح Issue أو Pull Request.
+
+## 📞 الدعم
+
+للمساعدة والاستفسارات، يرجى فتح Issue على GitHub.
+
+---
+
+⭐ إذا أعجبك المشروع، لا تنسى إضافة نجمة على GitHub!
+>>>>>>> baa0ab1d78498e8385735a7f4deae66a0e8de9df

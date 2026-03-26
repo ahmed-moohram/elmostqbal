@@ -1,0 +1,409 @@
+      {/* Modal de Añadir Curso */}
+      {showAddCourseModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden">
+            <div className="flex justify-between items-center p-6 border-b">
+              <h3 className="text-xl font-bold text-gray-800">إضافة دورة جديدة</h3>
+              <button 
+                onClick={() => setShowAddCourseModal(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <FaTimes />
+              </button>
+            </div>
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-10rem)]">
+              <form onSubmit={handleAddCourse}>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="md:col-span-2">
+                    <label className="block text-gray-700 text-sm font-bold mb-2">
+                      عنوان الدورة *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="أدخل عنوان الدورة"
+                      value={newCourse.title}
+                      onChange={(e) => setNewCourse({...newCourse, title: e.target.value})}
+                    />
+                  </div>
+                  
+                  <div className="md:col-span-2">
+                    <label className="block text-gray-700 text-sm font-bold mb-2">
+                      وصف الدورة *
+                    </label>
+                    <textarea
+                      required
+                      className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[100px]"
+                      placeholder="أدخل وصف الدورة"
+                      value={newCourse.description}
+                      onChange={(e) => setNewCourse({...newCourse, description: e.target.value})}
+                    ></textarea>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-gray-700 text-sm font-bold mb-2">
+                      الفئة *
+                    </label>
+                    <select
+                      required
+                      className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      value={newCourse.category}
+                      onChange={(e) => setNewCourse({...newCourse, category: e.target.value})}
+                    >
+                      <option value="" disabled>اختر الفئة</option>
+                      {availableCategories.map(category => (
+                        <option key={category} value={category}>{category}</option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-gray-700 text-sm font-bold mb-2">
+                      المستوى *
+                    </label>
+                    <select
+                      required
+                      className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      value={newCourse.level}
+                      onChange={(e) => setNewCourse({...newCourse, level: e.target.value})}
+                    >
+                      {availableLevels.map(level => (
+                        <option key={level} value={level}>{level}</option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-gray-700 text-sm font-bold mb-2">
+                      السعر *
+                    </label>
+                    <input
+                      type="number"
+                      required
+                      min="0"
+                      step="0.01"
+                      className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="أدخل سعر الدورة"
+                      value={newCourse.price}
+                      onChange={(e) => setNewCourse({...newCourse, price: parseFloat(e.target.value)})}
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-gray-700 text-sm font-bold mb-2">
+                      سعر الخصم (اختياري)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="أدخل سعر الخصم"
+                      value={newCourse.discountPrice !== null ? newCourse.discountPrice : ''}
+                      onChange={(e) => setNewCourse({
+                        ...newCourse, 
+                        discountPrice: e.target.value ? parseFloat(e.target.value) : null
+                      })}
+                    />
+                  </div>
+                  
+                  <div className="flex items-center space-x-4">
+                    <label className="inline-flex items-center">
+                      <input
+                        type="checkbox"
+                        className="form-checkbox h-5 w-5 text-blue-600"
+                        checked={newCourse.isPaid}
+                        onChange={(e) => setNewCourse({...newCourse, isPaid: e.target.checked})}
+                      />
+                      <span className="mr-2 text-gray-700">مدفوع</span>
+                    </label>
+                    
+                    <label className="inline-flex items-center">
+                      <input
+                        type="checkbox"
+                        className="form-checkbox h-5 w-5 text-blue-600"
+                        checked={newCourse.isPublished}
+                        onChange={(e) => setNewCourse({...newCourse, isPublished: e.target.checked})}
+                      />
+                      <span className="mr-2 text-gray-700">منشور</span>
+                    </label>
+                  </div>
+                  
+                  <div className="md:col-span-2">
+                    <label className="block text-gray-700 text-sm font-bold mb-2">
+                      صورة الغلاف
+                    </label>
+                    <div className="border-2 border-dashed border-gray-300 rounded-md p-4 text-center">
+                      <input
+                        type="file"
+                        ref={fileInputRef}
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleThumbnailChange}
+                      />
+                      
+                      {thumbnailPreview ? (
+                        <div className="mb-4">
+                          <img
+                            src={thumbnailPreview}
+                            alt="Course thumbnail preview"
+                            className="max-h-64 mx-auto rounded-md"
+                          />
+                        </div>
+                      ) : (
+                        <div className="text-gray-500 mb-4">
+                          <FaUpload className="mx-auto text-gray-400 text-3xl mb-2" />
+                          <p>اضغط لاختيار صورة</p>
+                        </div>
+                      )}
+                      
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300"
+                      >
+                        {thumbnailPreview ? 'تغيير الصورة' : 'اختيار صورة'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="flex justify-end mt-6 border-t pt-6">
+                  <button
+                    type="button"
+                    onClick={() => setShowAddCourseModal(false)}
+                    className="px-4 py-2 border border-gray-300 rounded-md mr-2 hover:bg-gray-50"
+                  >
+                    إلغاء
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center"
+                    disabled={loading.courses}
+                  >
+                    {loading.courses ? (
+                      <>
+                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        جاري الحفظ...
+                      </>
+                    ) : (
+                      'حفظ الدورة'
+                    )}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Modal de Editar Curso */}
+      {showEditCourseModal && currentCourse && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden">
+            <div className="flex justify-between items-center p-6 border-b">
+              <h3 className="text-xl font-bold text-gray-800">تعديل الدورة</h3>
+              <button 
+                onClick={() => setShowEditCourseModal(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <FaTimes />
+              </button>
+            </div>
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-10rem)]">
+              <form onSubmit={handleEditCourse}>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="md:col-span-2">
+                    <label className="block text-gray-700 text-sm font-bold mb-2">
+                      عنوان الدورة *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="أدخل عنوان الدورة"
+                      value={currentCourse.title}
+                      onChange={(e) => setCurrentCourse({...currentCourse, title: e.target.value})}
+                    />
+                  </div>
+                  
+                  <div className="md:col-span-2">
+                    <label className="block text-gray-700 text-sm font-bold mb-2">
+                      وصف الدورة *
+                    </label>
+                    <textarea
+                      required
+                      className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[100px]"
+                      placeholder="أدخل وصف الدورة"
+                      value={currentCourse.description}
+                      onChange={(e) => setCurrentCourse({...currentCourse, description: e.target.value})}
+                    ></textarea>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-gray-700 text-sm font-bold mb-2">
+                      الفئة *
+                    </label>
+                    <select
+                      required
+                      className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      value={currentCourse.category}
+                      onChange={(e) => setCurrentCourse({...currentCourse, category: e.target.value})}
+                    >
+                      <option value="" disabled>اختر الفئة</option>
+                      {availableCategories.map(category => (
+                        <option key={category} value={category}>{category}</option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-gray-700 text-sm font-bold mb-2">
+                      المستوى *
+                    </label>
+                    <select
+                      required
+                      className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      value={currentCourse.level}
+                      onChange={(e) => setCurrentCourse({...currentCourse, level: e.target.value})}
+                    >
+                      {availableLevels.map(level => (
+                        <option key={level} value={level}>{level}</option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-gray-700 text-sm font-bold mb-2">
+                      السعر *
+                    </label>
+                    <input
+                      type="number"
+                      required
+                      min="0"
+                      step="0.01"
+                      className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="أدخل سعر الدورة"
+                      value={currentCourse.price}
+                      onChange={(e) => setCurrentCourse({...currentCourse, price: parseFloat(e.target.value)})}
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-gray-700 text-sm font-bold mb-2">
+                      سعر الخصم (اختياري)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="أدخل سعر الخصم"
+                      value={currentCourse.discountPrice !== null ? currentCourse.discountPrice : ''}
+                      onChange={(e) => setCurrentCourse({
+                        ...currentCourse, 
+                        discountPrice: e.target.value ? parseFloat(e.target.value) : null
+                      })}
+                    />
+                  </div>
+                  
+                  <div className="flex items-center space-x-4">
+                    <label className="inline-flex items-center">
+                      <input
+                        type="checkbox"
+                        className="form-checkbox h-5 w-5 text-blue-600"
+                        checked={currentCourse.isPaid}
+                        onChange={(e) => setCurrentCourse({...currentCourse, isPaid: e.target.checked})}
+                      />
+                      <span className="mr-2 text-gray-700">مدفوع</span>
+                    </label>
+                    
+                    <label className="inline-flex items-center">
+                      <input
+                        type="checkbox"
+                        className="form-checkbox h-5 w-5 text-blue-600"
+                        checked={currentCourse.isPublished}
+                        onChange={(e) => setCurrentCourse({...currentCourse, isPublished: e.target.checked})}
+                      />
+                      <span className="mr-2 text-gray-700">منشور</span>
+                    </label>
+                  </div>
+                  
+                  <div className="md:col-span-2">
+                    <label className="block text-gray-700 text-sm font-bold mb-2">
+                      صورة الغلاف
+                    </label>
+                    <div className="border-2 border-dashed border-gray-300 rounded-md p-4 text-center">
+                      <input
+                        type="file"
+                        ref={fileInputRef}
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleThumbnailChange}
+                      />
+                      
+                      {thumbnailPreview ? (
+                        <div className="mb-4">
+                          <img
+                            src={thumbnailPreview}
+                            alt="Course thumbnail preview"
+                            className="max-h-64 mx-auto rounded-md"
+                          />
+                        </div>
+                      ) : (
+                        <div className="text-gray-500 mb-4">
+                          <FaUpload className="mx-auto text-gray-400 text-3xl mb-2" />
+                          <p>اضغط لاختيار صورة</p>
+                        </div>
+                      )}
+                      
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300"
+                      >
+                        {thumbnailPreview ? 'تغيير الصورة' : 'اختيار صورة'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="flex justify-end mt-6 border-t pt-6">
+                  <button
+                    type="button"
+                    onClick={() => setShowEditCourseModal(false)}
+                    className="px-4 py-2 border border-gray-300 rounded-md mr-2 hover:bg-gray-50"
+                  >
+                    إلغاء
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center"
+                    disabled={loading.courses}
+                  >
+                    {loading.courses ? (
+                      <>
+                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        جاري الحفظ...
+                      </>
+                    ) : (
+                      'حفظ التغييرات'
+                    )}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+      
+    </AdminLayout>
+  );
+}

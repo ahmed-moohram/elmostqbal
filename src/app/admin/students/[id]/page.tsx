@@ -1,0 +1,476 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
+import AdminLayout from '@/components/AdminLayout';
+import {
+  FaUser, FaPhone, FaEnvelope, FaGraduationCap, FaTrophy,
+  FaArrowLeft, FaChartLine, FaClock, FaCheckCircle, FaStar
+} from 'react-icons/fa';
+import { supabase } from '@/config/supabase';
+import { achievementsService } from '@/services/achievements.service';
+
+export default function StudentDetailsPage() {
+  const params = useParams();
+  const router = useRouter();
+  const studentId = params?.id as string;
+  const [student, setStudent] = useState<any>(null);
+  const [achievements, setAchievements] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [resetLoading, setResetLoading] = useState(false);
+
+  useEffect(() => {
+    fetchStudentDetails();
+  }, [studentId]);
+
+  const fetchStudentDetails = async () => {
+    try {
+      setLoading(true);
+
+      // جلب بيانات الطالب من جدول users في Supabase
+      const { data: userRow, error: userError } = await supabase
+        .from('users')
+        .select(`
+          id,
+          name,
+          email,
+          phone,
+          student_phone,
+          parent_phone,
+          mother_phone,
+          father_name,
+          school_name,
+          city,
+          grade_level,
+          guardian_job,
+          status,
+          created_at
+        `)
+        .eq('id', studentId)
+        .maybeSingle();
+
+      if (userError || !userRow) {
+        console.warn('⚠️ لم يتم العثور على الطالب في Supabase');
+        setStudent(null);
+        setAchievements([]);
+        return;
+      }
+
+      // جلب تقدم الكورسات والإنجازات لكل كورس
+      const courseProgress = await achievementsService.getUserCourseProgress(studentId);
+
+      const courses = (courseProgress || []).map((cp: any) => ({
+        id: cp.course_id,
+        title: cp.course_title,
+        grade: '',
+        progress: cp.progress || 0,
+        lastAccessed: '',
+        timeSpent: 0,
+        completedLessons: cp.completed_lessons || 0,
+        totalLessons: cp.total_lessons || 0,
+      }));
+
+      const totalPoints = (courseProgress || []).reduce(
+        (sum: number, cp: any) => sum + (cp.points_earned || 0),
+        0
+      );
+
+      const mappedStudent = {
+        id: userRow.id,
+        name: userRow.name || 'طالب',
+        grade: userRow.grade_level || '',
+        email: userRow.email || '',
+        phone: userRow.student_phone || (userRow as any).phone || '',
+        parentPhone: userRow.parent_phone || '',
+        motherPhone: (userRow as any).mother_phone || '',
+        fatherName: (userRow as any).father_name || '',
+        schoolName: (userRow as any).school_name || '',
+        city: (userRow as any).city || '',
+        guardianJob: (userRow as any).guardian_job || '',
+        status: (userRow as any).status || 'active',
+        totalPoints,
+        joinDate: userRow.created_at
+          ? new Date(userRow.created_at).toLocaleDateString('ar-EG')
+          : '',
+        isActive: ((userRow as any).status || 'active') === 'active',
+        courses,
+      };
+
+      setStudent(mappedStudent);
+
+      // جلب إنجازات الطالب التفصيلية
+      const userAchievements = await achievementsService.getUserAchievements(studentId);
+
+      const mappedAchievements = (userAchievements || []).map((ua: any) => ({
+        id: ua.id,
+        title: ua.achievement?.title || '',
+        description: ua.achievement?.description || '',
+        courseTitle: ua.course?.title || '',
+        date: ua.earned_at,
+        icon: ua.achievement?.icon || '🏆',
+        points: ua.achievement?.points || 0,
+        earnedAt: ua.earned_at,
+        badge: ua.achievement?.icon || '🏆',
+      }));
+
+      setAchievements(mappedAchievements);
+    } catch (error) {
+      console.error('❌ خطأ في جلب بيانات الطالب من Supabase:', error);
+      setStudent(null);
+      setAchievements([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGenerateResetLink = async () => {
+    if (!studentId) return;
+
+    try {
+      setResetLoading(true);
+
+      const res = await fetch(`/api/admin/users/${studentId}/reset-password-link`, {
+        method: 'POST',
+      });
+
+      const data = await res.json().catch(() => null as any);
+
+      if (!res.ok || !data?.success || !data.link) {
+        console.error('❌ فشل إنشاء رابط إعادة تعيين كلمة المرور:', data?.error);
+
+        if (res.status === 403) {
+          alert('غير مصرح. تأكد أنك مسجل دخول كأدمن.');
+        } else {
+          alert(data?.error || 'فشل إنشاء رابط إعادة تعيين كلمة المرور. الرجاء المحاولة مرة أخرى.');
+        }
+
+        return;
+      }
+
+      const link = data.link as string;
+
+      try {
+        await navigator.clipboard.writeText(link);
+        alert('✅ تم إنشاء رابط إعادة تعيين كلمة المرور ونسخه في الحافظة. يمكنك لصقه وإرساله للطالب.');
+      } catch {
+        // في حال فشل النسخ، نظهر الرابط ليتم نسخه يدويًا
+        // eslint-disable-next-line no-alert
+        window.prompt('تم إنشاء رابط إعادة تعيين كلمة المرور. انسخه وأرسله للطالب:', link);
+      }
+    } catch (error) {
+      console.error('❌ خطأ في إنشاء رابط إعادة تعيين كلمة المرور:', error);
+      alert('حدث خطأ أثناء إنشاء رابط إعادة تعيين كلمة المرور');
+    } finally {
+      setResetLoading(false);
+    }
+  };
+
+  const handleDeleteStudent = async () => {
+    if (!studentId) return;
+
+    if (!window.confirm('هل أنت متأكد من حذف هذا الطالب نهائيًا؟')) return;
+
+    try {
+      const res = await fetch(`/api/admin/users/${studentId}`, {
+        method: 'DELETE',
+      });
+
+      const data = await res.json().catch(() => null as any);
+
+      if (!res.ok || !data?.success) {
+        console.error('❌ فشل حذف الطالب:', data?.errors || data?.error);
+        alert('فشل حذف الطالب. الرجاء المحاولة مرة أخرى.');
+        return;
+      }
+
+      alert('✅ تم حذف الطالب نهائيًا من قاعدة البيانات.');
+      router.push('/admin/all-students');
+    } catch (error) {
+      console.error('❌ خطأ في حذف الطالب:', error);
+      alert('حدث خطأ أثناء حذف الطالب');
+    }
+  };
+
+  if (loading) {
+    return (
+      <AdminLayout>
+        <div className="p-6 flex items-center justify-center min-h-screen">
+          <p className="text-gray-500 text-lg">جاري التحميل...</p>
+        </div>
+      </AdminLayout>
+    );
+  }
+
+  if (!student) {
+    return (
+      <AdminLayout>
+        <div className="p-6">
+          <p className="text-red-500">الطالب غير موجود</p>
+        </div>
+      </AdminLayout>
+    );
+  }
+
+  return (
+    <AdminLayout>
+      <div className="p-6">
+        {/* Header */}
+        <div className="mb-6">
+          <Link
+            href="/admin/users"
+            className="text-primary hover:text-primary-dark flex items-center gap-2 mb-4"
+          >
+            <FaArrowLeft /> رجوع للطلاب
+          </Link>
+          <div className="flex items-center justify-between gap-4">
+            <h1 className="text-3xl font-bold">تفاصيل الطالب</h1>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleGenerateResetLink}
+                disabled={resetLoading}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm disabled:opacity-60"
+              >
+                {resetLoading ? 'جاري إنشاء رابط الباسورد...' : 'إنشاء رابط إعادة تعيين الباسورد'}
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteStudent}
+                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm"
+              >
+                حذف الطالب نهائيًا
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* معلومات الطالب الأساسية */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+          {/* البطاقة الشخصية */}
+          <div className="lg:col-span-1">
+            <div className="bg-gradient-to-br from-primary to-purple-600 rounded-lg p-6 text-white shadow-lg">
+              <div className="flex items-center justify-center mb-4">
+                <div className="w-24 h-24 bg-white text-primary rounded-full flex items-center justify-center text-4xl font-bold">
+                  {student.name.charAt(0)}
+                </div>
+              </div>
+              <h2 className="text-2xl font-bold text-center mb-2">{student.name}</h2>
+              <p className="text-center text-blue-100 mb-4">{student.grade}</p>
+
+              <div className="space-y-3 mt-4">
+                <div className="flex items-center gap-3 bg-white bg-opacity-20 p-3 rounded">
+                  <FaEnvelope />
+                  <div className="text-sm">
+                    <p className="opacity-80">البريد الإلكتروني</p>
+                    <p className="font-medium">{student.email}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 bg-white bg-opacity-20 p-3 rounded">
+                  <FaPhone />
+                  <div className="text-sm">
+                    <p className="opacity-80">رقم الطالب</p>
+                    <p className="font-medium">{student.phone}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 bg-white bg-opacity-20 p-3 rounded">
+                  <FaPhone />
+                  <div className="text-sm">
+                    <p className="opacity-80">رقم ولي الأمر</p>
+                    <p className="font-medium">{student.parentPhone || '—'}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 bg-white bg-opacity-20 p-3 rounded">
+                  <FaPhone />
+                  <div className="text-sm">
+                    <p className="opacity-80">رقم هاتف الأم</p>
+                    <p className="font-medium">{student.motherPhone || '—'}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-4 pt-4 border-t border-white border-opacity-20">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm opacity-80">إجمالي النقاط</span>
+                  <span className="text-2xl font-bold">{student.totalPoints} 🏆</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* الإحصائيات */}
+          <div className="lg:col-span-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+              <div className="bg-blue-50 p-6 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-gray-600 text-sm">الكورسات المسجل فيها</p>
+                    <p className="text-3xl font-bold text-blue-600">{student.courses.length}</p>
+                  </div>
+                  <FaGraduationCap className="text-5xl text-blue-600 opacity-20" />
+                </div>
+              </div>
+
+              <div className="bg-green-50 p-6 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-gray-600 text-sm">إجمالي الإنجازات</p>
+                    <p className="text-3xl font-bold text-green-600">{achievements.length}</p>
+                  </div>
+                  <FaTrophy className="text-5xl text-green-600 opacity-20" />
+                </div>
+              </div>
+
+              <div className="bg-purple-50 p-6 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-gray-600 text-sm">متوسط التقدم</p>
+                    <p className="text-3xl font-bold text-purple-600">
+                      {student.courses.length > 0
+                        ? Math.round(
+                          student.courses.reduce(
+                            (sum: number, c: any) => sum + c.progress,
+                            0
+                          ) / student.courses.length
+                        )
+                        : 0}
+                      %
+                    </p>
+                  </div>
+                  <FaChartLine className="text-5xl text-purple-600 opacity-20" />
+                </div>
+              </div>
+
+              <div className="bg-orange-50 p-6 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-gray-600 text-sm">الوقت المستغرق</p>
+                    <p className="text-3xl font-bold text-orange-600">
+                      {Math.round(student.courses.reduce((sum: number, c: any) => sum + c.timeSpent, 0) / 60)}h
+                    </p>
+                  </div>
+                  <FaClock className="text-5xl text-orange-600 opacity-20" />
+                </div>
+              </div>
+            </div>
+
+            {/* الحالة */}
+            <div className="bg-white rounded-lg shadow p-6">
+              <h3 className="font-bold text-lg mb-4">معلومات إضافية</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-gray-600 text-sm">تاريخ الانضمام</p>
+                  <p className="font-medium">{student.joinDate}</p>
+                </div>
+                <div>
+                  <p className="text-gray-600 text-sm">الحالة</p>
+                  <span
+                    className={`px-3 py-1 rounded text-sm font-medium ${student.isActive
+                        ? 'bg-green-100 text-green-800'
+                        : 'bg-gray-100 text-gray-800'
+                      }`}
+                  >
+                    {student.isActive ? 'نشط' : 'غير نشط'}
+                  </span>
+                </div>
+                <div>
+                  <p className="text-gray-600 text-sm">المدرسة</p>
+                  <p className="font-medium">{student.schoolName || 'غير محددة'}</p>
+                </div>
+                <div>
+                  <p className="text-gray-600 text-sm">المدينة</p>
+                  <p className="font-medium">{student.city || 'غير محددة'}</p>
+                </div>
+                <div>
+                  <p className="text-gray-600 text-sm">وظيفة ولي الأمر</p>
+                  <p className="font-medium">{student.guardianJob || 'غير محددة'}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* الكورسات */}
+        <div className="bg-white rounded-lg shadow p-6 mb-6">
+          <h3 className="font-bold text-xl mb-4 flex items-center gap-2">
+            <FaGraduationCap className="text-primary" />
+            الكورسات ({student.courses.length})
+          </h3>
+          <div className="space-y-4">
+            {student.courses.map((course: any) => (
+              <div key={course.id} className="border rounded-lg p-6 hover:shadow-md transition-shadow">
+                <div className="flex justify-between items-start mb-4">
+                  <div>
+                    <h4 className="font-bold text-lg">{course.title}</h4>
+                    <p className="text-sm text-gray-600">آخر دخول: {course.lastAccessed}</p>
+                  </div>
+                  <span className="bg-primary text-white px-3 py-1 rounded font-bold">
+                    {course.grade}
+                  </span>
+                </div>
+
+                {/* Progress Bar */}
+                <div className="mb-4">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-sm font-medium">التقدم</span>
+                    <span className="text-sm font-bold text-primary">{course.progress}%</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-3">
+                    <div
+                      className="bg-gradient-to-r from-primary to-purple-600 h-3 rounded-full transition-all duration-500"
+                      style={{ width: `${course.progress}%` }}
+                    ></div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-4 text-center">
+                  <div className="bg-blue-50 p-3 rounded">
+                    <p className="text-2xl font-bold text-blue-600">{course.completedLessons}/{course.totalLessons}</p>
+                    <p className="text-xs text-gray-600">الدروس المكتملة</p>
+                  </div>
+                  <div className="bg-green-50 p-3 rounded">
+                    <p className="text-2xl font-bold text-green-600">{Math.round(course.timeSpent / 60)}h</p>
+                    <p className="text-xs text-gray-600">الوقت المستغرق</p>
+                  </div>
+                  <div className="bg-purple-50 p-3 rounded">
+                    <p className="text-2xl font-bold text-purple-600">{course.progress}%</p>
+                    <p className="text-xs text-gray-600">نسبة الإنجاز</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* الإنجازات */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <h3 className="font-bold text-xl mb-4 flex items-center gap-2">
+            <FaTrophy className="text-yellow-500" />
+            الإنجازات ({achievements.length})
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {achievements.map((achievement: any) => (
+              <div key={achievement.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
+                <div className="flex items-start gap-3">
+                  <div className="text-4xl">{achievement.badge}</div>
+                  <div className="flex-1">
+                    <h4 className="font-bold mb-1">{achievement.title}</h4>
+                    <p className="text-sm text-gray-600 mb-2">{achievement.description}</p>
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs bg-gray-100 px-2 py-1 rounded">{achievement.courseTitle}</span>
+                      <span className="text-sm font-bold text-yellow-600">+{achievement.points} نقطة</span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-2">{achievement.earnedAt}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </AdminLayout>
+  );
+}
