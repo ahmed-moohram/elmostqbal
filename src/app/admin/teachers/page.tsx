@@ -235,7 +235,7 @@ export default function AdminTeachersPage() {
     });
 
   const handleDeleteTeacher = async (id: string) => {
-    if (!window.confirm('هل أنت متأكد من حذف هذا المدرس؟')) return;
+    if (!window.confirm('هل أنت متأكد من حذف هذا المدرس؟ سيتم حذف جميع بياناته وكورساته.')) return;
 
     try {
       const res = await fetch(`/api/admin/users/${id}`, {
@@ -244,17 +244,24 @@ export default function AdminTeachersPage() {
 
       const data = await res.json().catch(() => null as any);
 
-      if (!res.ok || !data?.success) {
-        console.error('❌ فشل حذف المدرس:', data?.errors || data?.error);
-        alert('فشل حذف المدرس. الرجاء المحاولة مرة أخرى.');
+      if (!data?.success) {
+        const errMsg = data?.error || 'فشل حذف المدرس، الرجاء المحاولة مرة أخرى';
+        console.error('❌ فشل حذف المدرس:', data);
+        alert(errMsg);
         return;
+      }
+
+      // نجح الحذف (قد تكون هناك تحذيرات غير فادحة)
+      if (data?.warnings?.length) {
+        console.warn('⚠️ تحذيرات أثناء الحذف:', data.warnings);
       }
 
       setTeachers(prev => prev.filter(teacher => teacher.id !== id));
       console.log('✅ تم حذف المدرس نهائيًا من قاعدة البيانات');
+      alert('تم حذف المدرس بنجاح ✅');
     } catch (error) {
       console.error('❌ خطأ في حذف المدرس:', error);
-      alert('حدث خطأ أثناء حذف المدرس');
+      alert('حدث خطأ في الاتصال بالخادم');
     }
   };
 
