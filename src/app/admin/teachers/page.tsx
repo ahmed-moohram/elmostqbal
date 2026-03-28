@@ -235,7 +235,7 @@ export default function AdminTeachersPage() {
     });
 
   const handleDeleteTeacher = async (id: string) => {
-    if (!window.confirm('هل أنت متأكد من حذف هذا المدرس؟')) return;
+    if (!window.confirm('هل أنت متأكد من حذف هذا المدرس؟ سيتم حذف جميع بياناته وكورساته.')) return;
 
     try {
       const res = await fetch(`/api/admin/users/${id}`, {
@@ -244,17 +244,24 @@ export default function AdminTeachersPage() {
 
       const data = await res.json().catch(() => null as any);
 
-      if (!res.ok || !data?.success) {
-        console.error('❌ فشل حذف المدرس:', data?.errors || data?.error);
-        alert('فشل حذف المدرس. الرجاء المحاولة مرة أخرى.');
+      if (!data?.success) {
+        const errMsg = data?.error || 'فشل حذف المدرس، الرجاء المحاولة مرة أخرى';
+        console.error('❌ فشل حذف المدرس:', data);
+        alert(errMsg);
         return;
+      }
+
+      // نجح الحذف (قد تكون هناك تحذيرات غير فادحة)
+      if (data?.warnings?.length) {
+        console.warn('⚠️ تحذيرات أثناء الحذف:', data.warnings);
       }
 
       setTeachers(prev => prev.filter(teacher => teacher.id !== id));
       console.log('✅ تم حذف المدرس نهائيًا من قاعدة البيانات');
+      alert('تم حذف المدرس بنجاح ✅');
     } catch (error) {
       console.error('❌ خطأ في حذف المدرس:', error);
-      alert('حدث خطأ أثناء حذف المدرس');
+      alert('حدث خطأ في الاتصال بالخادم');
     }
   };
 
@@ -422,16 +429,16 @@ export default function AdminTeachersPage() {
                   transition={{ duration: 0.3 }}
                   className="hover:bg-gray-50 dark:hover:bg-gray-750"
                 >
-                  <td className="px-4 py-3">
-                    <div className="relative w-10 h-10 rounded-full overflow-hidden">
-                      <Image 
-                        src={teacher.image || '/placeholder-avatar.png'} 
-                        alt={teacher.name}
-                        fill
-                        className="object-cover"
-                      />
-                    </div>
-                  </td>
+                    <td className="px-4 py-3">
+                      <div className="relative w-10 h-10 rounded-full overflow-hidden">
+                        <img 
+                          src={teacher.image && teacher.image !== '/placeholder-avatar.png' ? teacher.image : '/placeholder-avatar.png'} 
+                          alt={teacher.name}
+                          className="w-full h-full object-cover"
+                          onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder-avatar.png'; }}
+                        />
+                      </div>
+                    </td>
                   <td className="px-4 py-3 text-sm text-gray-800 dark:text-gray-200 font-medium">{teacher.name}</td>
                   <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">{teacher.specialty}</td>
                   <td className="px-4 py-3">
@@ -508,7 +515,7 @@ export default function AdminTeachersPage() {
                         رفع صورة
                       </button>
                       <Link 
-                        href={`/admin/teachers/${teacher.id}`}
+                        href={`/teachers/${teacher.id}`}
                         className="text-primary hover:text-primary-700"
                       >
                         عرض

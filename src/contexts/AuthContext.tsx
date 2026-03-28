@@ -278,6 +278,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.log('🔄 الاتصال بـ Supabase (مشروع chikf)...');
       
       // البحث عن المستخدم في جدول users
+      // نستخدم .limit(1) بدلاً من .single() لتجنب خطأ "multiple rows returned"
       console.log('🔍 البحث عن المستخدم برقم:', phone);
       const tryWithPhoneColumn = async () =>
         supabase
@@ -286,25 +287,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           .or(
             `phone.eq.${phone},student_phone.eq.${phone},parent_phone.eq.${phone},mother_phone.eq.${phone},email.eq.${phone}`
           )
-          .single();
+          .limit(1);
 
       const tryWithoutPhoneColumn = async () =>
         supabase
           .from('users')
           .select('*')
           .or(`student_phone.eq.${phone},parent_phone.eq.${phone},mother_phone.eq.${phone},email.eq.${phone}`)
-          .single();
+          .limit(1);
 
-      let { data: user, error } = await tryWithPhoneColumn();
+      let { data: rows, error } = await tryWithPhoneColumn();
 
       if (error && typeof error.message === 'string' && error.message.toLowerCase().includes('phone')) {
-        ({ data: user, error } = await tryWithoutPhoneColumn());
+        ({ data: rows, error } = await tryWithoutPhoneColumn());
       }
+
+      // استخراج أول صف من النتيجة
+      const user = Array.isArray(rows) ? (rows[0] || null) : null;
       
-      console.log('📊 نتيجة البحث:', { user, error });
+      console.log('📊 نتيجة البحث:', { user, error, rowsCount: Array.isArray(rows) ? rows.length : 0 });
       
       if (error || !user) {
-        console.log('❌ المستخدم غير موجود');
+        console.log('❌ المستخدم غير موجود أو حدث خطأ');
         return { success: false, error: 'رقم الهاتف أو كلمة المرور غير صحيحة' };
       }
       

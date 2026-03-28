@@ -9,17 +9,20 @@ const nextConfig = {
     },
     images: {
         formats: ['image/avif', 'image/webp'],
-        remotePatterns: [{
+        dangerouslyAllowSVG: true,
+        contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
+        remotePatterns: [
+            {
                 protocol: 'https',
-                hostname: 'chikfjvpkqtivtyhvvzt.supabase.co', // ✅ Supabase فقط (المشروع الجديد)
+                hostname: 'chikfjvpkqtivtyhvvzt.supabase.co',
             },
             {
                 protocol: 'https',
-                hostname: '**.supabase.co', // ✅ أي Supabase subdomain
+                hostname: '**.supabase.co',
             },
             {
                 protocol: 'https',
-                hostname: 'images.unsplash.com', // ✅ صور من Unsplash
+                hostname: 'images.unsplash.com',
             },
         ],
     },

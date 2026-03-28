@@ -386,12 +386,11 @@ export default function Home() {
                   className="group relative rounded-3xl overflow-hidden bg-gray-900/5 dark:bg-gray-800/40 border border-gray-200/50 dark:border-gray-700/50 shadow-xl hover:shadow-2xl hover:-translate-y-4 hover:scale-[1.03] transition-all duration-500 ease-out h-96 course-card"
                 >
                   {/* صورة المدرس تغطي الكارت بالكامل */}
-                  <Image
-                    src={teacher.avatar || '/placeholder-avatar.png'}
+                  <img
+                    src={teacher.avatar && !teacher.avatar.includes('placeholder') ? teacher.avatar : '/placeholder-avatar.png'}
                     alt={teacher.name}
-                    fill
-                    sizes="(min-width: 1024px) 25vw, (min-width: 768px) 33vw, 100vw"
-                    className="object-cover transform filter brightness-[1.02] saturate-[1.05] group-hover:scale-110 group-hover:brightness-115 group-hover:saturate-130 transition-transform duration-700 ease-out"
+                    className="absolute inset-0 w-full h-full object-cover transform filter brightness-[1.02] saturate-[1.05] group-hover:scale-110 group-hover:brightness-115 group-hover:saturate-130 transition-transform duration-700 ease-out"
+                    onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder-avatar.png'; }}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/22 to-transparent group-hover:from-black/55 group-hover:via-black/12 transition-colors duration-700 ease-out" />
 

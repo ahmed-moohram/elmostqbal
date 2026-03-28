@@ -127,13 +127,12 @@ export async function middleware(request: NextRequest) {
     /select.*from/gi,    // SQL injection
   ];
 
+  // فحص الـ URL فقط بدون قراءة الـ body (قراءة body تستهلكه وتسبب 404 على RSC requests)
   const requestUrl = request.url;
-  const requestBody = await request.text().catch(() => '');
   
   for (const pattern of suspiciousPatterns) {
-    if (pattern.test(requestUrl) || pattern.test(requestBody)) {
-      // Log security event (would connect to database in production)
-      console.error(`🚨 Security Alert: Suspicious pattern detected from IP ${ip}`);
+    if (pattern.test(requestUrl)) {
+      console.error(`🚨 Security Alert: Suspicious pattern in URL from IP ${ip}`);
       
       return new NextResponse(
         JSON.stringify({
