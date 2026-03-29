@@ -53,7 +53,9 @@ export default function LiveSessionsPage() {
       
       if (response.ok) {
         const data = await response.json();
-        setSessions(data.data);
+        // تأمين البيانات - API قد يرجع مصفوفة مباشرة أو { data: [] }
+        const sessionsArray = Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : [];
+        setSessions(sessionsArray);
       }
     } catch (error) {
       console.error('Error fetching sessions:', error);

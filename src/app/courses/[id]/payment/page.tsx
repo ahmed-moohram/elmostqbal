@@ -58,7 +58,7 @@ export default function PaymentPage() {
           .from('courses')
           .select('id, title, price, discount_price, thumbnail')
           .eq('id', courseId)
-          .single();
+          .maybeSingle();
 
         if (!error && courseData) {
           setCourse({

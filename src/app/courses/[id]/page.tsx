@@ -403,7 +403,7 @@ function CoursePage() {
         .from('courses')
         .select('*')
         .eq('id', courseId)
-        .single();
+        .maybeSingle();
       
       console.log('📊 نتيجة البحث:', { 
         found: !!courseData, 
@@ -413,26 +413,19 @@ function CoursePage() {
       });
       
       if (fetchError) {
-        if (fetchError.code === 'PGRST116') {
-          console.error('⚠️ لم يتم العثور على كورس بهذا الـ ID:', courseId);
-          
-          // محاولة جلب أول 3 كورسات للتأكد من الاتصال
-          const { data: testCourses } = await supabase
-            .from('courses')
-            .select('id, title')
-            .limit(3);
-          
-          console.log('📋 كورسات موجودة كمثال:', testCourses);
-          throw new Error(`الكورس غير موجود. ID المطلوب: ${courseId}`);
-        } else {
-          console.error('❌ خطأ في قاعدة البيانات:', fetchError);
-          throw new Error('خطأ في الاتصال بقاعدة البيانات');
-        }
+        console.error('❌ خطأ في قاعدة البيانات:', fetchError);
+        throw new Error('خطأ في الاتصال بقاعدة البيانات');
       }
       
       if (!courseData) {
-        console.error('⚠️ لا توجد بيانات للكورس');
-        throw new Error('الكورس غير موجود');
+        console.error('⚠️ لم يتم العثور على كورس بهذا الـ ID:', courseId);
+        // محاولة جلب أول 3 كورسات للتأكد من الاتصال
+        const { data: testCourses } = await supabase
+          .from('courses')
+          .select('id, title')
+          .limit(3);
+        console.log('📋 كورسات موجودة كمثال:', testCourses);
+        throw new Error(`الكورس غير موجود. ID المطلوب: ${courseId}`);
       }
       
       console.log('✅ تم جلب بيانات الكورس:', courseData);
