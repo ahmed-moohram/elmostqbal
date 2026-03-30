@@ -1,204 +1,102 @@
-# 📊 **تقرير الفحص الشامل للمنصة التعليمية**
+# 📊 تقرير الفحص الشامل – منصة المستقبل التعليمية
 
-**التاريخ:** 2024-11-09  
-**الحالة:** يحتاج لبعض الإصلاحات  
+**التاريخ:** 2026-03-30 | **الموقع:** https://elmostqbal.vercel.app
 
 ---
 
-## 🚨 **المشاكل الحرجة (الأولوية القصوى)**
+## 🟢 الصفحات التي تعمل بشكل ممتاز
 
-### 1️⃣ **ملف البيئة `.env` مفقود**
-- **المشكلة:** لا يوجد ملف `.env` في المشروع
-- **التأثير:** لن تعمل الاتصالات مع Supabase أو APIs
-- **الحل:**
-```bash
-# إنشاء ملف .env في مجلد frontend
-cp .env.example .env
+| الصفحة | الرابط | النتيجة |
+|---|---|---|
+| الصفحة الرئيسية | `/` | ✅ صور المدرسين تظهر، لا 422/404 |
+| تسجيل الدخول | `/login` | ✅ يعمل (form + validation) |
+| التسجيل | `/register` | ✅ نموذج 3 خطوات يعمل |
+| الكورسات | `/courses` | ✅ 8 دورات من Supabase |
+| صفحة الكورس الواحد | `/courses/[id]` | ✅ تعرض الاسم والدروس وزر الاشتراك |
+| نسيت كلمة المرور | `/forgot-password` | ✅ تعمل |
+| المكتبة | `/library` | ✅ تفتح (لا توجد كتب حالياً) |
+| الإشعارات | `/notifications` | ✅ تعمل |
+| الرسائل | `/messages` | ✅ تعمل |
+| صفحة المدرس | `/teachers/[id]` | ✅ لا 404 بعد إصلاح middleware |
+| الدروس المباشرة | `/live-sessions` | ✅ مُصلَح (كان ينهار) |
+
+## 🔒 صفحات محمية – تعيد للـ login بشكل صحيح
+
+| الصفحة | الرابط |
+|---|---|
+| لوحة الأدمن | `/admin` |
+| الملف الشخصي | `/profile` |
+| لوحة الطالب | `/student/dashboard` |
+| لوحة عامة | `/dashboard` |
+| الشهادات | `/certificates` |
+| الإعدادات | `/settings` |
+
+## 🔴 صفحات بها مشكلة (تم الإصلاح أو تحتاج تدخل)
+
+| الصفحة | المشكلة | الحالة |
+|---|---|---|
+| `/verify-email` | 404 – الصفحة غير موجودة | ⚠️ غير مُنشأة |
+| `/reset-password` | 404 – الصفحة غير موجودة | ⚠️ غير مُنشأة |
+| `/messages` | لا تعيد للـ login تلقائياً | ⚠️ مشكلة بسيطة |
+
+## ❓ صفحات لم يتم اختبارها (تتطلب login حقيقي بالمتصفح)
+
+| الصفحة | السبب |
+|---|---|
+| `/admin/teachers` | يتطلب دخول كأدمن |
+| `/admin/students` | يتطلب دخول كأدمن |
+| `/admin/courses` | يتطلب دخول كأدمن |
+| `/admin/payments` | يتطلب دخول كأدمن |
+| `/admin/payment-requests` | يتطلب دخول كأدمن |
+| `/teacher/dashboard` | يتطلب دخول كمدرس |
+| `/courses/[id]/learn` | يتطلب اشتراك في كورس |
+| `/courses/[id]/payment` | يتطلب تسجيل الدخول |
+
+---
+
+## 🔧 الإصلاحات المطبّقة في الجلسات الأخيرة (9 إصلاحات)
+
+| الملف | المشكلة | الإصلاح |
+|---|---|---|
+| `src/middleware.ts` | `request.text()` → RSC 404 | حذف `request.text()` |
+| `src/contexts/AuthContext.tsx` | `.single()` → "multiple rows" | استبدال بـ `.limit(1)` |
+| `src/app/page.tsx` | placeholder Image → 422 | استبدال بـ `<img>` |
+| `src/app/teachers/[id]/page.tsx` | placeholder Image → 422 | استبدال بـ `<img>` |
+| `src/app/admin/teachers/page.tsx` | رابط عرض → `/admin/teachers/[id]` 404 | تصحيح → `/teachers/[id]` |
+| `src/app/api/admin/users/[id]/route.ts` | FK constraints تمنع الحذف | حذف الكورسات أولاً |
+| `src/app/courses/[id]/page.tsx` | `.single()` → PGRST116 | → `.maybeSingle()` |
+| `src/app/courses/[id]/payment/page.tsx` | `.single()` خطر | → `.maybeSingle()` |
+| `src/app/live-sessions/page.tsx` | `undefined.filter()` crash | تأمين بـ `Array.isArray()` |
+
+---
+
+## 🗑️ ملفات مؤقتة حُذفت (12 ملف)
+
 ```
-
-### 2️⃣ **متغيرات البيئة الناقصة**
-```env
-# يجب إضافتها في .env:
-NEXT_PUBLIC_SUPABASE_URL=https://wnqifmvgvlmxgswhcwnc.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InducWlmbXZndmxteGdzd2hjd25jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI0MzYwNTUsImV4cCI6MjA3ODAxMjA1NX0.LqWhTZYmr7nu-dIy2uBBqntOxoWM-waluYIR9bipC9M
-SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InducWlmbXZndmxteGdzd2hjd25jIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MjQzNjA1NSwiZXhwIjoyMDc4MDEyMDU1fQ.OlrWLS7bjUqVh7rarNxa3cX9XrV-n-O24aiMvCs5sCU
-JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
-DATABASE_URL=postgresql://postgres:password@db.wnqifmvgvlmxgswhcwnc.supabase.co:5432/postgres
-```
-
----
-
-## ⚠️ **المشاكل المتوسطة**
-
-### 3️⃣ **وظائف غير مكتملة (TODOs)**
-| الملف | المشكلة | الأولوية |
-|-------|---------|---------|
-| `/api/payment-request/route.ts` | لا يحفظ `approved_by` عند الموافقة | متوسط |
-| `/reset-password/[token]/page.tsx` | صفحة إعادة تعيين كلمة المرور غير مكتملة | متوسط |
-| `/forgot-password/page.tsx` | آلية استعادة كلمة المرور غير مكتملة | متوسط |
-| `/teachers/courses/create/page.tsx` | إنشاء الكورسات للمدرسين | متوسط |
-| `/teachers/dashboard/page.tsx` | لوحة تحكم المدرس | متوسط |
-
-### 4️⃣ **مكونات ناقصة أو غير مكتملة**
-- **نظام الإشعارات:** يحتاج لتفعيل real-time notifications
-- **نظام الرسائل:** `/messages` موجود لكن غير مكتمل
-- **نظام الشهادات:** `/certificates` يحتاج للتطوير
-- **البث المباشر:** `/live-sessions` يحتاج للتكامل
-
----
-
-## ✅ **ما يعمل بشكل ممتاز**
-
-### الأنظمة الجاهزة:
-1. **نظام التسجيل والدخول** ✅
-2. **نظام الدفع (Vodafone Cash)** ✅
-3. **إدارة الكورسات** ✅
-4. **لوحة تحكم الأدمن** ✅
-5. **نظام الأمان (Middleware)** ✅
-6. **قاعدة البيانات (Supabase)** ✅
-
----
-
-## 🔧 **التحسينات المقترحة**
-
-### 5️⃣ **الأداء والتحسين**
-- تفعيل Redis للـ caching
-- إضافة CDN للملفات الثابتة
-- تحسين lazy loading للصور
-- إضافة Service Workers للـ offline mode
-
-### 6️⃣ **الأمان**
-- تفعيل 2FA للحسابات الحساسة
-- إضافة Captcha للنماذج
-- تشفير البيانات الحساسة
-- إضافة audit logs
-
-### 7️⃣ **تجربة المستخدم**
-- إضافة onboarding tour للمستخدمين الجدد
-- تحسين رسائل الخطأ
-- إضافة dark mode كامل
-- تحسين الـ responsive design
-
----
-
-## 📝 **خطة الإصلاح السريع**
-
-### الخطوة 1: إنشاء ملف البيئة
-```bash
-cd frontend
-touch .env
-```
-
-### الخطوة 2: إضافة المتغيرات
-```env
-# Supabase
-NEXT_PUBLIC_SUPABASE_URL=https://wnqifmvgvlmxgswhcwnc.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InducWlmbXZndmxteGdzd2hjd25jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI0MzYwNTUsImV4cCI6MjA3ODAxMjA1NX0.LqWhTZYmr7nu-dIy2uBBqntOxoWM-waluYIR9bipC9M
-SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InducWlmbXZndmxteGdzd2hjd25jIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MjQzNjA1NSwiZXhwIjoyMDc4MDEyMDU1fQ.OlrWLS7bjUqVh7rarNxa3cX9XrV-n-O24aiMvCs5sCU
-
-# JWT
-JWT_SECRET=your-super-secret-jwt-key-2024
-
-# Database
-DATABASE_URL=postgresql://postgres:password@db.wnqifmvgvlmxgswhcwnc.supabase.co:5432/postgres
-
-# NextAuth
-NEXTAUTH_URL=http://localhost:3000
-NEXTAUTH_SECRET=your-nextauth-secret-2024
-
-# API
-NEXT_PUBLIC_API_URL=http://localhost:3000/api
-
-# Vodafone Cash
-NEXT_PUBLIC_VODAFONE_NUMBER=01070333143
-NEXT_PUBLIC_VODAFONE_NAME=MR
-
-# App
-NEXT_PUBLIC_APP_NAME=المنصة التعليمية
-NEXT_PUBLIC_APP_URL=http://localhost:3000
-
-# Node Environment
-NODE_ENV=development
-```
-
-### الخطوة 3: إصلاح المكونات الناقصة
-```typescript
-// إصلاح approved_by في payment-request
-const adminId = // get from session/context
-updateData.approved_by = adminId;
+src/app/admin/page.tsx.clean/2/3/4/final/new
+src/app/courses/[id]/page.tsx.fixed/new/temp + page_fixed.tsx
+src/components/admin/AdvancedDashboard.tsx.fixed
+src/components/NightSkyEffect.tsx.new
 ```
 
 ---
 
-## 📊 **إحصائيات المنصة**
+## ⚙️ ملاحظات تقنية
 
-| المكون | الحالة | النسبة |
-|--------|--------|--------|
-| **Frontend** | جاهز | 90% |
-| **Backend APIs** | جاهز | 85% |
-| **Database** | جاهز | 95% |
-| **Security** | جيد | 85% |
-| **Performance** | متوسط | 70% |
-| **Documentation** | ناقص | 60% |
-
----
-
-## 🎯 **الأولويات**
-
-### يجب الآن:
-1. ✅ إنشاء ملف `.env`
-2. ✅ إضافة المتغيرات المطلوبة
-3. ✅ اختبار الاتصال بـ Supabase
-
-### هذا الأسبوع:
-1. إكمال نظام استعادة كلمة المرور
-2. إصلاح TODOs في payment-request
-3. تحسين error handling
-
-### هذا الشهر:
-1. إضافة نظام الإشعارات real-time
-2. تطوير نظام الشهادات
-3. إضافة analytics dashboard
+| النقطة | التفاصيل |
+|---|---|
+| Vercel branch | متصل بـ `main` (وليس `master`) |
+| `.single()` | لم يتبق في الكود – كل الكود مؤمّن |
+| `request.text()` | محذوف من middleware |
+| `SUPABASE_SERVICE_ROLE_KEY` | يجب وجوده في Vercel → Environment Variables |
+| `.env.local` محلي | غير موجود – الاختبار المحلي يعتمد على Vercel |
 
 ---
 
-## ✨ **نقاط القوة**
+## 📋 المهام المقترحة للمستقبل
 
-1. **البنية التحتية:** ممتازة ومنظمة
-2. **الأمان:** middleware قوي وحماية جيدة
-3. **قاعدة البيانات:** مصممة بشكل احترافي
-4. **UI/UX:** جميل ومتجاوب
-5. **الكود:** نظيف ومنظم
-
----
-
-## 💡 **التوصيات النهائية**
-
-### للإطلاق السريع:
-1. **أنشئ ملف `.env` فوراً**
-2. **اختبر كل الصفحات الرئيسية**
-3. **تأكد من عمل نظام الدفع**
-4. **فعّل SSL في الإنتاج**
-
-### للتطوير المستمر:
-1. **أضف unit tests**
-2. **استخدم CI/CD**
-3. **راقب الأداء بـ monitoring tools**
-4. **احتفظ بـ backups منتظمة**
-
----
-
-## 🚀 **الخلاصة**
-
-**المنصة جاهزة بنسبة 85%** وتحتاج فقط لـ:
-- ✅ ملف `.env` (حرج)
-- ✅ إكمال بعض الوظائف الثانوية
-- ✅ تحسينات في الأداء
-
-**يمكن إطلاقها بعد إصلاح المشاكل الحرجة!**
-
----
-
-**تم الفحص بواسطة:** Cascade AI  
-**التاريخ:** 2024-11-09  
-**النتيجة:** المنصة قوية وتحتاج لإصلاحات بسيطة
+1. **إنشاء صفحة `/reset-password`** – حالياً 404
+2. **إنشاء صفحة `/verify-email`** – حالياً 404
+3. **حماية `/messages`** بـ auth guard مثل بقية الصفحات
+4. **اختبار لوحات الأدمن كاملة** بعد تسجيل دخول يدوي
+5. **اختبار عملية الدفع** من أول الكورس لآخر التسجيل
